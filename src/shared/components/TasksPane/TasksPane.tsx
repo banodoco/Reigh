@@ -307,6 +307,13 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       setIsTasksPaneLocked(willBeLocked);
       setIsTasksPaneOpenProgrammatic(willBeLocked);
     },
+    programmaticOpen: isTasksPaneOpenProgrammatic,
+    // Sync context state when pane closes via internal mechanisms (hover timeout, etc.)
+    onOpenChange: (open) => {
+      if (!open && isTasksPaneOpenProgrammatic) {
+        setIsTasksPaneOpenProgrammatic(false);
+      }
+    },
   });
   
   // Delay pointer events until animation completes to prevent tap bleed-through on mobile

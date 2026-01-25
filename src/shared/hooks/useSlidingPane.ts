@@ -8,10 +8,20 @@ interface UseSlidingPaneOptions {
   isLocked: boolean;
   onToggleLock: () => void;
   additionalRefs?: React.RefObject<HTMLElement>[];
+  /** External programmatic open state - when true, pane opens even if not locked */
+  programmaticOpen?: boolean;
+  /** Callback when pane open state changes (e.g., from hover timeout) */
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
-export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }: UseSlidingPaneOptions) => {
-  const [isOpen, setIsOpen] = useState(isLocked);
+export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs, programmaticOpen, onOpenChange }: UseSlidingPaneOptions) => {
+  const [isOpen, setIsOpenInternal] = useState(isLocked || programmaticOpen);
+
+  // Wrapper that also notifies parent of state changes
+  const setIsOpen = useCallback((open: boolean) => {
+    setIsOpenInternal(open);
+    onOpenChange?.(open);
+  }, [onOpenChange]);
   const leaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const paneRef = useRef<HTMLDivElement | null>(null);
   const isMobile = useIsMobile();
@@ -35,19 +45,21 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
     }
 
     setIsOpen(open);
-  }, [isLocked, side, isSmallMobile]);
+  }, [isLocked, isSmallMobile, setIsOpen]);
 
-  // Sync open state with lock state (all devices including mobile)
+  // Sync open state with lock state AND programmatic open state
   // Using useLayoutEffect to ensure state updates synchronously before paint
-  // This prevents visual glitches when lock state changes from external sources (like MediaLightbox)
+  // This prevents visual glitches when state changes from external sources (like MediaLightbox)
+  // NOTE: Use setIsOpenInternal here (not setIsOpen) to avoid notifying parent of changes
+  // that originated from parent - that would create a feedback loop
   useLayoutEffect(() => {
-    // Locked panes are always open, unlocked panes close
-    if (isLocked) {
-      setIsOpen(true);
+    // Open if locked OR programmatically opened
+    if (isLocked || programmaticOpen) {
+      setIsOpenInternal(true);
     } else {
-      setIsOpen(false);
+      setIsOpenInternal(false);
     }
-  }, [isLocked]);
+  }, [isLocked, programmaticOpen]);
 
   // Close pane on route change (small phones only)
   useEffect(() => {

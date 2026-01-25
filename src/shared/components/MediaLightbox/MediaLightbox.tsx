@@ -2941,7 +2941,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
             >
               <TooltipProvider delayDuration={300}>
-                {/* Task count button - opens the pane */}
+                {/* Task pane toggle - shows count, click to toggle open/close */}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -2950,18 +2950,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       onPointerUp={(e) => {
                         e.stopPropagation();
                         e.preventDefault();
-                        // Toggle pane open state (programmatic open for desktop)
+                        // Toggle pane open state
                         setTasksPaneOpenContext(!effectiveTasksPaneOpen);
                       }}
                       onClick={(e) => e.stopPropagation()}
                       className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-                      aria-label={`${cancellableTaskCount} active tasks - click to ${effectiveTasksPaneOpen ? 'close' : 'open'}`}
+                      aria-label={`${cancellableTaskCount} tasks - click to ${effectiveTasksPaneOpen ? 'close' : 'open'}`}
                     >
                       <span className="text-xs font-light">{cancellableTaskCount}</span>
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="left" className="text-xs">
-                    {`${cancellableTaskCount} active task${cancellableTaskCount === 1 ? '' : 's'}`}
+                    {`${cancellableTaskCount} task${cancellableTaskCount === 1 ? '' : 's'} - click to ${effectiveTasksPaneOpen ? 'close' : 'open'}`}
                   </TooltipContent>
                 </Tooltip>
 
