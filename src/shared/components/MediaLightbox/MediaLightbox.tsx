@@ -1211,13 +1211,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   } = repositionHook;
 
   // Img2Img mode hook - uses persisted settings for strength and enablePromptExpansion
-  console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
-  console.log('[EDIT_DEBUG] 🖼️ MediaLightbox BEFORE useImg2ImgMode:');
-  console.log('[EDIT_DEBUG] 🖼️ persistedImg2imgStrength:', persistedImg2imgStrength);
-  console.log('[EDIT_DEBUG] 🖼️ persistedImg2imgEnablePromptExpansion:', persistedImg2imgEnablePromptExpansion);
-  console.log('[EDIT_DEBUG] 🖼️ editSettingsPersistence.isLoading:', editSettingsPersistence.isLoading);
-  console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
-
   const img2imgHook = useImg2ImgMode({
     media,
     selectedProjectId,
@@ -1253,12 +1246,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleGenerateImg2Img,
     loraManager: img2imgLoraManager,
   } = img2imgHook;
-
-  console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
-  console.log('[EDIT_DEBUG] 🖼️ MediaLightbox AFTER useImg2ImgMode:');
-  console.log('[EDIT_DEBUG] 🖼️ img2imgStrength:', img2imgStrength);
-  console.log('[EDIT_DEBUG] 🖼️ enablePromptExpansion:', enablePromptExpansion);
-  console.log('[EDIT_DEBUG] ████████████████████████████████████████████████████████████████');
 
   // Layout mode hook
   const layoutHook = useLayoutMode({
@@ -1618,6 +1605,17 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       }
       // Otherwise keep variantParams which may already have orchestrator_details (e.g., clip_join)
 
+      // Extract input images from effectiveParams (full task params) for segment tasks
+      // Segment tasks store images in input_image_paths_resolved or individual_segment_params
+      let variantInputImages: string[] = [];
+      if (variantParams.image) {
+        variantInputImages = [variantParams.image];
+      } else if (Array.isArray(effectiveParams?.input_image_paths_resolved)) {
+        variantInputImages = effectiveParams.input_image_paths_resolved;
+      } else if (Array.isArray(effectiveParams?.individual_segment_params?.input_image_paths_resolved)) {
+        variantInputImages = effectiveParams.individual_segment_params.input_image_paths_resolved;
+      }
+
       return {
         task: {
           id: activeVariant.id,
@@ -1628,7 +1626,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         },
         isLoading: isLoadingVariantTask,
         error: null,
-        inputImages: variantParams.image ? [variantParams.image] : [],
+        inputImages: variantInputImages,
         taskId: variantParams.source_task_id || activeVariant.id,
         // ALWAYS preserve onApplySettingsFromTask so Apply button shows for all variants
         onApplySettingsFromTask: taskDetailsData?.onApplySettingsFromTask,
