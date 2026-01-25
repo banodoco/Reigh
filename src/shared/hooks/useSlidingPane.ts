@@ -88,11 +88,12 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
 
     const handleClickOutside = (event: TouchEvent | MouseEvent | PointerEvent) => {
       const targetEl = event.target as HTMLElement;
+
       // Ignore if click is on any pane-control opener/closer
       if (targetEl.closest('[data-pane-control]')) {
         return; // allow event to proceed
       }
-      
+
       // Ignore clicks on Radix UI portal elements (Select, Popover, Dialog, etc.)
       // These are rendered outside the pane but should be considered "inside" for interaction purposes
       if (
@@ -114,11 +115,14 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
       }
     };
 
-    // Listen to touchstart FIRST (fires before pointerdown on touch devices)
-    // This prevents elements behind from receiving the touch and highlighting
-    document.addEventListener('touchstart', handleClickOutside, { capture: true, passive: false });
-    document.addEventListener('pointerdown', handleClickOutside, true);
+    // Delay subscribing to click-outside events to prevent catching stray events from open tap
+    const subscribeTimeout = setTimeout(() => {
+      document.addEventListener('touchstart', handleClickOutside, { capture: true, passive: false });
+      document.addEventListener('pointerdown', handleClickOutside, true);
+    }, 100);
+
     return () => {
+      clearTimeout(subscribeTimeout);
       document.removeEventListener('touchstart', handleClickOutside, true);
       document.removeEventListener('pointerdown', handleClickOutside, true);
     };
@@ -173,21 +177,26 @@ export const useSlidingPane = ({ side, isLocked, onToggleLock, additionalRefs }:
   }
 
   const handlePaneLeave = () => {
+    console.log(`[PaneDebug][SlidingPane:${side}] handlePaneLeave called`, { isSmallMobile, isLocked });
     // No hover behavior on small phones
     if (isSmallMobile) return;
-    
+
     if (isLocked) return;
+    console.log(`[PaneDebug][SlidingPane:${side}] -> Starting leave timeout`);
     leaveTimeoutRef.current = setTimeout(() => {
+      console.log(`[PaneDebug][SlidingPane:${side}] -> Leave timeout fired, closing`);
       setOpen(false);
     }, PANE_CONFIG.timing.HOVER_DELAY);
   };
 
   const handlePaneEnter = () => {
+    console.log(`[PaneDebug][SlidingPane:${side}] handlePaneEnter called`, { isSmallMobile, isLocked });
     // No hover behavior on small phones
     if (isSmallMobile) return;
-    
+
     if (isLocked) return;
     if (leaveTimeoutRef.current) {
+      console.log(`[PaneDebug][SlidingPane:${side}] -> Clearing leave timeout`);
       clearTimeout(leaveTimeoutRef.current);
       leaveTimeoutRef.current = null;
     }

@@ -415,17 +415,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
             </>
           ) : (
             <>
-              {/* Left/Right: Open, Third, Lock */}
-              <Button
-                variant="ghost"
-                size="icon"
-                onPointerUp={handleButtonClick(() => handleOpen())}
-                onClick={(e) => e.stopPropagation()}
-                className="h-9 w-9 text-zinc-300 hover:text-white hover:bg-zinc-700"
-                aria-label={paneTooltip || "Open pane"}
-              >
-                {getIcon()}
-              </Button>
+              {/* Left/Right: Third, Lock */}
               {thirdButton && (
                 <Button
                   variant="ghost"
@@ -763,19 +753,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
           </>
         ) : (
           <>
-            {/* Left/Right: Open, Third, Lock */}
-            <TooltipButton tooltip={paneTooltip} showTooltip={showTooltips} side={tooltipSide}>
-              <Button
-                variant="ghost"
-                size="icon"
-                onPointerUp={handleButtonClick(() => handleOpen())}
-                onClick={(e) => e.stopPropagation()}
-                className="h-8 w-8 text-zinc-300 hover:text-white hover:bg-zinc-700"
-                aria-label={paneTooltip || "Open pane"}
-              >
-                {getIcon()}
-              </Button>
-            </TooltipButton>
+            {/* Left/Right: Third, Lock */}
             {thirdButton && (
               <TooltipButton tooltip={thirdButton.tooltip} showTooltip={showTooltips} side={tooltipSide}>
                 <Button

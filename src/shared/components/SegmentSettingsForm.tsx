@@ -479,27 +479,38 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
       )}
 
       {/* Prompt */}
-      <div className="space-y-2">
-        <Label className="text-xs font-medium">Prompt:</Label>
-        <Textarea
-          value={settings.prompt}
-          onChange={(e) => onChange({ prompt: e.target.value })}
-          className="h-20 text-sm resize-none"
-          placeholder={
-            // Show default placeholder when prompt is empty
-            !settings.prompt && shotDefaults?.prompt
-              ? `[default] ${shotDefaults.prompt}`
-              : 'Describe this segment...'
-          }
-          clearable
-          onClear={() => onChange({ prompt: '' })}
-          voiceInput
-          voiceContext="This is a prompt for a video segment. Describe the motion, action, or visual content you want in this part of the video."
-          onVoiceResult={(result) => {
-            onChange({ prompt: result.prompt || result.transcription });
-          }}
-        />
-      </div>
+      {(() => {
+        // Show default when settings.prompt is empty/undefined AND there's a shot default
+        // Once user types anything, settings.prompt becomes truthy and we show their input
+        const isUsingPromptDefault = !settings.prompt && !!shotDefaults?.prompt;
+        const promptDisplayValue = isUsingPromptDefault ? shotDefaults.prompt : (settings.prompt || '');
+        return (
+          <div className="space-y-2">
+            <Label className="text-xs font-medium">Prompt:</Label>
+            <div className="relative">
+              <Textarea
+                value={promptDisplayValue}
+                onChange={(e) => onChange({ prompt: e.target.value })}
+                className="h-20 text-sm resize-none"
+                placeholder="Describe this segment..."
+                clearable
+                onClear={() => onChange({ prompt: '' })}
+                voiceInput
+                voiceContext="This is a prompt for a video segment. Describe the motion, action, or visual content you want in this part of the video."
+                onVoiceResult={(result) => {
+                  onChange({ prompt: result.prompt || result.transcription });
+                }}
+              />
+              {/* Default badge - shown when using shot default, positioned bottom left */}
+              {isUsingPromptDefault && (
+                <span className="absolute bottom-2 left-2 text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded z-10 pointer-events-none">
+                  Default
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Advanced Settings */}
       <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
@@ -534,27 +545,37 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
             )}
 
             {/* Negative Prompt */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium">Negative Prompt:</Label>
-              <Textarea
-                value={settings.negativePrompt}
-                onChange={(e) => onChange({ negativePrompt: e.target.value })}
-                className="h-16 text-xs resize-none"
-                placeholder={
-                  // Show default placeholder when negative prompt is empty
-                  !settings.negativePrompt && shotDefaults?.negativePrompt
-                    ? `[default] ${shotDefaults.negativePrompt}`
-                    : 'Things to avoid...'
-                }
-                clearable
-                onClear={() => onChange({ negativePrompt: '' })}
-                voiceInput
-                voiceContext="This is a negative prompt - things to AVOID in video generation. List unwanted qualities as a comma-separated list."
-                onVoiceResult={(result) => {
-                  onChange({ negativePrompt: result.prompt || result.transcription });
-                }}
-              />
-            </div>
+            {(() => {
+              // Show default when settings.negativePrompt is empty/undefined AND there's a shot default
+              const isUsingNegativePromptDefault = !settings.negativePrompt && !!shotDefaults?.negativePrompt;
+              const negativePromptDisplayValue = isUsingNegativePromptDefault ? shotDefaults.negativePrompt : (settings.negativePrompt || '');
+              return (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Negative Prompt:</Label>
+                  <div className="relative">
+                    <Textarea
+                      value={negativePromptDisplayValue}
+                      onChange={(e) => onChange({ negativePrompt: e.target.value })}
+                      className="h-16 text-xs resize-none"
+                      placeholder="Things to avoid..."
+                      clearable
+                      onClear={() => onChange({ negativePrompt: '' })}
+                      voiceInput
+                      voiceContext="This is a negative prompt - things to AVOID in video generation. List unwanted qualities as a comma-separated list."
+                      onVoiceResult={(result) => {
+                        onChange({ negativePrompt: result.prompt || result.transcription });
+                      }}
+                    />
+                    {/* Default badge - shown when using shot default, positioned bottom left */}
+                    {isUsingNegativePromptDefault && (
+                      <span className="absolute bottom-2 left-2 text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded z-10 pointer-events-none">
+                        Default
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Model & Resolution Info */}
             <div className="grid grid-cols-2 gap-2 text-xs">

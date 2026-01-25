@@ -309,17 +309,17 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
     },
   });
   
-  const effectiveIsOpen = !isMobile 
-    ? (isTasksPaneLocked || isTasksPaneOpenProgrammatic)
-    : isOpen;
+  // Delay pointer events until animation completes to prevent tap bleed-through on mobile
+  const [isPointerEventsEnabled, setIsPointerEventsEnabled] = useState(false);
 
-  const [isAnimating, setIsAnimating] = useState(false);
-  
   useEffect(() => {
     if (isOpen) {
-      setIsAnimating(true);
-      const timeoutId = setTimeout(() => setIsAnimating(false), 300);
+      const timeoutId = setTimeout(() => {
+        setIsPointerEventsEnabled(true);
+      }, 300);
       return () => clearTimeout(timeoutId);
+    } else {
+      setIsPointerEventsEnabled(false);
     }
   }, [isOpen]);
 
@@ -332,8 +332,18 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
       {showBackdrop && (
         <div
           className="fixed inset-0 z-[100000] touch-none"
-          onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); closePane(); }}
-          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); closePane(); }}
+          onTouchStart={(e) => {
+            console.log('[PaneDebug][TasksPane] Backdrop touchstart - closing pane');
+            e.preventDefault();
+            e.stopPropagation();
+            closePane();
+          }}
+          onPointerDown={(e) => {
+            console.log('[PaneDebug][TasksPane] Backdrop pointerdown - closing pane');
+            e.preventDefault();
+            e.stopPropagation();
+            closePane();
+          }}
           aria-hidden="true"
         />
       )}
@@ -357,6 +367,7 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
         paneIcon="tasks"
         paneTooltip="View all tasks"
         dataTour="tasks-pane-tab"
+        allowMobileLock={true}
       />
       
       <div
@@ -377,19 +388,14 @@ const TasksPaneComponent: React.FC<TasksPaneProps> = ({ onOpenSettings }) => {
           data-tasks-pane="true"
           data-scroll-lock-scrollable="true"
           className={cn(
-            'absolute top-0 right-0 h-full w-full bg-zinc-900/95 border-l border-zinc-600 shadow-xl transform transition-transform duration-300 ease-smooth flex flex-col',
-            !isMobile
-              ? (effectiveIsOpen ? 'translate-x-0' : 'translate-x-full')
-              : transformClass,
-            'pointer-events-auto'
+            'absolute top-0 right-0 h-full w-full bg-zinc-900/95 border-l border-zinc-600 shadow-xl transform transition-transform duration-300 ease-smooth flex flex-col pointer-events-auto',
+            transformClass
           )}
         >
-          <div 
+          <div
             className={cn(
               'flex flex-col h-full',
-              isMobile
-                ? (isAnimating || !isOpen ? 'pointer-events-none' : 'pointer-events-auto')
-                : (effectiveIsOpen ? 'pointer-events-auto' : 'pointer-events-none')
+              isPointerEventsEnabled ? 'pointer-events-auto' : 'pointer-events-none'
             )}
           >
             {/* Header */}
