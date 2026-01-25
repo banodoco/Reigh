@@ -9,7 +9,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { X } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
-import { useSegmentSettings } from '@/shared/hooks/useSegmentSettings';
+import { useSegmentSettingsForm } from '@/shared/hooks/useSegmentSettingsForm';
 import { SegmentSettingsForm } from '@/shared/components/SegmentSettingsForm';
 import { buildTaskParams } from '@/shared/components/segmentSettingsUtils';
 import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individualTravelSegment';
@@ -37,25 +37,11 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const pairShotGenerationId = segmentSlotMode.pairData.startImage?.id;
+  const startImageUrl = segmentSlotMode.pairData.startImage?.url ?? segmentSlotMode.pairData.startImage?.thumbUrl;
+  const endImageUrl = segmentSlotMode.pairData.endImage?.url ?? segmentSlotMode.pairData.endImage?.thumbUrl;
 
-  // Debug: log what we received
-  console.log('[SegmentIdDebug] SegmentSlotFormView received:', {
-    pairShotGenerationId: pairShotGenerationId?.substring(0, 8) || '(none)',
-    hasPairData: !!segmentSlotMode.pairData,
-    hasStartImage: !!segmentSlotMode.pairData?.startImage,
-    startImageId: segmentSlotMode.pairData?.startImage?.id?.substring(0, 8) || '(none)',
-    startImageKeys: segmentSlotMode.pairData?.startImage ? Object.keys(segmentSlotMode.pairData.startImage) : [],
-  });
-
-  // Use the segment settings hook for data management
-  const {
-    settings,
-    updateSettings,
-    saveSettings,
-    resetSettings,
-    hasOverride,
-    shotDefaults
-  } = useSegmentSettings({
+  // Use the combined hook for form props
+  const { formProps, getSettingsForTaskCreation, saveSettings } = useSegmentSettingsForm({
     pairShotGenerationId,
     shotId: segmentSlotMode.shotId,
     defaults: {
@@ -63,7 +49,20 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
       negativePrompt: segmentSlotMode.pairNegativePrompt ?? segmentSlotMode.defaultNegativePrompt ?? '',
       numFrames: segmentSlotMode.pairData.frames ?? 25,
     },
+    // Form display options
+    segmentIndex: segmentSlotMode.currentIndex,
+    startImageUrl,
+    endImageUrl,
+    resolution: segmentSlotMode.projectResolution,
+    isRegeneration: false,
+    buttonLabel: "Generate Segment",
+    showHeader: false,
+    queryKeyPrefix: `segment-slot-${segmentSlotMode.currentIndex}`,
+    // Structure video
     structureVideoDefaults: segmentSlotMode.structureVideoDefaults ?? null,
+    structureVideoType: segmentSlotMode.structureVideoType,
+    structureVideoUrl: segmentSlotMode.structureVideoUrl,
+    structureVideoFrameRange: segmentSlotMode.structureVideoFrameRange,
   });
 
   // Handle frame count change
@@ -109,9 +108,6 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
       return;
     }
 
-    const startImageUrl = segmentSlotMode.pairData.startImage?.url ?? segmentSlotMode.pairData.startImage?.thumbUrl;
-    const endImageUrl = segmentSlotMode.pairData.endImage?.url ?? segmentSlotMode.pairData.endImage?.thumbUrl;
-
     if (!startImageUrl || !endImageUrl) {
       toast({
         title: "Error",
@@ -132,8 +128,9 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
       // Notify parent for optimistic UI
       segmentSlotMode.onGenerateStarted?.(pairShotGenerationId);
 
-      // Build task params
-      const taskParams = buildTaskParams(settings, {
+      // Build task params using effective settings (merged with shot defaults)
+      const effectiveSettings = getSettingsForTaskCreation();
+      const taskParams = buildTaskParams(effectiveSettings, {
         projectId: segmentSlotMode.projectId,
         shotId: segmentSlotMode.shotId,
         generationId: segmentSlotMode.parentGenerationId,
@@ -166,13 +163,12 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
   }, [
     segmentSlotMode,
     pairShotGenerationId,
-    settings,
+    startImageUrl,
+    endImageUrl,
+    getSettingsForTaskCreation,
     saveSettings,
     toast,
   ]);
-
-  const startImageUrl = segmentSlotMode.pairData.startImage?.url ?? segmentSlotMode.pairData.startImage?.thumbUrl;
-  const endImageUrl = segmentSlotMode.pairData.endImage?.url ?? segmentSlotMode.pairData.endImage?.thumbUrl;
 
   return (
     <div
@@ -224,26 +220,10 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
         {/* Segment Settings Form */}
         <div className="p-4">
           <SegmentSettingsForm
-            settings={settings}
-            onChange={updateSettings}
+            {...formProps}
             onSubmit={handleSubmit}
-            segmentIndex={segmentSlotMode.currentIndex}
-            startImageUrl={startImageUrl}
-            endImageUrl={endImageUrl}
-            resolution={segmentSlotMode.projectResolution}
-            isRegeneration={false}
             isSubmitting={isSubmitting}
-            buttonLabel="Generate Segment"
-            showHeader={false}
-            queryKeyPrefix={`segment-slot-${segmentSlotMode.currentIndex}`}
             onFrameCountChange={handleFrameCountChange}
-            onRestoreDefaults={resetSettings}
-            hasOverride={hasOverride}
-            shotDefaults={shotDefaults}
-            structureVideoType={segmentSlotMode.structureVideoType}
-            structureVideoDefaults={segmentSlotMode.structureVideoDefaults}
-            structureVideoUrl={segmentSlotMode.structureVideoUrl}
-            structureVideoFrameRange={segmentSlotMode.structureVideoFrameRange}
           />
 
           {/* Show warning if missing context */}

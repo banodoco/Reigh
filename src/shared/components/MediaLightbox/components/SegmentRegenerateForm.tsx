@@ -7,7 +7,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/shared/hooks/use-toast';
-import { useSegmentSettings } from '@/shared/hooks/useSegmentSettings';
+import { useSegmentSettingsForm } from '@/shared/hooks/useSegmentSettingsForm';
 import { SegmentSettingsForm } from '@/shared/components/SegmentSettingsForm';
 import { buildTaskParams, extractSettingsFromParams } from '@/shared/components/segmentSettingsUtils';
 import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individualTravelSegment';
@@ -89,20 +89,8 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Debug: log what pairShotGenerationId we received
-  console.log('[SegmentIdDebug] SegmentRegenerateForm received:', {
-    pairShotGenerationId: pairShotGenerationId?.substring(0, 8) || '(none)',
-    shotId: shotId?.substring(0, 8) || '(none)',
-    generationId: generationId?.substring(0, 8) || '(none)',
-    childGenerationId: childGenerationId?.substring(0, 8) || '(none)',
-    segmentIndex,
-  });
-
-  // Use the segment settings hook for data management
-  // Settings are merged from: pair metadata > shot batch settings > defaults
-  // numFrames: prefer currentFrameCount (from timeline positions - source of truth),
-  // fall back to initialParams (from video) if not provided
-  const { settings, updateSettings, saveSettings, resetSettings, saveAsShotDefaults, hasOverride, shotDefaults } = useSegmentSettings({
+  // Use the combined hook for form props
+  const { formProps, getSettingsForTaskCreation, saveSettings, updateSettings, settings } = useSegmentSettingsForm({
     pairShotGenerationId,
     shotId,
     defaults: {
@@ -110,7 +98,21 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
       negativePrompt: '',
       numFrames: currentFrameCount ?? initialParams?.num_frames ?? 25,
     },
+    // Form display options
+    segmentIndex,
+    startImageUrl,
+    endImageUrl,
+    modelName: initialParams?.model_name || initialParams?.orchestrator_details?.model_name,
+    resolution: projectResolution || initialParams?.parsed_resolution_wh,
+    isRegeneration: true,
+    buttonLabel: "Regenerate Video",
+    showHeader: false,
+    queryKeyPrefix: "lightbox-segment-presets",
+    // Structure video
     structureVideoDefaults: structureVideoDefaults ?? null,
+    structureVideoType,
+    structureVideoUrl,
+    structureVideoFrameRange,
   });
 
   // Handle frame count change - wrap to include pairShotGenerationId
@@ -184,8 +186,9 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
         await saveSettings();
       }
 
-      // Build task params
-      const taskParams = buildTaskParams(settings, {
+      // Build task params using effective settings (merged with shot defaults)
+      const effectiveSettings = getSettingsForTaskCreation();
+      const taskParams = buildTaskParams(effectiveSettings, {
         projectId,
         shotId,
         generationId,
@@ -202,9 +205,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
       // Create task
       const result = await createIndividualTravelSegmentTask(taskParams);
 
-      if (result.task_id) {
-        // Success - task was created
-      } else {
+      if (!result.task_id) {
         throw new Error(result.error || 'Failed to create task');
       }
     } catch (error) {
@@ -219,7 +220,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
     }
   }, [
     projectId,
-    settings,
+    getSettingsForTaskCreation,
     saveSettings,
     shotId,
     generationId,
@@ -237,28 +238,10 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   return (
     <div className="p-4">
       <SegmentSettingsForm
-        settings={settings}
-        onChange={updateSettings}
+        {...formProps}
         onSubmit={handleSubmit}
-        segmentIndex={segmentIndex}
-        startImageUrl={startImageUrl}
-        endImageUrl={endImageUrl}
-        modelName={initialParams?.model_name || initialParams?.orchestrator_details?.model_name}
-        resolution={projectResolution || initialParams?.parsed_resolution_wh}
-        isRegeneration={true}
         isSubmitting={isSubmitting}
-        buttonLabel="Regenerate Video"
-        showHeader={false}
-        queryKeyPrefix="lightbox-segment-presets"
         onFrameCountChange={handleFrameCountChange}
-        onRestoreDefaults={resetSettings}
-        onSaveAsShotDefaults={saveAsShotDefaults}
-        hasOverride={hasOverride}
-        shotDefaults={shotDefaults}
-        structureVideoType={structureVideoType}
-        structureVideoDefaults={structureVideoDefaults}
-        structureVideoUrl={structureVideoUrl}
-        structureVideoFrameRange={structureVideoFrameRange}
       />
     </div>
   );

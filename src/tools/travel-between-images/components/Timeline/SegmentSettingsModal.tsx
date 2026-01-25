@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMediumModal } from '@/shared/hooks/useModal';
 import { useToast } from "@/shared/hooks/use-toast";
 import { framesToSeconds } from "./utils/time-utils";
-import { useSegmentSettings } from "@/shared/hooks/useSegmentSettings";
+import { useSegmentSettingsForm } from "@/shared/hooks/useSegmentSettingsForm";
 import { SegmentSettingsForm } from "@/shared/components/SegmentSettingsForm";
 import { buildTaskParams, buildMetadataUpdate } from "@/shared/components/segmentSettingsUtils";
 import { createIndividualTravelSegmentTask } from "@/shared/lib/tasks/individualTravelSegment";
@@ -92,11 +92,6 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
   isRegeneration = false,
   initialParams,
   projectResolution,
-  enhancedPrompt,
-  pairPrompt,
-  pairNegativePrompt,
-  defaultPrompt,
-  defaultNegativePrompt,
   onNavigatePrevious,
   onNavigateNext,
   hasPrevious = false,
@@ -113,10 +108,12 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Use the segment settings hook for data management
-  // Settings are merged from: pair metadata > shot batch settings > defaults
   const pairShotGenerationId = pairData?.startImage?.id;
-  const { settings, updateSettings, saveSettings, resetSettings, isLoading, isDirty, hasOverride, shotDefaults } = useSegmentSettings({
+  const startImageUrl = pairData?.startImage?.url || pairData?.startImage?.thumbUrl;
+  const endImageUrl = pairData?.endImage?.url || pairData?.endImage?.thumbUrl;
+
+  // Use the combined hook for form props
+  const { formProps, getSettingsForTaskCreation, saveSettings, settings, isDirty } = useSegmentSettingsForm({
     pairShotGenerationId,
     shotId,
     defaults: {
@@ -124,7 +121,21 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
       negativePrompt: '',
       numFrames: pairData?.frames || 25,
     },
+    // Form display options
+    segmentIndex: pairData?.index,
+    startImageUrl,
+    endImageUrl,
+    modelName: initialParams?.model_name || initialParams?.orchestrator_details?.model_name,
+    resolution: projectResolution || initialParams?.parsed_resolution_wh,
+    isRegeneration,
+    buttonLabel: isRegeneration ? "Regenerate Segment" : "Generate Segment",
+    showHeader: false,
+    queryKeyPrefix: pairData ? `pair-${pairData.index}-modal` : undefined,
+    // Structure video
     structureVideoDefaults: structureVideoDefaults ?? null,
+    structureVideoType,
+    structureVideoUrl,
+    structureVideoFrameRange,
   });
 
   // Handle close - optimistic update + background save
@@ -200,13 +211,6 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
 
   // Handle form submission (save + create task)
   const handleSubmit = useCallback(async () => {
-    console.log('[useSegmentSettings] 🚀 Submit called:', {
-      hasProjectId: !!projectId,
-      hasPairData: !!pairData,
-      pairShotGenerationId: pairShotGenerationId?.substring(0, 8) || null,
-      settingsPrompt: settings.prompt?.substring(0, 30) + '...',
-    });
-
     if (!projectId || !pairData) {
       toast({
         title: "Error",
@@ -215,9 +219,6 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
       });
       return;
     }
-
-    const startImageUrl = pairData.startImage?.url || pairData.startImage?.thumbUrl;
-    const endImageUrl = pairData.endImage?.url || pairData.endImage?.thumbUrl;
 
     if (!startImageUrl || !endImageUrl) {
       toast({
@@ -239,8 +240,9 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
       // Notify parent for optimistic UI
       onGenerateStarted?.(pairShotGenerationId);
 
-      // Build task params
-      const taskParams = buildTaskParams(settings, {
+      // Build task params using effective settings (merged with shot defaults)
+      const effectiveSettings = getSettingsForTaskCreation();
+      const taskParams = buildTaskParams(effectiveSettings, {
         projectId,
         shotId,
         generationId,
@@ -255,9 +257,7 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
       // Create task
       const result = await createIndividualTravelSegmentTask(taskParams);
 
-      if (result.task_id) {
-        // Success - task was created
-      } else {
+      if (!result.task_id) {
         throw new Error(result.error || 'Failed to create task');
       }
     } catch (error) {
@@ -274,7 +274,9 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
     projectId,
     pairData,
     pairShotGenerationId,
-    settings,
+    startImageUrl,
+    endImageUrl,
+    getSettingsForTaskCreation,
     saveSettings,
     shotId,
     generationId,
@@ -285,9 +287,6 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
   ]);
 
   if (!pairData) return null;
-
-  const startImageUrl = pairData.startImage?.url || pairData.startImage?.thumbUrl;
-  const endImageUrl = pairData.endImage?.url || pairData.endImage?.thumbUrl;
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -337,27 +336,10 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
 
         <div className="flex-1 overflow-y-auto px-4 pb-4">
           <SegmentSettingsForm
-            settings={settings}
-            onChange={updateSettings}
+            {...formProps}
             onSubmit={handleSubmit}
-            segmentIndex={pairData.index}
-            startImageUrl={startImageUrl}
-            endImageUrl={endImageUrl}
-            modelName={initialParams?.model_name || initialParams?.orchestrator_details?.model_name}
-            resolution={projectResolution || initialParams?.parsed_resolution_wh}
-            isRegeneration={isRegeneration}
             isSubmitting={isSubmitting}
-            buttonLabel={isRegeneration ? "Regenerate Segment" : "Generate Segment"}
-            showHeader={false}
-            queryKeyPrefix={`pair-${pairData.index}-modal`}
             onFrameCountChange={onFrameCountChange}
-            onRestoreDefaults={resetSettings}
-            hasOverride={hasOverride}
-            shotDefaults={shotDefaults}
-            structureVideoType={structureVideoType}
-            structureVideoDefaults={structureVideoDefaults}
-            structureVideoUrl={structureVideoUrl}
-            structureVideoFrameRange={structureVideoFrameRange}
           />
           {!generationId && !shotId && (
             <p className="text-xs text-muted-foreground text-center mt-2">

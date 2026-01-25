@@ -216,12 +216,17 @@ export function useSegmentSettings({
       // Use migration utility to normalize field names
       const result = readShotSettings(rawSettings);
 
-      console.log('[useSegmentSettings] 📦 Shot batch settings loaded (via migration):', {
+      console.log('[ShotDefaultsDebug] 📦 Shot batch settings loaded (via migration):', {
         shotId: shotId.substring(0, 8),
-        ...summarizeSettings(result),
-        // Also log raw for debugging during migration
-        rawBatchVideoPrompt: rawSettings.batchVideoPrompt?.substring(0, 30) || null,
-        rawSteerableNegPrompt: rawSettings.steerableMotionSettings?.negative_prompt?.substring(0, 30) || null,
+        // Raw fields from DB (before migration)
+        rawPrompt: rawSettings.prompt?.substring(0, 50) || '(undefined)',
+        rawBatchVideoPrompt: rawSettings.batchVideoPrompt?.substring(0, 50) || '(undefined)',
+        rawSteerableNegPrompt: rawSettings.steerableMotionSettings?.negative_prompt?.substring(0, 30) || '(undefined)',
+        rawLorasCount: rawSettings.selectedLoras?.length ?? rawSettings.loras?.length ?? 0,
+        // Result after migration
+        resultPrompt: result.prompt?.substring(0, 50) || '(empty)',
+        resultNegPrompt: result.negativePrompt?.substring(0, 30) || '(empty)',
+        resultLorasCount: result.loras?.length ?? 0,
       });
       return result;
     },
@@ -310,7 +315,7 @@ export function useSegmentSettings({
 
   // Shot-level defaults (for showing as placeholder/fallback when no pair override)
   const shotDefaultsValue = useMemo((): ShotDefaults => {
-    return {
+    const defaults = {
       prompt: shotVideoSettings?.prompt || '',
       negativePrompt: shotVideoSettings?.negativePrompt || '',
       motionMode: shotVideoSettings?.motionMode || 'basic',
@@ -319,6 +324,13 @@ export function useSegmentSettings({
       loras: shotVideoSettings?.loras || [],
       selectedPhasePresetId: shotVideoSettings?.selectedPhasePresetId ?? null,
     };
+    console.log('[ShotDefaultsDebug] Computing shotDefaultsValue:', {
+      hasShotVideoSettings: !!shotVideoSettings,
+      shotVideoSettingsPrompt: shotVideoSettings?.prompt?.substring(0, 50) || '(none)',
+      resultPrompt: defaults.prompt?.substring(0, 50) || '(empty)',
+      resultLoraCount: defaults.loras?.length ?? 0,
+    });
+    return defaults;
   }, [shotVideoSettings]);
 
   // Log merged settings when data loads (separate effect to avoid log spam)
@@ -652,6 +664,53 @@ export function useSegmentSettings({
     }
   }, [shotId, settings, shotDefaultsValue, instanceId, queryClient]);
 
+  // Get effective settings for task creation (merges segment overrides with shot defaults)
+  // This is what should be passed to buildTaskParams() when generating
+  const getSettingsForTaskCreation = useCallback((): SegmentSettings => {
+    // Merge settings with shot defaults, respecting override flags
+    // For fields without overrides, use shot defaults
+    const effectiveSettings: SegmentSettings = {
+      // Prompts: segment override (even empty string) > shot default > empty
+      prompt: settings.prompt ?? shotDefaultsValue.prompt ?? '',
+      negativePrompt: settings.negativePrompt ?? shotDefaultsValue.negativePrompt ?? '',
+
+      // Motion settings: segment override > shot default > defaults
+      motionMode: settings.motionMode ?? shotDefaultsValue.motionMode ?? 'basic',
+      amountOfMotion: settings.amountOfMotion ?? shotDefaultsValue.amountOfMotion ?? 50,
+      phaseConfig: settings.phaseConfig ?? shotDefaultsValue.phaseConfig,
+      selectedPhasePresetId: settings.selectedPhasePresetId ?? shotDefaultsValue.selectedPhasePresetId ?? null,
+
+      // LoRAs: if segment has override (even empty array), use it; otherwise use shot defaults
+      loras: hasOverride?.loras ? settings.loras : (shotDefaultsValue.loras?.map(l => ({
+        id: l.id || l.path,
+        name: l.name || l.path.split('/').pop()?.replace('.safetensors', '') || l.path,
+        path: l.path,
+        strength: l.strength,
+      })) ?? []),
+
+      // These don't fall back to shot defaults
+      numFrames: settings.numFrames,
+      randomSeed: settings.randomSeed ?? true,
+      seed: settings.seed,
+      makePrimaryVariant: settings.makePrimaryVariant ?? false,
+
+      // Structure video overrides
+      structureMotionStrength: settings.structureMotionStrength,
+      structureTreatment: settings.structureTreatment,
+      structureUni3cEndPercent: settings.structureUni3cEndPercent,
+    };
+
+    console.log(`[useSegmentSettings:${instanceId}] 📦 getSettingsForTaskCreation:`, {
+      hasSegmentPrompt: settings.prompt !== undefined,
+      usingShotDefaultPrompt: settings.prompt === undefined && !!shotDefaultsValue.prompt,
+      effectivePrompt: effectiveSettings.prompt?.substring(0, 50) || '(empty)',
+      hasLoraOverride: hasOverride?.loras,
+      effectiveLoraCount: effectiveSettings.loras?.length ?? 0,
+    });
+
+    return effectiveSettings;
+  }, [settings, shotDefaultsValue, hasOverride, instanceId]);
+
   // Keep saveSettingsRef updated
   useEffect(() => {
     saveSettingsRef.current = saveSettings;
@@ -755,6 +814,7 @@ export function useSegmentSettings({
     saveSettings,
     resetSettings,
     saveAsShotDefaults,
+    getSettingsForTaskCreation,
     isLoading: isLoadingPair || isLoadingBatch,
     isDirty,
     pairMetadata: pairMetadata ?? null,
