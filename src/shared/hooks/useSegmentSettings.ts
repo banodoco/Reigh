@@ -582,14 +582,15 @@ export function useSegmentSettings({
         resultLoraCount: result?.loras?.length ?? 0,
       });
 
-      // Invalidate both query caches so changes are visible everywhere:
-      console.log(`[SetAsShotDefaults] 🔄 Invalidating query caches...`);
+      // Invalidate and refetch query caches so changes are visible everywhere:
+      console.log(`[SetAsShotDefaults] 🔄 Invalidating and refetching query caches...`);
       // 1. useSegmentSettings uses this key
       await queryClient.invalidateQueries({ queryKey: ['shot-batch-settings', shotId] });
       // 2. useToolSettings / useShotSettings uses 'toolSettings' (not 'tool-settings')
       //    Key format: ['toolSettings', toolId, projectId, shotId]
-      await queryClient.invalidateQueries({ queryKey: ['toolSettings', 'travel-between-images'] });
-      console.log(`[SetAsShotDefaults] ✅ Query caches invalidated`);
+      //    Use refetchQueries to force immediate refetch (invalidate alone may not trigger re-render)
+      await queryClient.refetchQueries({ queryKey: ['toolSettings', 'travel-between-images'] });
+      console.log(`[SetAsShotDefaults] ✅ Query caches invalidated and refetched`);
 
       return true;
     } catch (error) {
