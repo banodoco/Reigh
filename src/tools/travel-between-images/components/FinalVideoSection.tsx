@@ -476,11 +476,6 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="text-sm">Generating joined clip...</span>
                 </div>
-              ) : currentProgress.total > 0 && currentProgress.completed < currentProgress.total ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span className="text-sm">{currentProgress.completed}/{currentProgress.total} segments generated...</span>
-                </div>
               ) : (
                 <div className="flex items-center gap-2">
                   <Film className="w-4 h-4 opacity-40" />
