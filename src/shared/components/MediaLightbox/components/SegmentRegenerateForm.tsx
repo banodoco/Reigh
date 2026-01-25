@@ -93,7 +93,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   // Settings are merged from: pair metadata > shot batch settings > defaults
   // numFrames: prefer currentFrameCount (from timeline positions - source of truth),
   // fall back to initialParams (from video) if not provided
-  const { settings, updateSettings, saveSettings, resetSettings, hasOverride, shotDefaults } = useSegmentSettings({
+  const { settings, updateSettings, saveSettings, resetSettings, saveAsShotDefaults, hasOverride, shotDefaults } = useSegmentSettings({
     pairShotGenerationId,
     shotId,
     defaults: {
@@ -243,6 +243,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
         queryKeyPrefix="lightbox-segment-presets"
         onFrameCountChange={handleFrameCountChange}
         onRestoreDefaults={resetSettings}
+        onSaveAsShotDefaults={saveAsShotDefaults}
         hasOverride={hasOverride}
         shotDefaults={shotDefaults}
         structureVideoType={structureVideoType}

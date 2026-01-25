@@ -26,7 +26,7 @@ import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
-import { ChevronLeft, Loader2, RotateCcw, Video } from 'lucide-react';
+import { ChevronLeft, Loader2, RotateCcw, Save, Video } from 'lucide-react';
 import { MotionPresetSelector } from '@/shared/components/MotionPresetSelector';
 import { detectGenerationMode, BUILTIN_I2V_PRESET, BUILTIN_VACE_PRESET } from './segmentSettingsUtils';
 import { ActiveLoRAsDisplay } from '@/shared/components/ActiveLoRAsDisplay';
@@ -81,6 +81,8 @@ export interface SegmentSettingsFormProps {
   onFrameCountChange?: (frames: number) => void;
   /** Callback to restore default settings */
   onRestoreDefaults?: () => void;
+  /** Callback to save current settings as shot defaults */
+  onSaveAsShotDefaults?: () => Promise<boolean>;
   /** Which fields have pair-level overrides (vs using shot defaults) */
   hasOverride?: {
     prompt: boolean;
@@ -251,6 +253,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   queryKeyPrefix = 'segment-settings',
   onFrameCountChange,
   onRestoreDefaults,
+  onSaveAsShotDefaults,
   hasOverride,
   shotDefaults,
   structureVideoType,
@@ -262,6 +265,8 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isLoraModalOpen, setIsLoraModalOpen] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [isSavingDefaults, setIsSavingDefaults] = useState(false);
+  const [saveDefaultsSuccess, setSaveDefaultsSuccess] = useState(false);
 
   // Fetch available LoRAs
   const { data: availableLoras = [] } = usePublicLoras();
@@ -373,6 +378,22 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
     onChange({ numFrames: quantized });
     onFrameCountChange?.(quantized);
   }, [onChange, onFrameCountChange]);
+
+  // Save as shot defaults
+  const handleSaveAsShotDefaults = useCallback(async () => {
+    if (!onSaveAsShotDefaults) return;
+    setIsSavingDefaults(true);
+    setSaveDefaultsSuccess(false);
+    try {
+      const success = await onSaveAsShotDefaults();
+      if (success) {
+        setSaveDefaultsSuccess(true);
+        setTimeout(() => setSaveDefaultsSuccess(false), 2000);
+      }
+    } finally {
+      setIsSavingDefaults(false);
+    }
+  }, [onSaveAsShotDefaults]);
 
   // ==========================================================================
   // RENDER
@@ -702,18 +723,40 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
         )}
       </Button>
 
-      {/* Restore Defaults Button */}
-      {onRestoreDefaults && (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={onRestoreDefaults}
-          disabled={isSubmitting}
-          className="w-full h-7 text-xs text-muted-foreground hover:text-foreground gap-1"
-        >
-          <RotateCcw className="w-3 h-3" />
-          Restore Default Settings
-        </Button>
+      {/* Restore Defaults / Save as Defaults Buttons */}
+      {(onRestoreDefaults || onSaveAsShotDefaults) && (
+        <div className="flex gap-2">
+          {onRestoreDefaults && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onRestoreDefaults}
+              disabled={isSubmitting || isSavingDefaults}
+              className="flex-1 h-7 text-xs text-muted-foreground hover:text-foreground gap-1"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Restore Defaults
+            </Button>
+          )}
+          {onSaveAsShotDefaults && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleSaveAsShotDefaults}
+              disabled={isSubmitting || isSavingDefaults}
+              className="flex-1 h-7 text-xs text-muted-foreground hover:text-foreground gap-1"
+            >
+              {isSavingDefaults ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : saveDefaultsSuccess ? (
+                <span className="text-green-600">✓</span>
+              ) : (
+                <Save className="w-3 h-3" />
+              )}
+              {saveDefaultsSuccess ? 'Saved!' : 'Set as Shot Defaults'}
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );

@@ -46,10 +46,10 @@ import {
 import {
   readShotSettings,
   readSegmentOverrides,
-  writeShotSettings,
   summarizeSettings,
   type ShotVideoSettings,
 } from '@/shared/utils/settingsMigration';
+import { updateToolSettingsSupabase } from '@/shared/hooks/useToolSettings';
 
 export interface UseSegmentSettingsOptions {
   /** Shot generation ID for pair-specific settings */
@@ -520,25 +520,10 @@ export function useSegmentSettings({
     });
 
     try {
-      // Fetch current shot settings
-      const { data: shot, error: fetchError } = await supabase
-        .from('shots')
-        .select('settings')
-        .eq('id', shotId)
-        .single();
-
-      if (fetchError) {
-        console.error('[useSegmentSettings] Error fetching shot settings:', fetchError);
-        return false;
-      }
-
-      const currentSettings = (shot?.settings as Record<string, any>) || {};
-      const currentTravelSettings = currentSettings['travel-between-images'] || {};
-
-      // Build new shot settings from current segment settings
-      // Merge with existing shot settings to preserve batch-specific fields
-      const newShotVideoSettings: ShotVideoSettings = {
-        // From current segment settings (what user sees in the form)
+      // Build the patch for shot-level settings
+      // Only include fields that are editable in the segment form
+      // Other shot settings (batch-specific) are preserved via the atomic merge in updateToolSettingsSupabase
+      const patch = {
         prompt: settings.prompt || '',
         negativePrompt: settings.negativePrompt || '',
         motionMode: settings.motionMode ?? 'basic',
@@ -546,42 +531,29 @@ export function useSegmentSettings({
         phaseConfig: settings.phaseConfig,
         selectedPhasePresetId: settings.selectedPhasePresetId ?? null,
         loras: settings.loras ?? [],
-        numFrames: settings.numFrames ?? 25,
+        // Note: numFrames intentionally not included - timeline positions are source of truth
         randomSeed: settings.randomSeed ?? true,
         seed: settings.seed,
-        makePrimaryVariant: settings.makePrimaryVariant ?? false,
-
-        // Preserve existing batch-specific settings (not editable in segment form)
-        batchVideoFrames: currentTravelSettings.batchVideoFrames ?? 25,
-        textBeforePrompts: currentTravelSettings.textBeforePrompts ?? '',
-        textAfterPrompts: currentTravelSettings.textAfterPrompts ?? '',
-        enhancePrompt: currentTravelSettings.enhancePrompt ?? false,
-        generationTypeMode: currentTravelSettings.generationTypeMode ?? 'i2v',
       };
 
-      // Write in new format
-      const newTravelSettings = writeShotSettings(newShotVideoSettings);
-
-      // Update shot settings
-      const { error: updateError } = await supabase
-        .from('shots')
-        .update({
-          settings: {
-            ...currentSettings,
-            'travel-between-images': newTravelSettings,
-          },
-        })
-        .eq('id', shotId);
-
-      if (updateError) {
-        console.error('[useSegmentSettings] Error saving shot defaults:', updateError);
-        return false;
-      }
+      // Use the proper settings update function which:
+      // 1. Merges with existing settings (preserves batch-specific fields)
+      // 2. Updates localStorage for settings inheritance
+      // 3. Uses atomic RPC for consistency
+      await updateToolSettingsSupabase({
+        scope: 'shot',
+        id: shotId,
+        toolId: 'travel-between-images',
+        patch,
+      }, undefined, 'immediate');
 
       console.log(`[useSegmentSettings:${instanceId}] ✅ Saved as shot defaults`);
 
-      // Invalidate shot batch settings cache
+      // Invalidate both query caches so changes are visible everywhere:
+      // 1. useSegmentSettings uses this key
       await queryClient.invalidateQueries({ queryKey: ['shot-batch-settings', shotId] });
+      // 2. useToolSettings / useShotSettings uses this key pattern
+      await queryClient.invalidateQueries({ queryKey: ['tool-settings', 'travel-between-images'] });
 
       return true;
     } catch (error) {
@@ -680,6 +652,7 @@ export function useSegmentSettings({
     updateSettings,
     saveSettings,
     resetSettings,
+    saveAsShotDefaults,
     isLoading: isLoadingPair || isLoadingBatch,
     isDirty,
     pairMetadata: pairMetadata ?? null,
