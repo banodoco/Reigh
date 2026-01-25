@@ -11,6 +11,7 @@ import type { PhaseConfig } from '@/tools/travel-between-images/settings';
 import type { UseVideoScrubbingReturn } from '@/shared/hooks/useVideoScrubbing';
 import type { PairData } from '@/tools/travel-between-images/components/Timeline/TimelineContainer';
 import { SingleImageDurationIndicator } from './SingleImageDurationIndicator';
+import { Loader2 } from 'lucide-react';
 
 const FPS = 16;
 
@@ -172,31 +173,49 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
             />
 
             {/* Cross-row: Previous pair's video + indicator - shows on LEFT at start of row, centered vertically together */}
-            {isAtStartOfRow && !shouldHideIndicator && (onPairClick || (prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location)) && (() => {
+            {isAtStartOfRow && !shouldHideIndicator && (() => {
               const slotIndex = index - 1;
               const isActiveScrubbing = activeScrubbingIndex === slotIndex;
               const hasVideo = prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location;
+              // Check for pending task using start image's shot_generation.id as pairShotGenerationId
+              const prevPairShotGenId = prevStartImage?.id;
+              const isPrevPending = hasPendingTask?.(prevPairShotGenId);
+              const showSegmentArea = hasVideo || isPrevPending;
+
+              // Only render if there's something to show (segment area or pair click handler)
+              if (!onPairClick && !showSegmentArea) return null;
+
               return (
                 <div className="absolute -left-[6px] top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-auto flex flex-col items-center gap-1">
-                  {hasVideo && (
+                  {showSegmentArea && (
                     <div className="w-20">
-                      <InlineSegmentVideo
-                        slot={prevSegmentSlot}
-                        pairIndex={slotIndex}
-                        onClick={() => onSegmentClick?.(slotIndex)}
-                        onOpenPairSettings={onPairClick}
-                        projectAspectRatio={projectAspectRatio}
-                        isMobile={isMobile}
-                        layout="flow"
-                        compact={true}
-                        isPending={hasPendingTask?.(prevSegmentSlot.pairShotGenerationId)}
-                        // Scrubbing props
-                        isScrubbingActive={isActiveScrubbing}
-                        onScrubbingStart={onScrubbingStart ? (rect: DOMRect) => onScrubbingStart(slotIndex, rect) : undefined}
-                        scrubbingContainerRef={isActiveScrubbing ? scrubbing?.containerRef : undefined}
-                        scrubbingContainerProps={isActiveScrubbing ? scrubbing?.containerProps : undefined}
-                        scrubbingProgress={isActiveScrubbing ? scrubbing?.progress : undefined}
-                      />
+                      {prevSegmentSlot ? (
+                        <InlineSegmentVideo
+                          slot={prevSegmentSlot}
+                          pairIndex={slotIndex}
+                          onClick={() => onSegmentClick?.(slotIndex)}
+                          onOpenPairSettings={onPairClick}
+                          projectAspectRatio={projectAspectRatio}
+                          isMobile={isMobile}
+                          layout="flow"
+                          compact={true}
+                          isPending={isPrevPending}
+                          // Scrubbing props
+                          isScrubbingActive={isActiveScrubbing}
+                          onScrubbingStart={onScrubbingStart ? (rect: DOMRect) => onScrubbingStart(slotIndex, rect) : undefined}
+                          scrubbingContainerRef={isActiveScrubbing ? scrubbing?.containerRef : undefined}
+                          scrubbingContainerProps={isActiveScrubbing ? scrubbing?.containerProps : undefined}
+                          scrubbingProgress={isActiveScrubbing ? scrubbing?.progress : undefined}
+                        />
+                      ) : isPrevPending ? (
+                        // No slot yet but task is pending - show loading indicator
+                        <div className="h-16 bg-muted/40 border-2 border-dashed border-primary/40 rounded-md flex items-center justify-center shadow-sm">
+                          <div className="flex flex-col items-center gap-0.5 text-primary">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span className="text-[10px] font-medium">Pending</span>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   )}
                   {onPairClick && (
@@ -225,31 +244,49 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
             })()}
 
             {/* Video + pair indicator - positioned in the gap to the right, centered vertically together (skip if at end of row) */}
-            {!isLastImage && !isAtEndOfRow && !shouldHideIndicator && (onPairClick || (segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location)) && (() => {
+            {!isLastImage && !isAtEndOfRow && !shouldHideIndicator && (() => {
               const slotIndex = index;
               const isActiveScrubbing = activeScrubbingIndex === slotIndex;
               const hasVideo = segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location;
+              // Check for pending task using start image's shot_generation.id as pairShotGenerationId
+              const pairShotGenId = startImage?.id;
+              const isPending = hasPendingTask?.(pairShotGenId);
+              const showSegmentArea = hasVideo || isPending;
+
+              // Only render if there's something to show (segment area or pair click handler)
+              if (!onPairClick && !showSegmentArea) return null;
+
               return (
                 <div className="absolute -right-[6px] top-1/2 translate-x-1/2 -translate-y-1/2 z-20 pointer-events-auto flex flex-col items-center gap-1">
-                  {hasVideo && (
+                  {showSegmentArea && (
                     <div className="w-20">
-                      <InlineSegmentVideo
-                        slot={segmentSlot}
-                        pairIndex={slotIndex}
-                        onClick={() => onSegmentClick?.(slotIndex)}
-                        onOpenPairSettings={onPairClick}
-                        projectAspectRatio={projectAspectRatio}
-                        isMobile={isMobile}
-                        layout="flow"
-                        compact={true}
-                        isPending={hasPendingTask?.(segmentSlot.pairShotGenerationId)}
-                        // Scrubbing props
-                        isScrubbingActive={isActiveScrubbing}
-                        onScrubbingStart={onScrubbingStart ? (rect: DOMRect) => onScrubbingStart(slotIndex, rect) : undefined}
-                        scrubbingContainerRef={isActiveScrubbing ? scrubbing?.containerRef : undefined}
-                        scrubbingContainerProps={isActiveScrubbing ? scrubbing?.containerProps : undefined}
-                        scrubbingProgress={isActiveScrubbing ? scrubbing?.progress : undefined}
-                      />
+                      {segmentSlot ? (
+                        <InlineSegmentVideo
+                          slot={segmentSlot}
+                          pairIndex={slotIndex}
+                          onClick={() => onSegmentClick?.(slotIndex)}
+                          onOpenPairSettings={onPairClick}
+                          projectAspectRatio={projectAspectRatio}
+                          isMobile={isMobile}
+                          layout="flow"
+                          compact={true}
+                          isPending={isPending}
+                          // Scrubbing props
+                          isScrubbingActive={isActiveScrubbing}
+                          onScrubbingStart={onScrubbingStart ? (rect: DOMRect) => onScrubbingStart(slotIndex, rect) : undefined}
+                          scrubbingContainerRef={isActiveScrubbing ? scrubbing?.containerRef : undefined}
+                          scrubbingContainerProps={isActiveScrubbing ? scrubbing?.containerProps : undefined}
+                          scrubbingProgress={isActiveScrubbing ? scrubbing?.progress : undefined}
+                        />
+                      ) : isPending ? (
+                        // No slot yet but task is pending - show loading indicator
+                        <div className="h-16 bg-muted/40 border-2 border-dashed border-primary/40 rounded-md flex items-center justify-center shadow-sm">
+                          <div className="flex flex-col items-center gap-0.5 text-primary">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span className="text-[10px] font-medium">Pending</span>
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   )}
                   {onPairClick && (
