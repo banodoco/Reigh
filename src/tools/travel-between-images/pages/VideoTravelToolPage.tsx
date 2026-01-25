@@ -368,6 +368,9 @@ const VideoTravelToolPage: React.FC = () => {
     setHeaderReady(!!node);
   }, []);
 
+  // Ref for ShotEditor to expose name click handler (triggers edit mode)
+  const nameClickRef = useRef<(() => void) | null>(null);
+
   // Use the shot navigation hook
   const { navigateToPreviousShot, navigateToNextShot, navigateToShot } = useShotNavigation();
 
@@ -899,6 +902,13 @@ const VideoTravelToolPage: React.FC = () => {
   const handleFloatingHeaderNameClick = useCallback(() => {
     // Scroll to absolute top to fully hide floating header
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Trigger edit mode after scroll completes
+    setTimeout(() => {
+      if (nameClickRef.current) {
+        nameClickRef.current();
+      }
+    }, 300);
   }, []);
 
   // Initialize video gallery thumbnail preloader (after dependencies are defined)
@@ -1724,6 +1734,7 @@ const VideoTravelToolPage: React.FC = () => {
               invalidateVideoCountsCache={invalidateOnVideoChanges}
               onDragStateChange={setIsDraggingInTimeline}
               headerContainerRef={headerCallbackRef}
+              nameClickRef={nameClickRef}
             />
               </>
             ) : (isNewlyCreatedShot || hashLoadingGrace) ? (
