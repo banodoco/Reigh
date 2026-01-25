@@ -341,143 +341,8 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   // Determine grid columns for positioning logic
   const gridColumns = isInMoveMode ? columns : 2;
 
-  // Build pairs for pair-per-row view (each transition gets its own row)
-  const pairs = React.useMemo(() => {
-    if (isInMoveMode || currentImages.length < 2) return [];
-    const result: Array<{
-      index: number;
-      leftImage: typeof currentImages[0];
-      rightImage: typeof currentImages[0];
-      segmentSlot: typeof segmentSlots extends (infer T)[] | undefined ? T | undefined : never;
-    }> = [];
-    for (let i = 0; i < currentImages.length - 1; i++) {
-      result.push({
-        index: i,
-        leftImage: currentImages[i],
-        rightImage: currentImages[i + 1],
-        segmentSlot: segmentSlots?.find(s => s.index === i),
-      });
-    }
-    return result;
-  }, [currentImages, segmentSlots, isInMoveMode]);
-
-  // Pair-per-row view (when not in move mode)
-  if (!isInMoveMode && currentImages.length >= 2) {
-    return (
-      <>
-        <div className="flex flex-col gap-4 pt-2">
-          {pairs.map((pair) => (
-            <div key={`pair-${pair.index}`} className="relative">
-              {/* Images side by side with small gap */}
-              <div className="flex items-center gap-3">
-                {/* Left image - tap to enter move mode */}
-                <div className="flex-1 relative">
-                  <MobileImageItem
-                    image={pair.leftImage}
-                    index={pair.index}
-                    isSelected={false}
-                    onMobileTap={() => {
-                      // Select this image to enter move mode
-                      setMobileSelectedIds([pair.leftImage.id as string]);
-                      setLastSelectedIndex(pair.index);
-                    }}
-                    onDelete={() => {}}
-                    onOpenLightbox={() => onOpenLightbox?.(pair.index)}
-                    duplicatingImageId={duplicatingImageId}
-                    duplicateSuccessImageId={duplicateSuccessImageId}
-                    frameNumber={pair.index * batchVideoFrames}
-                    projectAspectRatio={projectAspectRatio}
-                    readOnly={true}
-                  />
-                </div>
-
-                {/* Right image - tap to enter move mode */}
-                <div className="flex-1 relative">
-                  <MobileImageItem
-                    image={pair.rightImage}
-                    index={pair.index + 1}
-                    isSelected={false}
-                    onMobileTap={() => {
-                      // Select this image to enter move mode
-                      setMobileSelectedIds([pair.rightImage.id as string]);
-                      setLastSelectedIndex(pair.index + 1);
-                    }}
-                    onDelete={() => {}}
-                    onOpenLightbox={() => onOpenLightbox?.(pair.index + 1)}
-                    duplicatingImageId={duplicatingImageId}
-                    duplicateSuccessImageId={duplicateSuccessImageId}
-                    frameNumber={(pair.index + 1) * batchVideoFrames}
-                    projectAspectRatio={projectAspectRatio}
-                    readOnly={true}
-                  />
-                </div>
-              </div>
-
-              {/* Video and pair indicator - centered together in the gap */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-1 pointer-events-auto">
-                {/* Show video or pending indicator */}
-                {(() => {
-                  const hasVideo = pair.segmentSlot && pair.segmentSlot.type === 'child' && pair.segmentSlot.child.location;
-                  const pairShotGenId = pair.leftImage?.id;
-                  const isPending = hasPendingTask?.(pairShotGenId);
-                  const showSegmentArea = hasVideo || isPending;
-
-                  if (!showSegmentArea) return null;
-
-                  return (
-                    <div className="w-16">
-                      {pair.segmentSlot ? (
-                        <InlineSegmentVideo
-                          slot={pair.segmentSlot}
-                          pairIndex={pair.index}
-                          onClick={() => onSegmentClick?.(pair.index)}
-                          onOpenPairSettings={onPairClick ? () => onPairClick(pair.index) : undefined}
-                          projectAspectRatio={projectAspectRatio}
-                          isMobile={true}
-                          layout="flow"
-                          compact={true}
-                          isPending={isPending}
-                        />
-                      ) : isPending ? (
-                        <div className="h-12 bg-muted/40 border-2 border-dashed border-primary/40 rounded-md flex items-center justify-center shadow-sm">
-                          <div className="flex flex-col items-center gap-0.5 text-primary">
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            <span className="text-[9px] font-medium">Pending</span>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })()}
-                {onPairClick && (
-                  <PairPromptIndicator
-                    pairIndex={pair.index}
-                    frames={batchVideoFrames}
-                    startFrame={pair.index * batchVideoFrames}
-                    endFrame={(pair.index + 1) * batchVideoFrames}
-                    isMobile={true}
-                    onClearEnhancedPrompt={onClearEnhancedPrompt}
-                    onPairClick={() => onPairClick(pair.index)}
-                    pairPrompt={pairPrompts?.[pair.index]?.prompt}
-                    pairNegativePrompt={pairPrompts?.[pair.index]?.negativePrompt}
-                    enhancedPrompt={enhancedPrompts?.[pair.index]}
-                    defaultPrompt={defaultPrompt}
-                    defaultNegativePrompt={defaultNegativePrompt}
-                    pairPhaseConfig={pairOverrides?.[pair.index]?.phaseConfig}
-                    pairLoras={pairOverrides?.[pair.index]?.loras}
-                    pairMotionSettings={pairOverrides?.[pair.index]?.motionSettings}
-                  />
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Selection bar - hidden in pair-per-row mode */}
-      </>
-    );
-  }
-
+  // Always use grid view - no mode switching to prevent component unmount/remount flashing
+  // When not in move mode, grid uses 2 columns (gridColumns variable)
   return (
     <>
       <div className={cn("grid gap-3 pt-6 overflow-visible", mobileGridColsClass)}>
@@ -520,7 +385,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
             <React.Fragment key={imageKey}>
               <div className="relative">
                 {/* Video output from previous pair - shows on LEFT if at start of row (only in move mode, not pair-per-row) */}
-                {prevImageWasEndOfRow && mobileSelectedIds.length === 0 && isInMoveMode && (() => {
+                {prevImageWasEndOfRow && !isInMoveMode && (() => {
                   const hasPrevVideo = prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location;
                   const prevPairShotGenId = prevStartImage?.id;
                   const isPrevPending = hasPendingTask?.(prevPairShotGenId);
@@ -555,7 +420,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                 })()}
 
                 {/* Pair indicator from previous image - shows on LEFT if at start of row (only in move mode, not pair-per-row) */}
-                {prevImageWasEndOfRow && onPairClick && mobileSelectedIds.length === 0 && isInMoveMode && (() => {
+                {prevImageWasEndOfRow && onPairClick && !isInMoveMode && (() => {
                   const hasPrevVideo = prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location;
                   const prevPairShotGenId = prevStartImage?.id;
                   const isPrevPending = hasPendingTask?.(prevPairShotGenId);
@@ -645,7 +510,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                 )}
                 
                 {/* Video output above pair indicator - shows on RIGHT if NOT at end of row */}
-                {!isLastItem && mobileSelectedIds.length === 0 && !((index + 1) % gridColumns === 0) && (() => {
+                {!isLastItem && !isInMoveMode && !((index + 1) % gridColumns === 0) && (() => {
                   const hasVideo = segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location;
                   const pairShotGenId = startImage?.id;
                   const isPending = hasPendingTask?.(pairShotGenId);
@@ -680,7 +545,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                 })()}
 
                 {/* Pair indicator after this image - shows on RIGHT if NOT at end of row */}
-                {!isLastItem && onPairClick && mobileSelectedIds.length === 0 && !((index + 1) % gridColumns === 0) && (() => {
+                {!isLastItem && onPairClick && !isInMoveMode && !((index + 1) % gridColumns === 0) && (() => {
                   const hasVideo = segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location;
                   const pairShotGenId = startImage?.id;
                   const isPending = hasPendingTask?.(pairShotGenId);
