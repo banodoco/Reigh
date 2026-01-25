@@ -45,6 +45,8 @@ import { LoadingSkeleton } from '../components/LoadingSkeleton';
 import { useRenderCount } from '@/shared/components/debug/RefactorMetricsCollector';
 import { VideoTravelListHeader } from '../components/VideoTravelListHeader';
 import { VideoTravelVideosGallery } from '../components/VideoTravelVideosGallery';
+import { VideoTravelFloatingOverlay } from '../components/VideoTravelFloatingOverlay';
+import { useStickyHeader } from '../hooks/useStickyHeader';
 
 // ShotEditor is imported eagerly to avoid dynamic import issues on certain mobile browsers.
 // useVideoTravelData moved to hooks/useVideoTravelData.ts
@@ -355,7 +357,17 @@ const VideoTravelToolPage: React.FC = () => {
   
   // Add ref for main container
   const mainContainerRef = useRef<HTMLDivElement>(null);
-  
+
+  // Ref for sticky header tracking (attached to ShotEditor's header)
+  const headerContainerRef = useRef<HTMLDivElement>(null);
+  const [headerReady, setHeaderReady] = useState(false);
+
+  // Callback ref to pass to ShotEditor that updates our ref
+  const headerCallbackRef = useCallback((node: HTMLDivElement | null) => {
+    headerContainerRef.current = node;
+    setHeaderReady(!!node);
+  }, []);
+
   // Use the shot navigation hook
   const { navigateToPreviousShot, navigateToNextShot, navigateToShot } = useShotNavigation();
 
@@ -869,12 +881,25 @@ const VideoTravelToolPage: React.FC = () => {
   }, [selectedShot, viaShotClick, currentShotId, shots, hashShotId, shotFromState]);
 
   // Get pane widths for positioning floating elements
-  const { 
-    isShotsPaneLocked, 
-    shotsPaneWidth, 
-    isTasksPaneLocked, 
-    tasksPaneWidth 
+  const {
+    isShotsPaneLocked,
+    shotsPaneWidth,
+    isTasksPaneLocked,
+    tasksPaneWidth
   } = usePanes();
+
+  // Sticky header for shot navigation when scrolled
+  const stickyHeader = useStickyHeader({
+    headerRef: headerContainerRef,
+    isMobile,
+    enabled: shouldShowShotEditor && headerReady
+  });
+
+  // Handler for clicking the shot name in the floating header - scroll to top and trigger edit
+  const handleFloatingHeaderNameClick = useCallback(() => {
+    // Scroll to absolute top to fully hide floating header
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   // Initialize video gallery thumbnail preloader (after dependencies are defined)
   const preloaderState = useVideoGalleryPreloader({
@@ -1698,6 +1723,7 @@ const VideoTravelToolPage: React.FC = () => {
               getFinalVideoCount={getFinalVideoCount}
               invalidateVideoCountsCache={invalidateOnVideoChanges}
               onDragStateChange={setIsDraggingInTimeline}
+              headerContainerRef={headerCallbackRef}
             />
               </>
             ) : (isNewlyCreatedShot || hashLoadingGrace) ? (
@@ -1735,7 +1761,27 @@ const VideoTravelToolPage: React.FC = () => {
         projectId={selectedProjectId}
         cropToProjectSize={uploadSettings?.cropToProjectSize ?? true}
       />
-      
+
+      {/* Floating sticky header for shot navigation when scrolled */}
+      <VideoTravelFloatingOverlay
+        sticky={{
+          shouldShowShotEditor,
+          stickyHeader,
+          shotToEdit,
+          isMobile,
+          isShotsPaneLocked,
+          shotsPaneWidth,
+          isTasksPaneLocked,
+          tasksPaneWidth,
+          hasPrevious,
+          hasNext,
+          onPreviousShot: handlePreviousShotNoScroll,
+          onNextShot: handleNextShotNoScroll,
+          onBackToShotList: handleBackToShotList,
+          onFloatingHeaderNameClick: handleFloatingHeaderNameClick,
+        }}
+      />
+
     </div>
   );
 };
