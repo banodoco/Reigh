@@ -100,18 +100,6 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   onScrubbingStart,
   scrubbing,
 }) => {
-  // [BatchModeSelection] Debug: trace segmentSlots in ImageGrid
-  console.log('[BatchModeSelection] ImageGrid received segmentSlots:', {
-    count: segmentSlots?.length || 0,
-    slotSummary: segmentSlots?.slice(0, 3).map(s => ({
-      index: s.index,
-      type: s.type,
-      childId: s.type === 'child' ? s.child.id.substring(0, 8) : null,
-      hasLocation: s.type === 'child' ? !!s.child.location : false,
-    })) || [],
-    imagesCount: images.length,
-  });
-
   return (
     <div
       className={cn("grid gap-3 pt-6 overflow-visible", gridColsClass)}
@@ -184,7 +172,8 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
             />
 
             {/* Cross-row: Previous pair's video output - shows on LEFT at start of row */}
-            {isAtStartOfRow && prevSegmentSlot && !shouldHideIndicator && (() => {
+            {/* Only show in batch mode when there's actual video content (not placeholders) */}
+            {isAtStartOfRow && prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location && !shouldHideIndicator && (() => {
               const slotIndex = index - 1;
               const isActiveScrubbing = activeScrubbingIndex === slotIndex;
               return (
@@ -214,7 +203,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
             {isAtStartOfRow && onPairClick && !shouldHideIndicator && (
               <div className={cn(
                 "absolute -left-[6px] -translate-y-1/2 -translate-x-1/2 z-30 pointer-events-auto",
-                prevSegmentSlot ? "top-[calc(50%+24px)]" : "top-1/2"
+                (prevSegmentSlot && prevSegmentSlot.type === 'child' && prevSegmentSlot.child.location) ? "top-[calc(50%+24px)]" : "top-1/2"
               )}>
                 <PairPromptIndicator
                   pairIndex={index - 1}
@@ -239,7 +228,8 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
             )}
 
             {/* Video output above pair indicator - positioned in the gap to the right (skip if at end of row) */}
-            {!isLastImage && !isAtEndOfRow && segmentSlot && !shouldHideIndicator && (() => {
+            {/* Only show in batch mode when there's actual video content (not placeholders) */}
+            {!isLastImage && !isAtEndOfRow && segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location && !shouldHideIndicator && (() => {
               const slotIndex = index;
               const isActiveScrubbing = activeScrubbingIndex === slotIndex;
               return (
@@ -269,7 +259,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
             {!isLastImage && !isAtEndOfRow && onPairClick && !shouldHideIndicator && (
               <div className={cn(
                 "absolute -right-[6px] -translate-y-1/2 translate-x-1/2 z-30 pointer-events-auto",
-                segmentSlot ? "top-[calc(50%+24px)]" : "top-1/2"
+                (segmentSlot && segmentSlot.type === 'child' && segmentSlot.child.location) ? "top-[calc(50%+24px)]" : "top-1/2"
               )}>
                 <PairPromptIndicator
                   pairIndex={index}
