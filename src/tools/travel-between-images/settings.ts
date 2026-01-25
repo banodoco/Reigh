@@ -207,13 +207,14 @@ export function buildBasicModePhaseConfig(
 
 export interface VideoTravelSettings {
   videoControlMode: 'individual' | 'batch';
-  batchVideoPrompt: string;
+  prompt: string;  // Main prompt for video generation (was batchVideoPrompt)
+  negativePrompt?: string;  // Negative prompt (was steerableMotionSettings.negative_prompt)
   batchVideoFrames: number;
   batchVideoSteps: number;
   dimensionSource?: 'project' | 'firstImage' | 'custom'; // DEPRECATED - now using aspect ratios only
   customWidth?: number; // DEPRECATED - now using aspect ratios only
   customHeight?: number; // DEPRECATED - now using aspect ratios only
-  steerableMotionSettings: SteerableMotionSettings;
+  steerableMotionSettings: SteerableMotionSettings;  // Still used for seed, debug, model_name
   enhancePrompt: boolean;
   generationMode: 'batch' | 'by-pair' | 'timeline';
   selectedModel?: 'wan-2.1' | 'wan-2.2';
@@ -237,8 +238,8 @@ export interface VideoTravelSettings {
   }>;
   // Store the shot images as part of settings
   shotImageIds?: string[];
-  // LoRAs for this shot - now synced with all other settings via useShotSettings
-  selectedLoras?: ShotLora[];
+  // LoRAs for this shot (unified field name after DB migration)
+  loras?: ShotLora[];
   // Structure video settings (per-shot basis)
   structureVideo?: {
     path: string;
@@ -262,7 +263,8 @@ export const videoTravelSettings = {
   defaults: {
     // Content fields - explicit empty defaults
     // These do NOT inherit to new shots (cleared in shotSettingsInheritance.ts)
-    batchVideoPrompt: '',
+    prompt: '',  // Main prompt for video generation
+    negativePrompt: '',  // Negative prompt
     pairConfigs: [],
     shotImageIds: [],
     phaseConfig: undefined,

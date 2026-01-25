@@ -35,8 +35,8 @@ interface BatchSettingsFormProps {
   onCustomWidthChange: (v: number | undefined) => void;
   customHeight?: number;
   onCustomHeightChange: (v: number | undefined) => void;
-  steerableMotionSettings: SteerableMotionSettings;
-  onSteerableMotionSettingsChange: (settings: Partial<SteerableMotionSettings>) => void;
+  negativePrompt: string;
+  onNegativePromptChange: (value: string) => void;
   projects: Project[];
   selectedProjectId: string | null;
   isTimelineMode?: boolean; // Add timeline mode flag
@@ -111,8 +111,8 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   onCustomWidthChange,
   customHeight,
   onCustomHeightChange,
-  steerableMotionSettings,
-  onSteerableMotionSettingsChange,
+  negativePrompt,
+  onNegativePromptChange,
   projects,
   selectedProjectId,
   isTimelineMode,
@@ -296,18 +296,18 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                   )}
                   <Textarea
                     id="negative_prompt"
-                    value={steerableMotionSettings.negative_prompt}
-                    onChange={(e) => onSteerableMotionSettingsChange({ negative_prompt: e.target.value })}
+                    value={negativePrompt}
+                    onChange={(e) => onNegativePromptChange(e.target.value)}
                     onBlur={() => onBlurSave?.()}
                     placeholder="e.g., blurry, low quality"
                     className="min-h-[120px]"
                     rows={5}
                     clearable
-                    onClear={() => onSteerableMotionSettingsChange({ negative_prompt: '' })}
+                    onClear={() => onNegativePromptChange('')}
                     voiceInput
                     voiceContext="This is a negative prompt - things to AVOID in the video generation. List unwanted qualities like 'blurry, distorted, low quality, shaky'. Keep it as a comma-separated list of terms to avoid."
                     onVoiceResult={(result) => {
-                      onSteerableMotionSettingsChange({ negative_prompt: result.prompt || result.transcription });
+                      onNegativePromptChange(result.prompt || result.transcription);
                     }}
                   />
                 </div>

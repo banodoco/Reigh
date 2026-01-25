@@ -53,11 +53,11 @@ export async function getInheritedSettings(
     if (stored) {
       mainSettings = JSON.parse(stored);
       console.warn('[ShotSettingsInherit] ✅ Inheriting main settings from project localStorage', {
-        prompt: mainSettings.batchVideoPrompt?.substring(0, 20),
+        prompt: mainSettings.prompt?.substring(0, 20),
         motionMode: mainSettings.motionMode,
         amountOfMotion: mainSettings.amountOfMotion,
         generationMode: mainSettings.generationMode,
-        loraCount: mainSettings.selectedLoras?.length || 0
+        loraCount: mainSettings.loras?.length || 0
       });
     } else {
       console.warn('[ShotSettingsInherit] ⚠️ No main settings in project localStorage');
@@ -94,11 +94,11 @@ export async function getInheritedSettings(
       if (globalStored) {
         mainSettings = JSON.parse(globalStored);
         console.warn('[ShotSettingsInherit] ✅ Inheriting main settings from GLOBAL localStorage (cross-project)', {
-          prompt: mainSettings.batchVideoPrompt?.substring(0, 20),
+          prompt: mainSettings.prompt?.substring(0, 20),
           motionMode: mainSettings.motionMode,
           amountOfMotion: mainSettings.amountOfMotion,
           generationMode: mainSettings.generationMode,
-          loraCount: mainSettings.selectedLoras?.length || 0
+          loraCount: mainSettings.loras?.length || 0
         });
       } else {
         console.warn('[ShotSettingsInherit] ⚠️ No global settings in localStorage');
@@ -146,7 +146,7 @@ export async function getInheritedSettings(
       if (!mainSettings && latestShot.settings?.['travel-between-images']) {
         mainSettings = latestShot.settings['travel-between-images'];
         console.warn('[ShotSettingsInherit] ✅ Inheriting main settings from DB shot:', latestShot.name, {
-          loraCount: mainSettings.selectedLoras?.length || 0
+          loraCount: mainSettings.loras?.length || 0
         });
       }
       
@@ -189,7 +189,7 @@ export async function getInheritedSettings(
     hasUISettings: !!uiSettings,
     hasJoinSettings: !!joinSegmentsSettings,
     generationMode: mainSettings?.generationMode,
-    loraCount: mainSettings?.selectedLoras?.length || 0,
+    loraCount: mainSettings?.loras?.length || 0,
     joinGenerateMode: joinSegmentsSettings?.generateMode,
     joinLoraCount: joinSegmentsSettings?.selectedLoras?.length || 0
   });
@@ -214,26 +214,26 @@ export async function applyInheritedSettings(
   const { mainSettings, uiSettings, joinSegmentsSettings } = inherited;
 
   // Save main settings to sessionStorage for useShotSettings to pick up
-  // LoRAs are included in mainSettings.selectedLoras
+  // LoRAs are included in mainSettings.loras
   if (mainSettings || uiSettings) {
     const defaultsToApply = {
       ...(mainSettings || {}),
       _uiSettings: uiSettings || {},
       // Always start with empty prompt fields for new shots (don't inherit)
-      batchVideoPrompt: '',
+      prompt: '',  // Main prompt for video generation
       textBeforePrompts: '',
       textAfterPrompts: '',
       pairConfigs: [],
     };
     const storageKey = STORAGE_KEYS.APPLY_PROJECT_DEFAULTS(newShotId);
     sessionStorage.setItem(storageKey, JSON.stringify(defaultsToApply));
-    
+
     console.warn('[ShotSettingsInherit] 💾 SAVED TO SESSION STORAGE:', storageKey, {
       length: JSON.stringify(defaultsToApply).length,
       motionMode: defaultsToApply.motionMode,
       amountOfMotion: defaultsToApply.amountOfMotion,
       generationMode: defaultsToApply.generationMode,
-      loraCount: defaultsToApply.selectedLoras?.length || 0
+      loraCount: defaultsToApply.loras?.length || 0
     });
   } else {
     console.warn('[ShotSettingsInherit] ⚠️ No main settings to save to sessionStorage');

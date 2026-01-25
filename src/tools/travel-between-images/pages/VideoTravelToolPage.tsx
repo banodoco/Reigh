@@ -298,6 +298,7 @@ const VideoTravelToolPage: React.FC = () => {
     handleVideoControlModeChange,
     handlePairConfigChange,
     handleBatchVideoPromptChange,
+    handleNegativePromptChange,
     handleBatchVideoFramesChange,
     handleBatchVideoStepsChange,
     handleTextBeforePromptsChange,
@@ -520,7 +521,8 @@ const VideoTravelToolPage: React.FC = () => {
 
   const {
     videoControlMode = 'batch',
-    batchVideoPrompt = '',
+    prompt: batchVideoPrompt = '',  // Aliased for local usage (field renamed from batchVideoPrompt)
+    negativePrompt = '',  // Top-level negative prompt (was steerableMotionSettings.negative_prompt)
     batchVideoFrames = 61, // Must be 4N+1 format for Wan model compatibility
     batchVideoSteps = 6,
     enhancePrompt = false,
@@ -537,7 +539,7 @@ const VideoTravelToolPage: React.FC = () => {
     steerableMotionSettings = DEFAULT_STEERABLE_MOTION_SETTINGS,
     textBeforePrompts = '',
     textAfterPrompts = '',
-    selectedLoras = [], // LoRAs now synced with all other settings
+    loras: selectedLoras = [], // Aliased for local usage (field renamed from selectedLoras)
   } = shotSettings.settings || {};
 
   // [SmoothContinuationsDebug] Log the value to trace where it comes from
@@ -1640,6 +1642,8 @@ const VideoTravelToolPage: React.FC = () => {
               onVideoControlModeChange={handleVideoControlModeChange}
               onPairConfigChange={handlePairConfigChange}
               onBatchVideoPromptChange={handleBatchVideoPromptChange}
+              negativePrompt={negativePrompt}
+              onNegativePromptChange={handleNegativePromptChange}
               textBeforePrompts={textBeforePrompts}
               onTextBeforePromptsChange={handleTextBeforePromptsChange}
               textAfterPrompts={textAfterPrompts}

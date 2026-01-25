@@ -674,7 +674,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
                 
                 // Remove prompt-related keys
                 delete filteredToolSettings.promptsByShot;
-                delete filteredToolSettings.batchVideoPrompt;
+                delete filteredToolSettings.prompt;  // Main video prompt (renamed from batchVideoPrompt)
                 delete filteredToolSettings.prompts;
                 delete filteredToolSettings.beforeEachPromptText;
                 delete filteredToolSettings.afterEachPromptText;
@@ -754,7 +754,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
                'travel-between-images': {
                  ...mainSettings,
                  // Scrub content fields for new project (keep selectedLoras)
-                 batchVideoPrompt: '',
+                 prompt: '',  // Main video prompt
                  shotImageIds: [],
                  pairConfigs: [],
                  textBeforePrompts: '',
@@ -764,7 +764,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
              
              console.log('[ProjectContext] 🧬 Inheriting shot settings from localStorage (scrubbed content):', {
                hasSettings: !!mainSettings,
-               loraCount: mainSettings.selectedLoras?.length || 0
+               loraCount: mainSettings.loras?.length || 0
              });
            }
         } catch (e) {
@@ -792,8 +792,8 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
               shotSettingsToInherit = {
                 'travel-between-images': {
                   ...mainSettings,
-                  // Scrub content fields for new project (keep selectedLoras)
-                  batchVideoPrompt: '',
+                  // Scrub content fields for new project (keep loras)
+                  prompt: '',  // Main video prompt
                   shotImageIds: [],
                   pairConfigs: [],
                   textBeforePrompts: '',
@@ -801,7 +801,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
                 }
               };
               console.log('[ProjectContext] 🧬 Inheriting shot settings from LATEST DB SHOT (scrubbed content)', {
-                loraCount: mainSettings.selectedLoras?.length || 0
+                loraCount: mainSettings.loras?.length || 0
               });
             }
           }

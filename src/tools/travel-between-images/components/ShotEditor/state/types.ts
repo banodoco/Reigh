@@ -60,7 +60,7 @@ export const DEFAULT_STEERABLE_MOTION_SETTINGS: SteerableMotionSettings = {
 // NEW: Simplified settings bundle approach
 export interface ShotSettings {
   videoControlMode: 'individual' | 'batch';
-  batchVideoPrompt: string;
+  prompt: string;  // Main prompt for video generation
   batchVideoFrames: number;
   batchVideoSteps: number;
   steerableMotionSettings: SteerableMotionSettings;
@@ -91,6 +91,8 @@ export interface ShotEditorProps {
   // OLD: Individual props (kept for backward compatibility)
   videoControlMode?: 'individual' | 'batch';
   batchVideoPrompt?: string;
+  negativePrompt?: string;
+  onNegativePromptChange?: (prompt: string) => void;
   batchVideoFrames?: number;
   onShotImagesUpdate: () => void;
   onBack: () => void;

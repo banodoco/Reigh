@@ -88,6 +88,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   videoJustQueued: parentVideoJustQueued,
   onPairConfigChange,
   onBatchVideoPromptChange,
+  negativePrompt = '',
+  onNegativePromptChange,
   onBatchVideoFramesChange,
   // onBatchVideoContextChange, // Removed
   batchVideoSteps,
@@ -1950,7 +1952,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             enhance_prompt: enhancePrompt,
             text_before_prompts: textBeforePrompts,
             text_after_prompts: textAfterPrompts,
-            default_negative_prompt: steerableMotionSettings.negative_prompt,
+            default_negative_prompt: negativePrompt,
           },
           motionConfig: {
             amount_of_motion: amountOfMotion,
@@ -2181,11 +2183,6 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     parentOnSelectionChangeRef.current?.(hasSelection);
   }, []);
 
-  // 🎯 PERF FIX: Uses ref to prevent callback recreation
-  const handleDefaultNegativePromptChange = useCallback((value: string) => {
-    onSteerableMotionSettingsChangeRef.current({ negative_prompt: value });
-  }, []);
-
   const handleShotChange = useCallback((shotId: string) => {
     console.log('[ShotEditor] Shot change requested to:', shotId);
     // Shot change will be handled by parent navigation
@@ -2254,7 +2251,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         textBeforePrompts,
         textAfterPrompts,
         basePrompt: batchVideoPrompt,
-        negativePrompt: steerableMotionSettings.negative_prompt,
+        negativePrompt,
         enhancePrompt,
         durationFrames: batchVideoFrames,
         lastGeneratedVideoUrl: lastVideoGeneration || undefined,
@@ -2265,7 +2262,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         }))
     };
     return settings;
-  }, [textBeforePrompts, textAfterPrompts, batchVideoPrompt, steerableMotionSettings.negative_prompt, enhancePrompt, batchVideoFrames, lastVideoGeneration, loraManager.selectedLoras]);
+  }, [textBeforePrompts, textAfterPrompts, batchVideoPrompt, negativePrompt, enhancePrompt, batchVideoFrames, lastVideoGeneration, loraManager.selectedLoras]);
 
   if (!selectedShot) {
     return (
@@ -2383,8 +2380,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onSelectionChange={handleSelectionChangeLocal}
             defaultPrompt={batchVideoPrompt}
             onDefaultPromptChange={onBatchVideoPromptChange}
-            defaultNegativePrompt={steerableMotionSettings.negative_prompt || ""}
-            onDefaultNegativePromptChange={handleDefaultNegativePromptChange}
+            defaultNegativePrompt={negativePrompt}
+            onDefaultNegativePromptChange={onNegativePromptChange}
             // Structure video props (legacy single-video)
             structureVideoPath={structureVideoPath}
             structureVideoMetadata={structureVideoMetadata}
@@ -2518,8 +2515,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             onCustomWidthChange={onCustomWidthChange}
                             customHeight={customHeight}
                             onCustomHeightChange={onCustomHeightChange}
-                            steerableMotionSettings={steerableMotionSettings}
-                            onSteerableMotionSettingsChange={onSteerableMotionSettingsChange}
+                            negativePrompt={negativePrompt}
+                            onNegativePromptChange={onNegativePromptChange || (() => {})}
                             projects={projects}
                             selectedProjectId={selectedProjectId}
                             selectedLoras={loraManager.selectedLoras}

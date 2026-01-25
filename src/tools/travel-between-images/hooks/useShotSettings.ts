@@ -11,7 +11,8 @@ import { DEFAULT_STEERABLE_MOTION_SETTINGS } from '../components/ShotEditor/stat
 // Default settings for new shots
 const DEFAULT_SETTINGS: VideoTravelSettings = {
   videoControlMode: 'batch',
-  batchVideoPrompt: '',
+  prompt: '',
+  negativePrompt: '',
   batchVideoFrames: 61, // Must be 4N+1 format for Wan model compatibility (61 = 4*15+1)
   batchVideoSteps: 6,
   steerableMotionSettings: DEFAULT_STEERABLE_MOTION_SETTINGS,
@@ -25,7 +26,7 @@ const DEFAULT_SETTINGS: VideoTravelSettings = {
   generationMode: 'timeline',
   generationTypeMode: 'i2v', // Default to I2V (image-to-video) mode
   pairConfigs: [],
-  selectedLoras: [],
+  loras: [],
 };
 
 export interface UseShotSettingsReturn {
@@ -95,7 +96,7 @@ export const useShotSettings = (
         
         console.log('[useShotSettings] 📦 Found inherited settings for new shot:', {
           shotId: shotId.substring(0, 8),
-          hasPrompt: !!defaults.batchVideoPrompt,
+          hasPrompt: !!defaults.prompt,
         });
         
         // Merge with defaults, ensuring proper nested object initialization

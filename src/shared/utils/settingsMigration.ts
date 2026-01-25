@@ -1,31 +1,18 @@
 /**
  * Settings Migration Utilities
  *
- * These utilities handle reading settings from both old and new formats,
- * and writing only in the new format. This enables gradual migration
- * without breaking existing data.
+ * These utilities handle reading and writing settings in the unified format.
  *
- * OLD FORMAT (shots.settings['travel-between-images']):
- * - batchVideoPrompt → prompt
- * - steerableMotionSettings.negative_prompt → negativePrompt
- * - amountOfMotion → motionAmount
- * - selectedLoras → loras
- * - selectedPhasePresetId → phasePresetId
- * - batchVideoFrames → batchFrameCount
- * - enhancePrompt → enhancePrompts
- * - generationTypeMode → generationMode
+ * SHOT SETTINGS (shots.settings['travel-between-images']):
+ * - prompt, negativePrompt, motionMode, amountOfMotion, phaseConfig,
+ *   selectedPhasePresetId, loras, numFrames, randomSeed, seed, etc.
  *
- * OLD FORMAT (shot_generations.metadata):
- * - pair_prompt → segmentOverrides.prompt
- * - pair_negative_prompt → segmentOverrides.negativePrompt
- * - pair_motion_settings.amount_of_motion → segmentOverrides.motionAmount
- * - pair_motion_settings.motion_mode → segmentOverrides.motionMode
- * - pair_phase_config → segmentOverrides.phaseConfig
- * - pair_loras → segmentOverrides.loras
- * - pair_num_frames → segmentOverrides.frameCount
- * - pair_random_seed → segmentOverrides.randomSeed
- * - pair_seed → segmentOverrides.seed
- * - pair_selected_phase_preset_id → segmentOverrides.phasePresetId
+ * SEGMENT OVERRIDES (shot_generations.metadata.segmentOverrides):
+ * - prompt, negativePrompt, motionMode, amountOfMotion, phaseConfig,
+ *   selectedPhasePresetId, loras, numFrames, randomSeed, seed
+ *
+ * NOTE: Old field names (batchVideoPrompt, selectedLoras, pair_* fields) were
+ * migrated to new names via DB migration 20260125_migrate_settings_field_names.sql.
  */
 
 import type {
@@ -95,8 +82,7 @@ export function motionAmountToBackend(value: number): number {
 // =============================================================================
 
 /**
- * Read shot settings with automatic migration from old format.
- * Returns normalized format, reads from either old or new field locations.
+ * Read shot settings from unified format.
  *
  * @param raw - Raw settings object from shots.settings['travel-between-images']
  * @returns Normalized ShotVideoSettings
@@ -104,33 +90,24 @@ export function motionAmountToBackend(value: number): number {
 export function readShotSettings(raw: Record<string, any> | null | undefined): ShotVideoSettings {
   if (!raw) return { ...DEFAULT_SHOT_VIDEO_SETTINGS };
 
-  // Determine negative prompt (new location or old nested location)
-  const negativePrompt =
-    raw.negativePrompt ??
-    raw.steerableMotionSettings?.negative_prompt ??
-    DEFAULT_SHOT_VIDEO_SETTINGS.negativePrompt;
-
-  // Determine motion amount (normalize to 0-100)
-  const amountOfMotion = normalizeMotionAmount(raw.amountOfMotion);
-
   return {
-    // Prompts (batchVideoPrompt is the old name)
-    prompt: raw.prompt ?? raw.batchVideoPrompt ?? DEFAULT_SHOT_VIDEO_SETTINGS.prompt,
-    negativePrompt,
+    // Prompts (unified field names after DB migration)
+    prompt: raw.prompt ?? DEFAULT_SHOT_VIDEO_SETTINGS.prompt,
+    negativePrompt: raw.negativePrompt ?? DEFAULT_SHOT_VIDEO_SETTINGS.negativePrompt,
 
     // Motion
     motionMode: raw.motionMode ?? DEFAULT_SHOT_VIDEO_SETTINGS.motionMode,
-    amountOfMotion,
+    amountOfMotion: normalizeMotionAmount(raw.amountOfMotion),
 
-    // Advanced config (selectedPhasePresetId is existing name)
+    // Advanced config
     phaseConfig: raw.phaseConfig,
     selectedPhasePresetId: raw.selectedPhasePresetId ?? DEFAULT_SHOT_VIDEO_SETTINGS.selectedPhasePresetId,
 
-    // LoRAs (selectedLoras is existing name)
-    loras: migrateLoras(raw.loras ?? raw.selectedLoras),
+    // LoRAs (unified field name after DB migration)
+    loras: migrateLoras(raw.loras),
 
-    // Video (numFrames for segment, batchVideoFrames for batch)
-    numFrames: raw.numFrames ?? raw.batchVideoFrames ?? DEFAULT_SHOT_VIDEO_SETTINGS.numFrames,
+    // Video
+    numFrames: raw.numFrames ?? DEFAULT_SHOT_VIDEO_SETTINGS.numFrames,
 
     // Seed
     randomSeed: raw.randomSeed ?? DEFAULT_SHOT_VIDEO_SETTINGS.randomSeed,
@@ -139,14 +116,14 @@ export function readShotSettings(raw: Record<string, any> | null | undefined): S
     // Variant behavior
     makePrimaryVariant: raw.makePrimaryVariant ?? DEFAULT_SHOT_VIDEO_SETTINGS.makePrimaryVariant,
 
-    // Batch-specific (using existing field names)
+    // Batch-specific
     batchVideoFrames: raw.batchVideoFrames ?? DEFAULT_SHOT_VIDEO_SETTINGS.batchVideoFrames,
     textBeforePrompts: raw.textBeforePrompts ?? DEFAULT_SHOT_VIDEO_SETTINGS.textBeforePrompts,
     textAfterPrompts: raw.textAfterPrompts ?? DEFAULT_SHOT_VIDEO_SETTINGS.textAfterPrompts,
     enhancePrompt: raw.enhancePrompt ?? DEFAULT_SHOT_VIDEO_SETTINGS.enhancePrompt,
     generationTypeMode: raw.generationTypeMode ?? DEFAULT_SHOT_VIDEO_SETTINGS.generationTypeMode,
 
-    // Legacy (preserve for backwards compat reads)
+    // Legacy (for any code still reading this)
     advancedMode: raw.advancedMode,
   };
 }
@@ -190,7 +167,7 @@ export function writeShotSettings(settings: ShotVideoSettings): Record<string, a
 // =============================================================================
 
 /**
- * Read segment overrides from pair metadata with automatic migration.
+ * Read segment overrides from metadata.
  * Returns sparse SegmentOverrides with only overridden fields.
  *
  * @param metadata - Raw metadata object from shot_generations.metadata
@@ -200,85 +177,67 @@ export function readSegmentOverrides(metadata: Record<string, any> | null | unde
   if (!metadata) return {};
 
   const overrides: SegmentOverrides = {};
-
-  // Check new location first, then old location
-  const newOverrides = metadata.segmentOverrides ?? {};
+  const segmentOverrides = metadata.segmentOverrides ?? {};
 
   // Prompt - include empty strings to distinguish "explicitly empty" from "no override"
-  const prompt = newOverrides.prompt ?? metadata.pair_prompt;
-  if (prompt !== undefined) {
-    overrides.prompt = prompt;
+  if (segmentOverrides.prompt !== undefined) {
+    overrides.prompt = segmentOverrides.prompt;
   }
 
   // Negative prompt - include empty strings to distinguish "explicitly empty" from "no override"
-  const negativePrompt = newOverrides.negativePrompt ?? metadata.pair_negative_prompt;
-  if (negativePrompt !== undefined) {
-    overrides.negativePrompt = negativePrompt;
+  if (segmentOverrides.negativePrompt !== undefined) {
+    overrides.negativePrompt = segmentOverrides.negativePrompt;
   }
 
-  // Motion mode (from new location or old pair_motion_settings)
-  const motionMode =
-    newOverrides.motionMode ??
-    metadata.pair_motion_settings?.motion_mode;
-  if (motionMode !== undefined) {
-    overrides.motionMode = motionMode;
+  // Motion mode
+  if (segmentOverrides.motionMode !== undefined) {
+    overrides.motionMode = segmentOverrides.motionMode;
   }
 
-  // Motion amount (normalize from 0-1 if from old format)
-  const rawMotionAmount =
-    newOverrides.amountOfMotion ??
-    metadata.pair_motion_settings?.amount_of_motion;
-  if (rawMotionAmount !== undefined) {
-    overrides.amountOfMotion = normalizeMotionAmount(rawMotionAmount);
+  // Motion amount (normalize to 0-100 scale)
+  if (segmentOverrides.amountOfMotion !== undefined) {
+    overrides.amountOfMotion = normalizeMotionAmount(segmentOverrides.amountOfMotion);
   }
 
   // Phase config
-  const phaseConfig = newOverrides.phaseConfig ?? metadata.pair_phase_config;
-  if (phaseConfig !== undefined) {
-    overrides.phaseConfig = phaseConfig;
+  if (segmentOverrides.phaseConfig !== undefined) {
+    overrides.phaseConfig = segmentOverrides.phaseConfig;
   }
 
-  // Phase preset ID (using existing field name)
-  const selectedPhasePresetId =
-    newOverrides.selectedPhasePresetId ??
-    metadata.pair_selected_phase_preset_id;
-  if (selectedPhasePresetId !== undefined) {
-    overrides.selectedPhasePresetId = selectedPhasePresetId;
+  // Phase preset ID
+  if (segmentOverrides.selectedPhasePresetId !== undefined) {
+    overrides.selectedPhasePresetId = segmentOverrides.selectedPhasePresetId;
   }
 
   // LoRAs - include empty arrays to distinguish "explicitly no loras" from "no override"
-  const loras = newOverrides.loras ?? metadata.pair_loras;
-  if (loras !== undefined && Array.isArray(loras)) {
-    overrides.loras = migrateLoras(loras);
+  if (segmentOverrides.loras !== undefined && Array.isArray(segmentOverrides.loras)) {
+    overrides.loras = migrateLoras(segmentOverrides.loras);
   }
 
-  // Frame count (using existing field name: numFrames)
-  const numFrames = newOverrides.numFrames ?? metadata.pair_num_frames;
-  if (numFrames !== undefined) {
-    overrides.numFrames = numFrames;
+  // Frame count
+  if (segmentOverrides.numFrames !== undefined) {
+    overrides.numFrames = segmentOverrides.numFrames;
   }
 
   // Random seed
-  const randomSeed = newOverrides.randomSeed ?? metadata.pair_random_seed;
-  if (randomSeed !== undefined) {
-    overrides.randomSeed = randomSeed;
+  if (segmentOverrides.randomSeed !== undefined) {
+    overrides.randomSeed = segmentOverrides.randomSeed;
   }
 
   // Seed
-  const seed = newOverrides.seed ?? metadata.pair_seed;
-  if (seed !== undefined) {
-    overrides.seed = seed;
+  if (segmentOverrides.seed !== undefined) {
+    overrides.seed = segmentOverrides.seed;
   }
 
-  // Structure video overrides (new format only, no legacy fields)
-  if (newOverrides.structureMotionStrength !== undefined) {
-    overrides.structureMotionStrength = newOverrides.structureMotionStrength;
+  // Structure video overrides
+  if (segmentOverrides.structureMotionStrength !== undefined) {
+    overrides.structureMotionStrength = segmentOverrides.structureMotionStrength;
   }
-  if (newOverrides.structureTreatment !== undefined) {
-    overrides.structureTreatment = newOverrides.structureTreatment;
+  if (segmentOverrides.structureTreatment !== undefined) {
+    overrides.structureTreatment = segmentOverrides.structureTreatment;
   }
-  if (newOverrides.structureUni3cEndPercent !== undefined) {
-    overrides.structureUni3cEndPercent = newOverrides.structureUni3cEndPercent;
+  if (segmentOverrides.structureUni3cEndPercent !== undefined) {
+    overrides.structureUni3cEndPercent = segmentOverrides.structureUni3cEndPercent;
   }
 
   return overrides;

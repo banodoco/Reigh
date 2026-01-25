@@ -524,12 +524,10 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
                     onCustomWidthChange={() => {}} // No-op
                     customHeight={taskSettings.height}
                     onCustomHeightChange={() => {}} // No-op
-                    steerableMotionSettings={{
-                      seed: taskSettings.seed,
-                      negative_prompt: taskSettings.negative_prompt,
-                      model_name: 'wan_2_2_i2v'
-                    }}
-                    onSteerableMotionSettingsChange={() => {}} // No-op
+                    negativePrompt={taskSettings.negative_prompt || ''}
+                    onNegativePromptChange={() => {}} // No-op
+                    projects={[]}
+                    selectedProjectId={null}
                     enhancePrompt={taskSettings.enhancePrompt}
                     onEnhancePromptChange={() => {}} // No-op
                     turboMode={taskSettings.turboMode}
@@ -542,9 +540,10 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
                     selectedPhasePresetId={null}
                     onPhasePresetSelect={() => {}} // No-op
                     onPhasePresetRemove={() => {}} // No-op
-                    projectId="shared-project"
-                    shotId="shared-shot"
-                    isCloudGenerationEnabled={true}
+                    accelerated={false}
+                    onAcceleratedChange={() => {}} // No-op
+                    randomSeed={true}
+                    onRandomSeedChange={() => {}} // No-op
                   />
                 </div>
               </div>

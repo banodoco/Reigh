@@ -83,7 +83,7 @@ export const TOOL_FIELD_CATEGORIES = {
   
   'travel-between-images': {
     content: [
-      'batchVideoPrompt',   // Main batch prompt
+      'prompt',             // Main batch prompt (renamed from batchVideoPrompt)
       'pairConfigs',        // Individual pair configs (contain prompts)
       'shotImageIds',       // Images in this shot
       'phaseConfig',        // Advanced phase configuration
@@ -105,6 +105,7 @@ export const TOOL_FIELD_CATEGORIES = {
       'turboMode',          // Turbo mode toggle
       'amountOfMotion',     // Motion intensity
       'advancedMode',       // Show advanced settings
+      'loras',              // LoRAs (renamed from selectedLoras)
     ],
   },
   

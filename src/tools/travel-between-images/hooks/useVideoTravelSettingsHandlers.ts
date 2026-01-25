@@ -36,15 +36,16 @@ interface UseVideoTravelSettingsHandlersParams {
 export interface VideoTravelSettingsHandlers {
   // Video control mode
   handleVideoControlModeChange: (mode: 'individual' | 'batch') => void;
-  
+
   // Pair configs
   handlePairConfigChange: (pairId: string, field: 'prompt' | 'frames' | 'context', value: string | number) => void;
-  
+
   // Batch video settings
   handleBatchVideoPromptChange: (prompt: string) => void;
+  handleNegativePromptChange: (prompt: string) => void;
   handleBatchVideoFramesChange: (frames: number) => void;
   handleBatchVideoStepsChange: (steps: number) => void;
-  
+
   // Text prompts
   handleTextBeforePromptsChange: (text: string) => void;
   handleTextAfterPromptsChange: (text: string) => void;
@@ -123,15 +124,13 @@ export const useVideoTravelSettingsHandlers = ({
   // BATCH VIDEO SETTINGS
   // =============================================================================
   const handleBatchVideoPromptChange = useCallback((prompt: string) => {
-    // Write to BOTH fields to ensure migration reads the correct value
-    // readShotSettings reads: raw.prompt ?? raw.batchVideoPrompt
-    // So we must update `prompt` (new name) as well as `batchVideoPrompt` (old name)
-    shotSettingsRef.current.updateFields({
-      prompt,
-      batchVideoPrompt: prompt,
-    });
+    shotSettingsRef.current.updateField('prompt', prompt);
   }, [shotSettingsRef]);
-  
+
+  const handleNegativePromptChange = useCallback((prompt: string) => {
+    shotSettingsRef.current.updateField('negativePrompt', prompt);
+  }, [shotSettingsRef]);
+
   const handleBatchVideoFramesChange = useCallback((frames: number) => {
     shotSettingsRef.current.updateField('batchVideoFrames', frames);
   }, [shotSettingsRef]);
@@ -218,7 +217,7 @@ export const useVideoTravelSettingsHandlers = ({
     
     const useVaceMode = (options?.generationTypeMode ?? currentSettings?.generationTypeMode) === 'vace';
     const motion = options?.amountOfMotion ?? currentSettings?.amountOfMotion ?? 50;
-    const loras = options?.selectedLoras ?? (currentSettings?.selectedLoras || []).map(l => ({
+    const loras = options?.selectedLoras ?? (currentSettings?.loras || []).map(l => ({
       path: l.path,
       strength: l.strength
     }));
@@ -267,7 +266,7 @@ export const useVideoTravelSettingsHandlers = ({
         const currentSettings = shotSettingsRef.current.settings;
         const useVaceMode = currentSettings?.generationTypeMode === 'vace';
         const currentMotion = currentSettings?.amountOfMotion ?? 50;
-        const currentLoras = (currentSettings?.selectedLoras || []).map(l => ({
+        const currentLoras = (currentSettings?.loras || []).map(l => ({
           path: l.path,
           strength: l.strength
         }));
@@ -469,10 +468,10 @@ export const useVideoTravelSettingsHandlers = ({
   // =============================================================================
   // LORAS
   // =============================================================================
-  const handleSelectedLorasChange = useCallback((loras: any[]) => {
-    shotSettingsRef.current.updateField('selectedLoras', loras);
+  const handleSelectedLorasChange = useCallback((lorasToSet: any[]) => {
+    shotSettingsRef.current.updateField('loras', lorasToSet);
     rebuildPhaseConfig({
-      selectedLoras: (loras || []).map(l => ({ path: l.path, strength: l.strength }))
+      selectedLoras: (lorasToSet || []).map(l => ({ path: l.path, strength: l.strength }))
     });
   }, [shotSettingsRef, rebuildPhaseConfig]);
 
@@ -481,6 +480,7 @@ export const useVideoTravelSettingsHandlers = ({
     handleVideoControlModeChange,
     handlePairConfigChange,
     handleBatchVideoPromptChange,
+    handleNegativePromptChange,
     handleBatchVideoFramesChange,
     handleBatchVideoStepsChange,
     handleTextBeforePromptsChange,

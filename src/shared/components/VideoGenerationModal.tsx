@@ -126,7 +126,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
   
   // Selected LoRAs as ActiveLora[]
   const selectedLoras = useMemo(() => {
-    return (settings.selectedLoras || []).map(lora => ({
+    return (settings.loras || []).map(lora => ({
       id: lora.id,
       name: lora.name,
       path: lora.path,
@@ -134,7 +134,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
       previewImageUrl: lora.previewImageUrl,
       trigger_word: lora.trigger_word,
     }));
-  }, [settings.selectedLoras]);
+  }, [settings.loras]);
   
   // Validate preset ID - only pass known preset IDs to prevent "not found" errors
   // Known presets are: builtin defaults + featured presets from the constant
@@ -167,31 +167,30 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
       previewImageUrl: lora['Preview Image URL'] as string | undefined,
       trigger_word: lora['Trigger Word'] as string | undefined,
     };
-    const currentLoras = settings.selectedLoras || [];
+    const currentLoras = settings.loras || [];
     if (!currentLoras.some(l => l.id === newLora.id)) {
-      updateField('selectedLoras', [...currentLoras, newLora]);
+      updateField('loras', [...currentLoras, newLora]);
     }
     setIsLoraModalOpen(false);
-  }, [settings.selectedLoras, updateField]);
-  
+  }, [settings.loras, updateField]);
+
   const handleRemoveLora = useCallback((loraId: string) => {
-    updateField('selectedLoras', (settings.selectedLoras || []).filter(l => l.id !== loraId));
-  }, [settings.selectedLoras, updateField]);
-  
+    updateField('loras', (settings.loras || []).filter(l => l.id !== loraId));
+  }, [settings.loras, updateField]);
+
   const handleLoraStrengthChange = useCallback((loraId: string, strength: number) => {
-    updateField('selectedLoras', (settings.selectedLoras || []).map(l => 
+    updateField('loras', (settings.loras || []).map(l =>
       l.id === loraId ? { ...l, strength } : l
     ));
-  }, [settings.selectedLoras, updateField]);
+  }, [settings.loras, updateField]);
   
   const handleAddTriggerWord = useCallback((loraId: string, word: string) => {
-    const currentPrompt = settings.batchVideoPrompt || '';
+    const currentPrompt = settings.prompt || '';
     if (!currentPrompt.includes(word)) {
       const newPrompt = currentPrompt ? `${currentPrompt}, ${word}` : word;
-      // Write to BOTH fields for migration compatibility
-      updateFields({ prompt: newPrompt, batchVideoPrompt: newPrompt });
+      updateField('prompt', newPrompt);
     }
-  }, [settings.batchVideoPrompt, updateFields]);
+  }, [settings.prompt, updateField]);
   
   // Model name helper
   // Model selection depends on structure video TYPE:
@@ -261,7 +260,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
         generationMode: 'batch',
         // Grouped configs (snake_case matching API)
         promptConfig: {
-          base_prompt: settings.batchVideoPrompt || '',
+          base_prompt: settings.prompt || '',
           enhance_prompt: settings.enhancePrompt || false,
           text_before_prompts: settings.textBeforePrompts,
           text_after_prompts: settings.textAfterPrompts,
@@ -445,8 +444,8 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
                   <div className="lg:w-1/2">
                     <div className="mb-4"><SectionHeader title="Settings" theme="orange" /></div>
                     <BatchSettingsForm
-                      batchVideoPrompt={settings.batchVideoPrompt || ''}
-                      onBatchVideoPromptChange={(v) => updateFields({ prompt: v, batchVideoPrompt: v })}
+                      batchVideoPrompt={settings.prompt || ''}
+                      onBatchVideoPromptChange={(v) => updateField('prompt', v)}
                       batchVideoFrames={settings.batchVideoFrames || 61}
                       onBatchVideoFramesChange={(v) => updateField('batchVideoFrames', v)}
                       batchVideoSteps={settings.batchVideoSteps || 6}
@@ -457,8 +456,8 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
                       onCustomWidthChange={(v) => updateField('customWidth', v)}
                       customHeight={settings.customHeight}
                       onCustomHeightChange={(v) => updateField('customHeight', v)}
-                      steerableMotionSettings={settings.steerableMotionSettings || DEFAULT_STEERABLE_MOTION_SETTINGS}
-                      onSteerableMotionSettingsChange={(v) => updateField('steerableMotionSettings', { ...(settings.steerableMotionSettings || DEFAULT_STEERABLE_MOTION_SETTINGS), ...v })}
+                      negativePrompt={settings.negativePrompt || ''}
+                      onNegativePromptChange={(v) => updateField('negativePrompt', v)}
                       projects={projects}
                       selectedProjectId={selectedProjectId}
                       selectedLoras={selectedLoras}

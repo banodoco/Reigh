@@ -603,30 +603,27 @@ export function useSegmentSettings({
         seed: settings.seed,
       };
 
-      // Use OLD field names for shot settings (useShotSettings reads raw settings with old names)
-      // The migration utility handles reading both formats, but writes need to match read expectations
+      // Use unified field names for shot settings
       const shotPatch = {
-        batchVideoPrompt: patch.prompt,
-        steerableMotionSettings: {
-          negative_prompt: patch.negativePrompt,
-        },
+        prompt: patch.prompt,
+        negativePrompt: patch.negativePrompt,
         motionMode: patch.motionMode,
         amountOfMotion: patch.amountOfMotion,
         phaseConfig: patch.phaseConfig,
         selectedPhasePresetId: patch.selectedPhasePresetId,
-        selectedLoras: patch.loras,
+        loras: patch.loras,
       };
 
       console.log(`[SetAsShotDefaults] 📤 Sending patch to updateToolSettingsSupabase:`, {
         shotId: shotId.substring(0, 8),
         shotPatch: {
-          batchVideoPrompt: shotPatch.batchVideoPrompt?.substring(0, 50) || '(empty)',
-          negativePrompt: shotPatch.steerableMotionSettings?.negative_prompt?.substring(0, 50) || '(empty)',
+          prompt: shotPatch.prompt?.substring(0, 50) || '(empty)',
+          negativePrompt: shotPatch.negativePrompt?.substring(0, 50) || '(empty)',
           motionMode: shotPatch.motionMode,
           amountOfMotion: shotPatch.amountOfMotion,
           hasPhaseConfig: !!shotPatch.phaseConfig,
-          loraCount: shotPatch.selectedLoras?.length ?? 0,
-          loraNames: shotPatch.selectedLoras?.map(l => l.name) ?? [],
+          loraCount: shotPatch.loras?.length ?? 0,
+          loraNames: shotPatch.loras?.map((l: any) => l.name) ?? [],
         },
       });
 
@@ -643,8 +640,8 @@ export function useSegmentSettings({
 
       console.log(`[SetAsShotDefaults] ✅ updateToolSettingsSupabase returned:`, {
         shotId: shotId.substring(0, 8),
-        resultPrompt: result?.batchVideoPrompt?.substring(0, 50) || '(none in result)',
-        resultLoraCount: result?.selectedLoras?.length ?? 0,
+        resultPrompt: result?.prompt?.substring(0, 50) || '(none in result)',
+        resultLoraCount: result?.loras?.length ?? 0,
       });
 
       // Refetch query caches so changes are visible everywhere:
