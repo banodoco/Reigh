@@ -23,7 +23,9 @@ export const MediaWrapper: React.FC<MediaWrapperProps> = ({ children, className,
         className
       )}
       style={{
-        // Constrain height to leave room for controls and padding
+        // Explicit height for children's h-full/max-h-full to reference
+        // Without this, percentage-based heights in children resolve to auto
+        height: 'calc(100vh - 220px)',
         maxHeight: 'calc(100vh - 220px)',
         ...props.style
       }}

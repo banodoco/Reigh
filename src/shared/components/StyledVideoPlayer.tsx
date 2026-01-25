@@ -250,9 +250,11 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
     }
   }, [togglePlayPause]);
 
+  // The wrapper needs explicit height to pass through to the video's max-h-full
+  // When in a flex container, we inherit the height via h-full
   return (
-    <div 
-      className={cn("relative block", className)}
+    <div
+      className={cn("relative h-full flex items-center justify-center", className)}
       style={style}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
@@ -268,8 +270,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
         autoPlay={autoPlay}
         playsInline={playsInline}
         preload={preload}
-        className="w-full h-auto object-contain rounded-lg bg-black cursor-pointer"
-        style={{ maxHeight: '100%' }}
+        className="block max-w-full max-h-full object-contain rounded-lg bg-black cursor-pointer"
         onDoubleClick={isMobile ? undefined : toggleFullscreen}
         onLoadedMetadata={onLoadedMetadata}
       >
@@ -278,11 +279,11 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
 
       {/* Thumbnail overlay while video is loading */}
       {poster && !isVideoReady && (
-        <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <img
             src={getDisplayUrl(poster)}
             alt=""
-            className="w-full h-full object-contain rounded-lg"
+            className="max-w-full max-h-full object-contain rounded-lg"
           />
           {/* Loading spinner overlay */}
           <div className="absolute inset-0 flex items-center justify-center">

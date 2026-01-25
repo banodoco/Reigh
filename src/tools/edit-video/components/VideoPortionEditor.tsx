@@ -23,10 +23,14 @@ function SegmentThumbnail({ videoUrl, time, size = 'small' }: { videoUrl: string
   const [error, setError] = useState(false);
   const loadedRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  
-  // Canvas dimensions based on size
-  const canvasWidth = size === 'large' ? 160 : 48;
-  const canvasHeight = size === 'large' ? 90 : 27;
+  const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number } | null>(null);
+
+  // Canvas dimensions based on size and video aspect ratio
+  // Default to 16:9 if dimensions not yet known
+  const baseWidth = size === 'large' ? 160 : 48;
+  const aspectRatio = videoDimensions ? videoDimensions.width / videoDimensions.height : 16 / 9;
+  const canvasWidth = baseWidth;
+  const canvasHeight = Math.round(baseWidth / aspectRatio);
   
   useEffect(() => {
     // Reset loaded state when videoUrl or time changes
@@ -64,6 +68,15 @@ function SegmentThumbnail({ videoUrl, time, size = 'small' }: { videoUrl: string
         const ctx = canvas.getContext('2d');
         if (ctx) {
           try {
+            // Update canvas dimensions based on actual video dimensions
+            if (video.videoWidth && video.videoHeight) {
+              const videoAspect = video.videoWidth / video.videoHeight;
+              const targetWidth = size === 'large' ? 160 : 48;
+              const targetHeight = Math.round(targetWidth / videoAspect);
+              canvas.width = targetWidth;
+              canvas.height = targetHeight;
+              setVideoDimensions({ width: video.videoWidth, height: video.videoHeight });
+            }
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             loadedRef.current = true;
             setLoaded(true);
@@ -80,6 +93,10 @@ function SegmentThumbnail({ videoUrl, time, size = 'small' }: { videoUrl: string
     };
     
     const handleLoadedData = () => {
+      // Capture video dimensions for proper aspect ratio
+      if (video.videoWidth && video.videoHeight) {
+        setVideoDimensions({ width: video.videoWidth, height: video.videoHeight });
+      }
       // Seek to time once video data is ready
       if (video.duration && time <= video.duration) {
         video.currentTime = time;
@@ -126,19 +143,20 @@ function SegmentThumbnail({ videoUrl, time, size = 'small' }: { videoUrl: string
       video.src = '';
       video.load();
     };
-  }, [videoUrl, time, error]);
+  }, [videoUrl, time, error, size]);
   
   return (
-    <canvas 
+    <canvas
       ref={canvasRef}
       width={canvasWidth}
       height={canvasHeight}
       className={cn(
         "rounded border border-border/50",
-        size === 'large' ? "w-full aspect-video" : "w-8 h-[18px]",
+        size === 'large' ? "w-full h-auto" : "w-8 h-auto",
         !loaded && !error && "bg-muted/30 animate-pulse",
         error && "bg-destructive/20"
       )}
+      style={size === 'large' ? { aspectRatio: `${canvasWidth} / ${canvasHeight}` } : undefined}
     />
   );
 }

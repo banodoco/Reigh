@@ -228,6 +228,13 @@ export const useVariants = ({
         console.log('[useVariants] Single-segment child - propagating to parent:', generation.parent_generation_id.substring(0, 8));
 
         // Create a new variant on the parent with the promoted video
+        // Exclude task-specific fields that shouldn't propagate to parent
+        const {
+          source_task_id: _sourceTaskId,
+          child_generation_id: _childGenId,
+          ...paramsToPropagate
+        } = (promotedVariant.params || {}) as Record<string, unknown>;
+
         const { error: insertError } = await supabase
           .from('generation_variants')
           .insert({
@@ -237,7 +244,7 @@ export const useVariants = ({
             is_primary: true, // DB trigger will unset old primary
             variant_type: 'travel_segment',
             params: {
-              ...promotedVariant.params,
+              ...paramsToPropagate,
               propagated_from_child: generationId,
               propagated_from_variant: variantId,
             },

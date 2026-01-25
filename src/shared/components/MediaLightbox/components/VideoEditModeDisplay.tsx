@@ -117,6 +117,54 @@ export const VideoEditModeDisplay: React.FC<VideoEditModeDisplayProps> = ({
     }
   };
 
+  // Poll for video metadata - handles race conditions and cached videos
+  useEffect(() => {
+    // If we already have duration, no need to poll
+    if (videoDuration > 0) {
+      console.log('[VideoEditMode] Already have duration:', videoDuration);
+      return;
+    }
+
+    let cancelled = false;
+
+    const checkVideoReady = () => {
+      const video = videoRef.current;
+      console.log('[VideoEditMode] Checking video ready:', {
+        hasRef: !!video,
+        readyState: video?.readyState,
+        duration: video?.duration,
+        src: video?.src?.substring(0, 50),
+      });
+      if (video && Number.isFinite(video.duration) && video.duration > 0) {
+        console.log('[VideoEditMode] Video ready! Duration:', video.duration);
+        onLoadedMetadata(video.duration);
+        return true;
+      }
+      return false;
+    };
+
+    // Poll every 50ms until video is ready (max 3 seconds)
+    let attempts = 0;
+    const maxAttempts = 60;
+
+    const poll = () => {
+      if (cancelled) return;
+      if (checkVideoReady()) return;
+      attempts++;
+      if (attempts < maxAttempts) {
+        setTimeout(poll, 50);
+      } else {
+        console.log('[VideoEditMode] Gave up polling after', maxAttempts, 'attempts');
+      }
+    };
+
+    poll();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [videoRef, onLoadedMetadata, videoDuration]);
+
   const handlePlayPause = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -127,8 +175,25 @@ export const VideoEditModeDisplay: React.FC<VideoEditModeDisplayProps> = ({
     }
   };
 
+  // Render video directly without wrapper - parent handles centering
+  // Overlays are positioned relative to parent container
   return (
-    <div className="relative w-full h-full flex flex-col items-center justify-center">
+    <>
+      <video
+        ref={videoRef}
+        src={videoUrl}
+        poster={posterUrl}
+        muted
+        autoPlay
+        playsInline
+        controls={false}
+        preload="auto"
+        className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded cursor-pointer"
+        style={{ WebkitAppearance: 'none' }}
+        onLoadedMetadata={handleLoadedMetadata}
+        onClick={handlePlayPause}
+      />
+
       {/* Position overlay - top left */}
       {videoDuration > 0 && (
         <div className="absolute top-3 left-3 z-10 flex items-center gap-1.5 text-[11px] font-mono text-white/80 bg-black/50 backdrop-blur-sm rounded px-2 py-1">
@@ -164,23 +229,9 @@ export const VideoEditModeDisplay: React.FC<VideoEditModeDisplayProps> = ({
         {isPlaying ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8 ml-1" />}
       </button>
 
-      <video
-        ref={videoRef}
-        src={videoUrl}
-        poster={posterUrl}
-        muted
-        playsInline
-        controls={false}
-        preload="auto"
-        className="max-w-full max-h-[calc(100%-140px)] object-contain shadow-wes border border-border/20 rounded cursor-pointer"
-        style={{ WebkitAppearance: 'none' }}
-        onLoadedMetadata={handleLoadedMetadata}
-        onClick={handlePlayPause}
-      />
-
       {/* Timeline overlay for portion selection */}
       {videoDuration > 0 && (
-        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
+        <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 z-20">
           <div className="bg-black/80 backdrop-blur-sm rounded-lg p-3">
             <MultiPortionTimeline
               duration={videoDuration}
@@ -205,7 +256,7 @@ export const VideoEditModeDisplay: React.FC<VideoEditModeDisplayProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

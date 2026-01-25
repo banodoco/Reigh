@@ -17,8 +17,6 @@ import { BaseShotImageManagerProps } from './types';
 import { PairPromptIndicator } from './components/PairPromptIndicator';
 import { InlineSegmentVideo } from '@/tools/travel-between-images/components/Timeline/InlineSegmentVideo';
 
-const DOUBLE_TAP_WINDOW_MS = 275;
-
 export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   images,
   onImageDelete,
@@ -70,16 +68,6 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     shotsPaneWidth, 
     tasksPaneWidth 
   } = usePanes();
-
-  // Double-tap detection for mobile taps
-  const lastTapTimeRef = useRef<number>(0);
-  const lastTappedIdRef = useRef<string | null>(null);
-  const pendingSingleTapRef = useRef<{
-    imageId: string;
-    previousSelection: string[];
-    previousLastSelectedIndex: number | null;
-  } | null>(null);
-  const pendingSingleTapClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // In selection/move mode, use configured columns. Otherwise, use 2 cols for pair-per-row view
   const isInMoveMode = mobileSelectedIds.length > 0;
@@ -176,54 +164,11 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   }, [images, isOptimisticUpdate, optimisticOrder]);
 
   // Mobile tap handler for selection (disabled in readOnly)
-  const clearPendingSingleTap = useCallback(() => {
-    if (pendingSingleTapClearTimeoutRef.current) {
-      clearTimeout(pendingSingleTapClearTimeoutRef.current);
-      pendingSingleTapClearTimeoutRef.current = null;
-    }
-    pendingSingleTapRef.current = null;
-  }, []);
-
+  // Simple toggle - no double-tap detection needed since we show a lightbox button when selected
   const handleMobileTap = useCallback((imageId: string, index: number) => {
     if (readOnly) return; // Don't allow selection in readOnly mode
 
-    const now = Date.now();
-    const timeDiff = now - lastTapTimeRef.current;
-    const isSameImage = lastTappedIdRef.current === imageId;
-    const isDoubleTap =
-      timeDiff > 10 && timeDiff < DOUBLE_TAP_WINDOW_MS && isSameImage;
-
-    if (isDoubleTap) {
-      const pendingState = pendingSingleTapRef.current;
-      if (pendingState?.imageId === imageId) {
-        setMobileSelectedIds(pendingState.previousSelection);
-        setLastSelectedIndex(pendingState.previousLastSelectedIndex);
-      }
-      clearPendingSingleTap();
-      if (onOpenLightbox) {
-        onOpenLightbox(index);
-      }
-      lastTapTimeRef.current = 0;
-      lastTappedIdRef.current = null;
-      return;
-    }
-
     const wasSelected = mobileSelectedIds.includes(imageId);
-    const previousSelectionSnapshot = [...mobileSelectedIds];
-    const previousLastSelectedIndexSnapshot = lastSelectedIndex;
-
-    clearPendingSingleTap();
-
-    pendingSingleTapRef.current = {
-      imageId,
-      previousSelection: previousSelectionSnapshot,
-      previousLastSelectedIndex: previousLastSelectedIndexSnapshot,
-    };
-
-    pendingSingleTapClearTimeoutRef.current = setTimeout(() => {
-      pendingSingleTapRef.current = null;
-      pendingSingleTapClearTimeoutRef.current = null;
-    }, DOUBLE_TAP_WINDOW_MS);
 
     if (wasSelected) {
       setMobileSelectedIds(prev => prev.filter(id => id !== imageId));
@@ -232,10 +177,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
       setMobileSelectedIds(prev => [...prev, imageId]);
       setLastSelectedIndex(index);
     }
-
-    lastTapTimeRef.current = now;
-    lastTappedIdRef.current = imageId;
-  }, [mobileSelectedIds, readOnly, onOpenLightbox, clearPendingSingleTap, lastSelectedIndex]);
+  }, [mobileSelectedIds, readOnly, lastSelectedIndex]);
 
   // Cleanup any pending single-tap timeout on unmount
   React.useEffect(() => {

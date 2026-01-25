@@ -695,7 +695,8 @@ export function MultiPortionTimeline({
                 onMouseDown={(e) => startDrag(e, selection.id, 'start')}
                 onTouchStart={(e) => {
                   e.preventDefault(); // Prevent text selection on iPad
-                  startDrag(e, selection.id, 'start');
+                  // On touch devices, use tap-to-select mode instead of drag
+                  handleHandleTap(e, selection.id, 'start');
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -727,7 +728,8 @@ export function MultiPortionTimeline({
                 onMouseDown={(e) => startDrag(e, selection.id, 'end')}
                 onTouchStart={(e) => {
                   e.preventDefault(); // Prevent text selection on iPad
-                  startDrag(e, selection.id, 'end');
+                  // On touch devices, use tap-to-select mode instead of drag
+                  handleHandleTap(e, selection.id, 'end');
                 }}
                 onClick={(e) => {
                   e.stopPropagation();

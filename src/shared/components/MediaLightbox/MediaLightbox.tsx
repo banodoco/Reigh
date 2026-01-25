@@ -926,6 +926,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     activeVariantLocation: activeVariant?.location, // Use variant's image URL when editing a variant
     createAsGeneration, // If true, create a new generation instead of a variant
     advancedSettings, // Pass advanced settings for hires fix
+    // Canvas-based rendering URLs (for single canvas approach on mobile)
+    // Use activeVariant.location if available, otherwise effectiveImageUrl
+    imageUrl: !isVideo ? (activeVariant?.location || effectiveImageUrl) : undefined,
+    thumbnailUrl: !isVideo ? (activeVariant?.thumbnail_url || media.thumbUrl) : undefined,
   });
   const {
     isInpaintMode,
@@ -952,6 +956,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,
+    // Konva-based handlers
+    handleKonvaPointerDown,
+    handleKonvaPointerMove,
+    handleKonvaPointerUp,
+    handleShapeClick,
     handleUndo,
     handleClearMask,
     handleEnterInpaintMode,
@@ -960,6 +969,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleDeleteSelected,
     handleToggleFreeForm,
     getDeleteButtonPosition,
+    // Canvas-based rendering
+    isImageLoaded: isInpaintImageLoaded,
+    imageLoadError: inpaintImageLoadError,
+    isDrawing,
+    currentStroke,
   } = inpaintingHook;
   
   // ============================================
@@ -2083,9 +2097,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setVideoEditSubMode(restoredMode);
     setPersistedPanelMode('edit');
 
-    // Only trigger trim mode change if restoring to trim
+    // Set the appropriate mode flags based on restored sub-mode
     if (restoredMode === 'trim') {
+      videoEditing.setIsVideoEditMode(false);
       onTrimModeChange?.(true);
+    } else if (restoredMode === 'replace') {
+      videoEditing.setIsVideoEditMode(true);
+      resetTrim();
+    } else if (restoredMode === 'regenerate') {
+      videoEditing.setIsVideoEditMode(false);
+      resetTrim();
     }
 
     // Try to capture video duration from already-loaded video element
@@ -2097,7 +2118,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
         }
       });
     }, 100);
-  }, [onTrimModeChange, setVideoDuration, persistedVideoEditSubMode, setVideoEditSubMode, setPersistedPanelMode, canRegenerate]);
+  }, [onTrimModeChange, setVideoDuration, persistedVideoEditSubMode, setVideoEditSubMode, setPersistedPanelMode, canRegenerate, videoEditing, resetTrim]);
 
   // Handle exiting video edit mode entirely
   const handleExitVideoEditMode = useCallback(() => {
@@ -3200,7 +3221,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isRepositionDragging={isRepositionDragging}
                       imageContainerRef={imageContainerRef}
                       canvasRef={canvasRef}
-                      displayCanvasRef={displayCanvasRef}
                       maskCanvasRef={maskCanvasRef}
                       onImageLoad={setImageDimensions}
                       onVideoLoadedMetadata={(e) => {
@@ -3209,14 +3229,24 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                           setVideoDuration(video.duration);
                         }
                       }}
-                      handlePointerDown={handlePointerDown}
-                      handlePointerMove={handlePointerMove}
-                      handlePointerUp={handlePointerUp}
                       onContainerClick={onClose}
                       variant="desktop-side-panel"
                       containerClassName="max-w-full max-h-full"
                       tasksPaneWidth={effectiveTasksPaneOpen && !isMobile ? effectiveTasksPaneWidth : 0}
                       debugContext="Desktop"
+                      // Konva-based stroke overlay props
+                      imageDimensions={imageDimensions}
+                      brushStrokes={brushStrokes}
+                      currentStroke={currentStroke}
+                      isDrawing={isDrawing}
+                      isEraseMode={isEraseMode}
+                      brushSize={brushSize}
+                      annotationMode={editMode === 'annotate' ? annotationMode : null}
+                      selectedShapeId={selectedShapeId}
+                      onStrokePointerDown={handleKonvaPointerDown}
+                      onStrokePointerMove={handleKonvaPointerMove}
+                      onStrokePointerUp={handleKonvaPointerUp}
+                      onShapeClick={handleShapeClick}
                     />
                   )}
 
@@ -3346,7 +3376,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         isEraseMode={isEraseMode}
                         onSetBrushSize={setBrushSize}
                         onSetIsEraseMode={setIsEraseMode}
-                        annotationMode={annotationMode}
+                        annotationMode={editMode === 'annotate' ? annotationMode : null}
                         onSetAnnotationMode={setAnnotationMode}
                         repositionTransform={repositionTransform}
                         onRepositionTranslateXChange={setTranslateX}
@@ -3548,7 +3578,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               <div className="w-full h-full flex flex-col bg-black/90">
                 {/* Media section - Top (50% height) with swipe navigation */}
                 <div
-                  className="flex-1 flex items-center justify-center relative touch-pan-y"
+                  className="flex-none flex items-center justify-center relative touch-pan-y z-10"
                   style={{
                     height: '50%',
                     transform: swipeNavigation.isSwiping ? `translateX(${swipeNavigation.swipeOffset}px)` : undefined,
@@ -3620,16 +3650,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       isRepositionDragging={isRepositionDragging}
                       imageContainerRef={imageContainerRef}
                       canvasRef={canvasRef}
-                      displayCanvasRef={displayCanvasRef}
                       maskCanvasRef={maskCanvasRef}
                       onImageLoad={setImageDimensions}
-                      handlePointerDown={handlePointerDown}
-                      handlePointerMove={handlePointerMove}
-                      handlePointerUp={handlePointerUp}
                       onContainerClick={onClose}
                       variant="mobile-stacked"
                       containerClassName="w-full h-full"
                       debugContext="Mobile Stacked"
+                      // Konva-based stroke overlay props
+                      imageDimensions={imageDimensions}
+                      brushStrokes={brushStrokes}
+                      currentStroke={currentStroke}
+                      isDrawing={isDrawing}
+                      isEraseMode={isEraseMode}
+                      brushSize={brushSize}
+                      annotationMode={editMode === 'annotate' ? annotationMode : null}
+                      selectedShapeId={selectedShapeId}
+                      onStrokePointerDown={handleKonvaPointerDown}
+                      onStrokePointerMove={handleKonvaPointerMove}
+                      onStrokePointerUp={handleKonvaPointerUp}
+                      onShapeClick={handleShapeClick}
                     />
                     )}
 
@@ -3703,7 +3742,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         isEraseMode={isEraseMode}
                         onSetBrushSize={setBrushSize}
                         onSetIsEraseMode={setIsEraseMode}
-                        annotationMode={annotationMode}
+                        annotationMode={editMode === 'annotate' ? annotationMode : null}
                         onSetAnnotationMode={setAnnotationMode}
                         repositionTransform={repositionTransform}
                         onRepositionTranslateXChange={setTranslateX}
@@ -4012,16 +4051,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     isRepositionDragging={isRepositionDragging}
                     imageContainerRef={imageContainerRef}
                     canvasRef={canvasRef}
-                    displayCanvasRef={displayCanvasRef}
                     maskCanvasRef={maskCanvasRef}
                     onImageLoad={setImageDimensions}
-                    handlePointerDown={handlePointerDown}
-                    handlePointerMove={handlePointerMove}
-                    handlePointerUp={handlePointerUp}
                     onContainerClick={onClose}
                     variant="regular-centered"
                     containerClassName="w-full h-full"
                     debugContext="Regular Centered"
+                    // Konva-based stroke overlay props
+                    imageDimensions={imageDimensions}
+                    brushStrokes={brushStrokes}
+                    currentStroke={currentStroke}
+                    isDrawing={isDrawing}
+                    isEraseMode={isEraseMode}
+                    brushSize={brushSize}
+                    annotationMode={editMode === 'annotate' ? annotationMode : null}
+                    selectedShapeId={selectedShapeId}
+                    onStrokePointerDown={handleKonvaPointerDown}
+                    onStrokePointerMove={handleKonvaPointerMove}
+                    onStrokePointerUp={handleKonvaPointerUp}
+                    onShapeClick={handleShapeClick}
                   />
                 )}
 

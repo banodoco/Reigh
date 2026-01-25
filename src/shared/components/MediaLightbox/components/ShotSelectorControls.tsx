@@ -322,7 +322,7 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
           onClick={handleJumpToShot}
           className="flex items-center gap-1.5 px-2.5 py-1 mt-1 text-xs text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors whitespace-nowrap"
         >
-          <span>Jump to {selectedShot.name}</span>
+          <span>{selectedShot.name}</span>
           <ArrowRight className="w-3 h-3" />
         </button>
       )}

@@ -1,5 +1,7 @@
 import React from 'react';
 import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
+import { StrokeOverlay, BrushStroke } from './StrokeOverlay';
+import type { KonvaEventObject } from 'konva/lib/Node';
 
 interface MediaDisplayWithCanvasProps {
   // Media info
@@ -24,36 +26,47 @@ interface MediaDisplayWithCanvasProps {
     onPointerCancel: (e: React.PointerEvent) => void;
   };
   isRepositionDragging?: boolean;
-  
+
   // Refs
   imageContainerRef: React.RefObject<HTMLDivElement>;
   canvasRef: React.RefObject<HTMLCanvasElement>;
-  displayCanvasRef: React.RefObject<HTMLCanvasElement>;
   maskCanvasRef: React.RefObject<HTMLCanvasElement>;
-  
+
   // Handlers
   onImageLoad?: (dimensions: { width: number; height: number }) => void;
   onVideoLoadedMetadata?: (e: React.SyntheticEvent<HTMLVideoElement>) => void;
-  handlePointerDown?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
-  handlePointerMove?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
-  handlePointerUp?: (e: React.PointerEvent<HTMLCanvasElement>) => void;
   /** Called when clicking on the container background (not on media content) */
   onContainerClick?: () => void;
-  
+
   // Styling variants
   variant?: 'desktop-side-panel' | 'mobile-stacked' | 'regular-centered';
   className?: string;
   containerClassName?: string;
-  
+
   // Layout adjustments
   tasksPaneWidth?: number; // Width of tasks pane to adjust for (desktop only)
-  
+
   // Playback constraints (for trim preview)
   playbackStart?: number;
   playbackEnd?: number;
-  
+
   // Debug
   debugContext?: string;
+
+  // === Konva-based stroke overlay props ===
+  imageDimensions?: { width: number; height: number } | null;
+  brushStrokes?: BrushStroke[];
+  currentStroke?: Array<{ x: number; y: number }>;
+  isDrawing?: boolean;
+  isEraseMode?: boolean;
+  brushSize?: number;
+  annotationMode?: 'rectangle' | null;
+  selectedShapeId?: string | null;
+  // Handlers receive coordinates in IMAGE space (Konva handles conversion)
+  onStrokePointerDown?: (point: { x: number; y: number }, e: KonvaEventObject<PointerEvent>) => void;
+  onStrokePointerMove?: (point: { x: number; y: number }, e: KonvaEventObject<PointerEvent>) => void;
+  onStrokePointerUp?: (e: KonvaEventObject<PointerEvent>) => void;
+  onShapeClick?: (strokeId: string, point: { x: number; y: number }) => void;
 }
 
 export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
@@ -69,13 +82,9 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   isRepositionDragging = false,
   imageContainerRef,
   canvasRef,
-  displayCanvasRef,
   maskCanvasRef,
   onImageLoad,
   onVideoLoadedMetadata,
-  handlePointerDown,
-  handlePointerMove,
-  handlePointerUp,
   onContainerClick,
   variant = 'regular-centered',
   className = '',
@@ -83,8 +92,26 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   tasksPaneWidth = 0,
   playbackStart,
   playbackEnd,
-  debugContext = 'MediaDisplay'
+  debugContext = 'MediaDisplay',
+  // Konva stroke overlay props
+  imageDimensions,
+  brushStrokes = [],
+  currentStroke = [],
+  isDrawing = false,
+  isEraseMode = false,
+  brushSize = 20,
+  annotationMode = null,
+  selectedShapeId = null,
+  onStrokePointerDown,
+  onStrokePointerMove,
+  onStrokePointerUp,
+  onShapeClick,
 }) => {
+  // Track the display size AND position of the image for Konva overlay
+  const [displaySize, setDisplaySize] = React.useState({ width: 0, height: 0 });
+  const [imageOffset, setImageOffset] = React.useState({ left: 0, top: 0 });
+  const imageWrapperRef = React.useRef<HTMLDivElement>(null);
+  const imageRef = React.useRef<HTMLImageElement>(null);
   const [imageLoadError, setImageLoadError] = React.useState(false);
   // Progressive loading: show thumbnail first, then swap to full image when loaded
   const [fullImageLoaded, setFullImageLoaded] = React.useState(() => {
@@ -134,7 +161,40 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
       setFullImageLoaded(false);
     }
   }, [effectiveImageUrl, thumbUrl, debugContext, onImageLoad]);
-  
+
+  // Measure the actual image element for Konva Stage size and position
+  // This is more accurate than measuring the wrapper because the image has the
+  // actual constrained dimensions applied via max-w-full max-h-full
+  React.useEffect(() => {
+    const img = imageRef.current;
+    const wrapper = imageWrapperRef.current;
+    if (!img || !wrapper) return;
+
+    const updateSize = () => {
+      const { clientWidth, clientHeight, offsetLeft, offsetTop } = img;
+      console.log('[KonvaDebug] Image element:', {
+        clientWidth,
+        clientHeight,
+        offsetLeft,
+        offsetTop,
+        wrapperWidth: wrapper.clientWidth,
+        wrapperHeight: wrapper.clientHeight
+      });
+      if (clientWidth > 0 && clientHeight > 0) {
+        setDisplaySize({ width: clientWidth, height: clientHeight });
+        setImageOffset({ left: offsetLeft, top: offsetTop });
+      }
+    };
+
+    // Update on load and resize
+    updateSize();
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(img);
+    resizeObserver.observe(wrapper);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
   // Variant-specific styling
   const getMediaStyle = (): React.CSSProperties => {
     switch (variant) {
@@ -237,7 +297,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
       }}
     >
       {isVideo ? (
-        // Video Player
+        // Video Player - StyledVideoPlayer handles its own centering
         <StyledVideoPlayer
           src={effectiveImageUrl}
           poster={thumbUrl}
@@ -246,19 +306,30 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
           autoPlay
           playsInline
           preload="auto"
-          className={`shadow-wes border border-border/20 ${variant === 'regular-centered' ? 'rounded' : ''}`}
+          className={`max-w-full max-h-full shadow-wes border border-border/20 ${variant === 'regular-centered' ? 'rounded' : ''}`}
           style={mediaStyle}
           onLoadedMetadata={onVideoLoadedMetadata}
           playbackStart={playbackStart}
           playbackEnd={playbackEnd}
         />
       ) : (
-        // Image with Canvas Overlays - Progressive loading: thumbnail first, then full image
-        // When showing thumbnail (loading), use w-full h-full so it doesn't appear smaller
-        // Once full image loads, inline-block sizes exactly to image content
+        // Image with Canvas Overlays
+        // Use a single relative container with the image and canvas both using same centering/constraints
         <div
-          className={`relative max-w-full max-h-full ${fullImageLoaded ? 'inline-block' : 'w-full h-full flex items-center justify-center'}`}
+          className="relative w-full h-full flex items-center justify-center"
           style={{
+            // Checkered pattern background for reposition mode
+            ...(isRepositionMode ? {
+              backgroundImage: `
+                linear-gradient(45deg, #1a1a2e 25%, transparent 25%),
+                linear-gradient(-45deg, #1a1a2e 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #1a1a2e 75%),
+                linear-gradient(-45deg, transparent 75%, #1a1a2e 75%)
+              `,
+              backgroundSize: '20px 20px',
+              backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+              backgroundColor: '#252540',
+            } : {}),
             // Enable drag-to-move cursor in reposition mode
             cursor: isRepositionMode
               ? (isRepositionDragging ? 'grabbing' : 'grab')
@@ -276,59 +347,103 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
             onPointerCancel: repositionDragHandlers.onPointerCancel,
           } : {})}
         >
-          {/* Use thumbnail or full image based on loading state */}
-          <img
-            src={thumbUrl && thumbUrl !== effectiveImageUrl && !fullImageLoaded ? thumbUrl : effectiveImageUrl}
-            alt="Media content"
-            draggable={false}
-            className={`
-              block object-contain select-none
-              ${fullImageLoaded ? 'max-w-full max-h-full' : 'w-full h-full'}
-              ${variant === 'regular-centered' ? 'rounded' : ''}
-              ${isFlippedHorizontally ? 'scale-x-[-1]' : ''}
-              ${isSaving ? 'opacity-30' : 'opacity-100'}
-              ${isInpaintMode ? 'pointer-events-none' : ''}
-              ${editMode === 'reposition' ? 'transition-transform duration-75' : 'transition-opacity duration-300'}
-              ${className}
-            `.trim()}
-            style={{
-              ...mediaStyle,
-              ...(editMode === 'reposition' && repositionTransformStyle ? repositionTransformStyle : {}),
-              transform: editMode === 'reposition' && repositionTransformStyle?.transform
-                ? repositionTransformStyle.transform
-                : (isFlippedHorizontally ? 'scaleX(-1)' : 'none'),
-              transformOrigin: editMode === 'reposition' ? 'center center' : undefined,
-              pointerEvents: isInpaintMode ? 'none' : 'auto',
-              // Keep image below settings panel during reposition (z-80 is the panel)
-              zIndex: editMode === 'reposition' ? 40 : undefined,
-              position: editMode === 'reposition' ? 'relative' : undefined,
-            }}
-            onLoad={(e) => {
-              const img = e.target as HTMLImageElement;
-              // Only call onImageLoad when the full image (not thumbnail) loads
-              if (img.src === effectiveImageUrl || !thumbUrl || thumbUrl === effectiveImageUrl) {
-                console.log(`[${debugContext}] ✅ Full image loaded successfully:`, {
-                  url: effectiveImageUrl.substring(0, 100),
-                  width: img.naturalWidth,
-                  height: img.naturalHeight
+          {/*
+            Wrapper fills available space. Image is constrained within via max-w/h.
+            Konva overlay is positioned absolutely at the image's exact location.
+          */}
+          <div
+            ref={imageWrapperRef}
+            className="relative w-full h-full flex items-center justify-center overflow-hidden"
+          >
+            {/* Use thumbnail or full image based on loading state */}
+            <img
+              ref={imageRef}
+              src={thumbUrl && thumbUrl !== effectiveImageUrl && !fullImageLoaded ? thumbUrl : effectiveImageUrl}
+              alt="Media content"
+              draggable={false}
+              className={`
+                block max-w-full max-h-full select-none
+                ${variant === 'regular-centered' ? 'rounded' : ''}
+                ${isFlippedHorizontally ? 'scale-x-[-1]' : ''}
+                ${isSaving ? 'opacity-30' : 'opacity-100'}
+                ${isInpaintMode ? 'pointer-events-none' : ''}
+                ${editMode === 'reposition' ? 'transition-transform duration-75' : 'transition-opacity duration-300'}
+                ${className}
+              `.trim()}
+              style={{
+                ...mediaStyle,
+                ...(editMode === 'reposition' && repositionTransformStyle ? repositionTransformStyle : {}),
+                transform: editMode === 'reposition' && repositionTransformStyle?.transform
+                  ? repositionTransformStyle.transform
+                  : (isFlippedHorizontally ? 'scaleX(-1)' : 'none'),
+                transformOrigin: editMode === 'reposition' ? 'center center' : undefined,
+                pointerEvents: isInpaintMode ? 'none' : 'auto',
+                // Keep image below settings panel during reposition (z-80 is the panel)
+                zIndex: editMode === 'reposition' ? 40 : undefined,
+                position: editMode === 'reposition' ? 'relative' : undefined,
+              }}
+              onLoad={(e) => {
+                const img = e.target as HTMLImageElement;
+                // Only call onImageLoad when the full image (not thumbnail) loads
+                if (img.src === effectiveImageUrl || !thumbUrl || thumbUrl === effectiveImageUrl) {
+                  console.log(`[${debugContext}] ✅ Full image loaded successfully:`, {
+                    url: effectiveImageUrl.substring(0, 100),
+                    width: img.naturalWidth,
+                    height: img.naturalHeight
+                  });
+                  setFullImageLoaded(true);
+                  onImageLoad?.({
+                    width: img.naturalWidth,
+                    height: img.naturalHeight
+                  });
+                } else {
+                  console.log(`[${debugContext}] 🖼️ Thumbnail loaded, preloading full image...`);
+                }
+              }}
+              onError={(e) => {
+                console.error(`[${debugContext}] ❌ Image load error:`, {
+                  url: effectiveImageUrl,
+                  error: e
                 });
-                setFullImageLoaded(true);
-                onImageLoad?.({
-                  width: img.naturalWidth,
-                  height: img.naturalHeight
-                });
-              } else {
-                console.log(`[${debugContext}] 🖼️ Thumbnail loaded, preloading full image...`);
-              }
-            }}
-            onError={(e) => {
-              console.error(`[${debugContext}] ❌ Image load error:`, {
-                url: effectiveImageUrl,
-                error: e
-              });
-              setImageLoadError(true);
-            }}
-          />
+                setImageLoadError(true);
+              }}
+            />
+
+            {/* Overlay container - positioned exactly over the image */}
+            {isInpaintMode && (editMode === 'inpaint' || editMode === 'annotate') &&
+             imageDimensions && onStrokePointerDown && displaySize.width > 0 && displaySize.height > 0 && (
+              <div
+                className="absolute overflow-hidden"
+                style={{
+                  zIndex: 50,
+                  // Position exactly over the image element
+                  left: imageOffset.left,
+                  top: imageOffset.top,
+                  width: displaySize.width,
+                  height: displaySize.height,
+                }}
+              >
+                <StrokeOverlay
+                  imageWidth={imageDimensions.width}
+                  imageHeight={imageDimensions.height}
+                  displayWidth={displaySize.width}
+                  displayHeight={displaySize.height}
+                  strokes={brushStrokes}
+                  currentStroke={currentStroke}
+                  isDrawing={isDrawing}
+                  isEraseMode={isEraseMode}
+                  brushSize={brushSize}
+                  annotationMode={annotationMode}
+                  selectedShapeId={selectedShapeId}
+                  onPointerDown={onStrokePointerDown}
+                  onPointerMove={onStrokePointerMove!}
+                  onPointerUp={onStrokePointerUp!}
+                  onShapeClick={onShapeClick}
+                />
+                <canvas ref={maskCanvasRef} className="hidden" />
+              </div>
+            )}
+          </div>
 
           {/* Preload full image in background when showing thumbnail */}
           {thumbUrl && thumbUrl !== effectiveImageUrl && !fullImageLoaded && (
@@ -353,12 +468,15 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
           )}
 
           {/* Original Image Bounds Outline - Shows the canvas boundary in reposition mode */}
-          {isRepositionMode && (
+          {isRepositionMode && displaySize.width > 0 && displaySize.height > 0 && (
             <div
               className="absolute pointer-events-none z-[45]"
               style={{
-                // This overlay shows the original image boundary - inset:0 now matches the wrapper which fits the image
-                inset: 0,
+                // Position exactly over the image element
+                left: imageOffset.left,
+                top: imageOffset.top,
+                width: displaySize.width,
+                height: displaySize.height,
                 border: '2px dashed rgba(59, 130, 246, 0.7)',
                 borderRadius: variant === 'regular-centered' ? '4px' : undefined,
                 boxShadow: 'inset 0 0 0 2px rgba(59, 130, 246, 0.2)',
@@ -395,69 +513,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
             className="hidden"
           />
 
-          {/* Canvas Overlay for Inpainting/Annotate - only show for modes that need drawing */}
-          {(() => {
-            // Only show canvas for inpaint and annotate modes, not for reposition/img2img/text
-            const shouldRenderCanvas = isInpaintMode && (editMode === 'inpaint' || editMode === 'annotate');
-            console.log(`[${debugContext}] 🖼️ Canvas render check`, {
-              isInpaintMode,
-              editMode,
-              hasDisplayCanvasRef: !!displayCanvasRef,
-              hasDisplayCanvas: !!displayCanvasRef?.current,
-              shouldRenderCanvas
-            });
-            return shouldRenderCanvas;
-          })() && (
-            <>
-              {/* Display Canvas - User draws here */}
-              <canvas
-                ref={displayCanvasRef}
-                className={`absolute top-0 left-0 ${editMode === 'text' || editMode === 'reposition' ? 'pointer-events-none' : 'pointer-events-auto cursor-crosshair'}`}
-                style={{
-                  touchAction: editMode === 'text' ? 'auto' : variant === 'mobile-stacked' ? 'pan-y pinch-zoom' : 'none',
-                  zIndex: 50,
-                  userSelect: 'none',
-                  WebkitUserSelect: 'none'
-                }}
-                onPointerDown={(e) => {
-                  console.log(`[${debugContext}] 🎨 Canvas onPointerDown`, {
-                    clientX: e.clientX,
-                    clientY: e.clientY,
-                    canvasWidth: displayCanvasRef.current?.width,
-                    canvasHeight: displayCanvasRef.current?.height,
-                    isInpaintMode,
-                    hasHandler: !!handlePointerDown
-                  });
-                  handlePointerDown?.(e);
-                }}
-                onPointerMove={(e) => {
-                  console.log(`[${debugContext}] 🖌️ Canvas onPointerMove`, {
-                    clientX: e.clientX,
-                    clientY: e.clientY
-                  });
-                  handlePointerMove?.(e);
-                }}
-                onPointerUp={(e) => {
-                  console.log(`[${debugContext}] 🛑 Canvas onPointerUp`);
-                  handlePointerUp?.(e);
-                }}
-                onPointerCancel={(e) => {
-                  console.log(`[${debugContext}] ⚠️ Canvas onPointerCancel`);
-                  handlePointerUp?.(e);
-                }}
-                onDragStart={(e) => {
-                  console.log(`[${debugContext}] 🚫 Preventing drag`);
-                  e.preventDefault();
-                }}
-              />
-
-              {/* Mask Canvas - Hidden, stores the mask */}
-              <canvas
-                ref={maskCanvasRef}
-                className="hidden"
-              />
-            </>
-          )}
+          {/* Canvas is now inside the image wrapper above */}
         </div>
       )}
     </div>
