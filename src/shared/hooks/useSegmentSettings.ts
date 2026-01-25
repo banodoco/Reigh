@@ -552,16 +552,32 @@ export function useSegmentSettings({
         seed: settings.seed,
       };
 
+      // Map segment field names to shot settings field names:
+      // - segment `prompt` → shot `batchVideoPrompt`
+      // - segment `negativePrompt` → shot `steerableMotionSettings.negative_prompt`
+      // - segment `loras` → shot `selectedLoras`
+      const shotPatch = {
+        batchVideoPrompt: patch.prompt,
+        steerableMotionSettings: {
+          negative_prompt: patch.negativePrompt,
+        },
+        motionMode: patch.motionMode,
+        amountOfMotion: patch.amountOfMotion,
+        phaseConfig: patch.phaseConfig,
+        selectedPhasePresetId: patch.selectedPhasePresetId,
+        selectedLoras: patch.loras,
+      };
+
       console.log(`[SetAsShotDefaults] 📤 Sending patch to updateToolSettingsSupabase:`, {
         shotId: shotId.substring(0, 8),
-        patch: {
-          prompt: patch.prompt?.substring(0, 50) || '(empty)',
-          negativePrompt: patch.negativePrompt?.substring(0, 50) || '(empty)',
-          motionMode: patch.motionMode,
-          amountOfMotion: patch.amountOfMotion,
-          hasPhaseConfig: !!patch.phaseConfig,
-          loraCount: patch.loras?.length ?? 0,
-          loraNames: patch.loras?.map(l => l.name) ?? [],
+        shotPatch: {
+          batchVideoPrompt: shotPatch.batchVideoPrompt?.substring(0, 50) || '(empty)',
+          negativePrompt: shotPatch.steerableMotionSettings?.negative_prompt?.substring(0, 50) || '(empty)',
+          motionMode: shotPatch.motionMode,
+          amountOfMotion: shotPatch.amountOfMotion,
+          hasPhaseConfig: !!shotPatch.phaseConfig,
+          loraCount: shotPatch.selectedLoras?.length ?? 0,
+          loraNames: shotPatch.selectedLoras?.map(l => l.name) ?? [],
         },
       });
 
@@ -573,13 +589,13 @@ export function useSegmentSettings({
         scope: 'shot',
         id: shotId,
         toolId: 'travel-between-images',
-        patch,
+        patch: shotPatch,
       }, undefined, 'immediate');
 
       console.log(`[SetAsShotDefaults] ✅ updateToolSettingsSupabase returned:`, {
         shotId: shotId.substring(0, 8),
-        resultPrompt: result?.prompt?.substring(0, 50) || '(none in result)',
-        resultLoraCount: result?.loras?.length ?? 0,
+        resultPrompt: result?.batchVideoPrompt?.substring(0, 50) || '(none in result)',
+        resultLoraCount: result?.selectedLoras?.length ?? 0,
       });
 
       // Invalidate and refetch query caches so changes are visible everywhere:
