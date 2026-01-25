@@ -1,6 +1,15 @@
-import { defineConfig } from "vite";
+import { defineConfig, createLogger } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+
+// Custom logger to suppress known benign warnings
+const logger = createLogger();
+const originalWarn = logger.warn.bind(logger);
+logger.warn = (msg, options) => {
+  // Suppress PostCSS "from" option warning (known issue with tailwindcss)
+  if (msg.includes('postcss.parse') && msg.includes('from')) return;
+  originalWarn(msg, options);
+};
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }: { mode: string }) => {
@@ -10,6 +19,7 @@ export default defineConfig(({ mode }: { mode: string }) => {
   const port = process.env.PORT ? parseInt(process.env.PORT) : 2222;
 
   return {
+    customLogger: logger,
     server: {
       host: "::", // Allows access from other devices on the network
       port: port,
