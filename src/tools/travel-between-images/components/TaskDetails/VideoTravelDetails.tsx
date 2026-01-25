@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { TaskDetailsProps, getVariantConfig, parseTaskParams, deriveInputImages } from './taskDetailsConfig';
+import { TaskDetailsProps, getVariantConfig, parseTaskParams, deriveInputImages, derivePrompt } from './taskDetailsConfig';
 import { getDisplayNameFromUrl } from '../../utils/loraDisplayUtils';
 
 /**
@@ -98,25 +98,8 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
   // In basic mode, we don't show phase config details even if they exist internally
   const showPhaseContentInRightColumn = isAdvancedMode && phaseConfig?.phases && variant === 'panel';
 
-  // Get prompts - check multiple locations for segment tasks
-  const prompt = useMemo(() => {
-    // For segment tasks, prefer individual_segment_params first
-    if (isSegmentTask) {
-      return individualSegmentParams?.base_prompt ||
-        parsedParams?.base_prompt ||
-        parsedParams?.prompt ||
-        orchestratorDetails?.base_prompt ||
-        null;
-    }
-    // For full timeline/orchestrated tasks
-    return orchestratorDetails?.base_prompts_expanded?.[0] ||
-      orchestratorPayload?.base_prompts_expanded?.[0] ||
-      orchestratorDetails?.base_prompt ||
-      orchestratorPayload?.base_prompt ||
-      parsedParams?.base_prompt ||
-      parsedParams?.prompt ||
-      null;
-  }, [isSegmentTask, individualSegmentParams, parsedParams, orchestratorDetails, orchestratorPayload]);
+  // Get prompt using shared utility
+  const prompt = useMemo(() => derivePrompt(parsedParams), [parsedParams]);
   
   const negativePrompt = individualSegmentParams?.negative_prompt ||
     (isSegmentTask 

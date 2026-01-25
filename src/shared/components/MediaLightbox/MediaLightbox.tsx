@@ -118,7 +118,7 @@ import { VideoPortionEditor } from '@/tools/edit-video/components/VideoPortionEd
 import { MultiPortionTimeline } from '@/shared/components/VideoPortionTimeline';
 import { useVideoEditing } from './hooks/useVideoEditing';
 import { readSegmentOverrides } from '@/shared/utils/settingsMigration';
-import { deriveInputImages } from '@/tools/travel-between-images/components/TaskDetails/taskDetailsConfig';
+import { deriveInputImages } from '@/shared/utils/taskParamsUtils';
 
 interface ShotOption {
   id: string;

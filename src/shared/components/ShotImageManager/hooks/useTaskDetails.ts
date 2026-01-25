@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
+import { deriveInputImages } from '@/shared/utils/taskParamsUtils';
 
 interface UseTaskDetailsProps {
   generationId: string | null;
@@ -19,31 +20,6 @@ interface UseTaskDetailsReturn {
 }
 
 /**
- * Derives input images from task params
- * Checks multiple possible locations where images might be stored
- */
-function deriveInputImages(task: any): string[] {
-  if (!task?.params) return [];
-  
-  const params = task.params;
-  const inputImages: string[] = [];
-  
-  // Check various possible locations for input images
-  if (params.input_image) inputImages.push(params.input_image);
-  if (params.image) inputImages.push(params.image);
-  if (params.init_image) inputImages.push(params.init_image);
-  if (params.control_image) inputImages.push(params.control_image);
-  if (params.images && Array.isArray(params.images)) {
-    inputImages.push(...params.images);
-  }
-  if (params.input_images && Array.isArray(params.input_images)) {
-    inputImages.push(...params.input_images);
-  }
-  
-  return inputImages.filter(Boolean);
-}
-
-/**
  * Hook to fetch and manage task details for a generation
  * Used to display task information in the MediaLightbox sidebar
  */
@@ -58,8 +34,12 @@ export function useTaskDetails({
     (taskMapping?.taskId as string) || ''
   );
   
-  // Derive input images from task params
-  const inputImages = useMemo(() => deriveInputImages(task), [task]);
+  // Derive input images from task params using shared utility
+  const inputImages = useMemo(() => {
+    if (!task?.params) return [];
+    const params = typeof task.params === 'string' ? JSON.parse(task.params) : task.params;
+    return deriveInputImages(params);
+  }, [task]);
   
   console.log('[BasedOnNav] 🔍 useTaskDetails:', {
     generationId: generationId?.substring(0, 8),
