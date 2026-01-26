@@ -533,6 +533,12 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // State for crossfade animation (moved here, actual memo is after shotGenerations is defined)
   const [crossfadeProgress, setCrossfadeProgress] = useState(0);
   const crossfadeTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // State for video-to-video crossfade transitions
+  const [videoTransitionFrame, setVideoTransitionFrame] = useState<string | null>(null);
+  const [videoTransitionOpacity, setVideoTransitionOpacity] = useState(1);
+  const videoTransitionTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const transitionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   
   // Preview video effects - handles video segments
   React.useEffect(() => {
@@ -2689,6 +2695,26 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                           if (audio && isAudioEnabled && propAudioUrl) {
                             syncAudioToVideo();
                           }
+
+                          // Start fading out the transition frame if present
+                          if (videoTransitionFrame) {
+                            // Clear any existing timer
+                            if (videoTransitionTimerRef.current) {
+                              clearInterval(videoTransitionTimerRef.current);
+                            }
+                            const fadeStartTime = Date.now();
+                            const fadeDuration = 300; // 300ms crossfade
+                            videoTransitionTimerRef.current = setInterval(() => {
+                              const elapsed = Date.now() - fadeStartTime;
+                              const progress = Math.min(elapsed / fadeDuration, 1);
+                              setVideoTransitionOpacity(1 - progress);
+                              if (progress >= 1) {
+                                clearInterval(videoTransitionTimerRef.current!);
+                                videoTransitionTimerRef.current = null;
+                                setVideoTransitionFrame(null);
+                              }
+                            }, 16); // ~60fps
+                          }
                         }}
                         onPause={() => {
                           setPreviewIsPlaying(false);
@@ -2734,12 +2760,47 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                           }
                         }}
                         onEnded={() => {
+                          const video = previewVideoRef.current;
                           const nextIndex = (safeIndex + 1) % previewableSegments.length;
+                          const nextSegment = previewableSegments[nextIndex];
+
+                          // Capture last frame for crossfade if next segment also has video
+                          if (video && nextSegment?.hasVideo) {
+                            try {
+                              // Create canvas if not exists
+                              if (!transitionCanvasRef.current) {
+                                transitionCanvasRef.current = document.createElement('canvas');
+                              }
+                              const canvas = transitionCanvasRef.current;
+                              canvas.width = video.videoWidth;
+                              canvas.height = video.videoHeight;
+                              const ctx = canvas.getContext('2d');
+                              if (ctx) {
+                                ctx.drawImage(video, 0, 0);
+                                const frameUrl = canvas.toDataURL('image/jpeg', 0.8);
+                                setVideoTransitionFrame(frameUrl);
+                                setVideoTransitionOpacity(1);
+                              }
+                            } catch (e) {
+                              console.warn('[VideoTransition] Failed to capture frame:', e);
+                            }
+                          }
+
                           setCurrentPreviewIndex(nextIndex);
                         }}
                         key={currentSegment.videoUrl}
                       />
-                    ) : (
+                    ) : null}
+                    {/* Video transition frame - fades out over new video */}
+                    {videoTransitionFrame && (
+                      <img
+                        src={videoTransitionFrame}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                        style={{ opacity: videoTransitionOpacity }}
+                      />
+                    )}
+                    {!currentSegment.hasVideo ? (
                       // Image crossfade segment
                       <div
                         className="absolute inset-0 cursor-pointer"

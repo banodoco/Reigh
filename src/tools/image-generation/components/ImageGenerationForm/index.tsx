@@ -344,9 +344,14 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const effectiveShotId = associatedShotId || 'none';
   
   // Get reference pointers array and selected reference for current shot
-  const cachedProjectSettings = selectedProjectId
-    ? queryClient.getQueryData<ProjectImageSettings>(['toolSettings', 'project-image-settings', selectedProjectId, undefined])
+  // NOTE: Cache stores data in wrapper format { settings: {...}, hasShotSettings }
+  const rawCachedData = selectedProjectId
+    ? queryClient.getQueryData<any>(['toolSettings', 'project-image-settings', selectedProjectId, undefined])
     : undefined;
+  const cachedProjectSettings = rawCachedData && 'settings' in rawCachedData
+    ? rawCachedData.settings as ProjectImageSettings
+    : rawCachedData as ProjectImageSettings | undefined;
+
   const referencePointers = projectImageSettings?.references ?? cachedProjectSettings?.references ?? [];
   // Reference count is simply the number of pointers - no complex tracking needed
   // Skeleton count is managed by comparing referencePointers.length vs hydratedReferences.length
