@@ -94,7 +94,7 @@ export const useMagicEditMode = ({
   const [magicEditNumImages, setMagicEditNumImages] = useState(4);
   const [isCreatingMagicEditTasks, setIsCreatingMagicEditTasks] = useState(false);
   const [magicEditTasksCreated, setMagicEditTasksCreated] = useState(false);
-  const [inpaintPanelPosition, setInpaintPanelPosition] = useState<'top' | 'bottom'>('bottom');
+  const [inpaintPanelPosition, setInpaintPanelPosition] = useState<'top' | 'bottom'>('top');
 
   const { currentShotId } = useCurrentShot();
 
