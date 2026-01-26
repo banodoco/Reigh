@@ -10,6 +10,7 @@ import React from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Shot } from '@/types/shots';
+import { useIsTablet } from '@/shared/hooks/use-mobile';
 
 // =============================================================================
 // PROP TYPES
@@ -63,15 +64,36 @@ export const VideoTravelFloatingOverlay: React.FC<VideoTravelFloatingOverlayProp
     onFloatingHeaderNameClick,
   } = sticky;
 
+  const isTablet = useIsTablet();
+
+  // Track viewport width to match header visibility logic
+  // Header is sticky (visible at top) when viewport >= 768px OR device is tablet
+  const [isWideViewport, setIsWideViewport] = React.useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 768 : true
+  );
+
+  React.useEffect(() => {
+    const handleResize = () => setIsWideViewport(window.innerWidth >= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // The header is visible/sticky when viewport is wide OR device is tablet
+  // This matches the logic in GlobalHeader.tsx
+  const hasVisibleHeader = isWideViewport || isTablet;
+
   if (!shouldShowShotEditor || !stickyHeader.isSticky || !shotToEdit) {
     return null;
   }
+
+  // Use larger offset when header is visible (sticky), smaller when it's not (scrolls away on phones)
+  const topOffset = hasVisibleHeader ? 114 : 52;
 
   return (
     <div
       className="fixed z-50 animate-in fade-in slide-in-from-top-2"
       style={{
-        top: `${isMobile ? 52 : 114}px`,
+        top: `${topOffset}px`,
         left: stickyHeader.stableBounds.width > 0
           ? `${stickyHeader.stableBounds.left}px`
           : `${isShotsPaneLocked ? shotsPaneWidth : 0}px`,
