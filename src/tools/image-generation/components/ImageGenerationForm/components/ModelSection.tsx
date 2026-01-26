@@ -248,37 +248,16 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
     });
   }, [references]);
   
-  // Debug logging for ReferenceSelector rendering decision
-  // [GridDebug] Log EVERY render to catch the disappearance
-  const renderCount = React.useRef(0);
-  renderCount.current++;
-  
-  const shouldShowSkeletonsComputed = references.length === 0 && (referenceCount > 0 || isLoadingReferenceData);
-  const skeletonCountComputed = Math.max(referenceCount, isLoadingReferenceData ? 1 : 0);
-  
-  console.log('[GridDebug] 🔲 ModelSection RENDER #' + renderCount.current, {
-    references_length: references.length,
-    referenceCount,
-    isLoadingReferenceData,
-    shouldShowSkeletons: shouldShowSkeletonsComputed,
-    skeletonCount: skeletonCountComputed,
-    willRenderNothing: !shouldShowSkeletonsComputed && references.length === 0,
-    selectedReferenceId: selectedReferenceId?.substring(0, 8) || 'null',
-  });
-  
-  // Aggressively preload thumbnail images as soon as we have them
+  // Preload thumbnail images as soon as we have them
   React.useEffect(() => {
     if (!isLoadingReferenceData && references.length > 0) {
-      console.log('[RefLoadingDebug] 📥 Preloading', references.length, 'thumbnail images with high priority');
-      
       references.forEach(ref => {
         const thumbnailUrl = ref.thumbnailUrl || ref.styleReferenceImageOriginal || ref.styleReferenceImage;
         if (thumbnailUrl) {
           const img = new Image();
-          img.fetchPriority = 'high'; // Request high priority from browser
-          img.loading = 'eager'; // Load immediately, don't wait for viewport
+          img.fetchPriority = 'high';
+          img.loading = 'eager';
           img.src = thumbnailUrl;
-          // Don't need to track these - just trigger the download
         }
       });
     }
@@ -384,10 +363,9 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
 
         {/* Show skeleton placeholders OR actual references */}
         {(() => {
-          // If we have NO refs yet, show all skeletons
+          // If we have NO hydrated refs yet but pointers exist, show skeletons
           if (references.length === 0 && (referenceCount > 0 || isLoadingReferenceData)) {
             const skeletonCount = Math.min(Math.max(referenceCount, 1), REFS_PER_PAGE);
-            console.log('[GridDebug] 💀 All skeletons:', skeletonCount);
             return Array.from({ length: skeletonCount }).map((_, idx) => (
               <div
                 key={`skeleton-${idx}`}
@@ -400,9 +378,9 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
             ));
           }
 
-          // We have SOME refs - render them (already reversed at pagination level) + placeholder skeletons for remaining
-          const remainingSkeletons = Math.max(0, referenceCount - references.length);
-          console.log('[GridDebug] 🖼️ Rendering', visibleReferences.length, 'refs (page', currentPage + 1, 'of', totalPages, ') +', remainingSkeletons, 'skeletons');
+          // Render hydrated refs + skeleton placeholders for any still loading
+          // Only show skeletons for refs that haven't hydrated yet (referenceCount - references.length)
+          const remainingSkeletons = isLoadingReferenceData ? Math.max(0, referenceCount - references.length) : 0;
 
           return (
             <>

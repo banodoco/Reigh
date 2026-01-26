@@ -347,18 +347,10 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
   const cachedProjectSettings = selectedProjectId
     ? queryClient.getQueryData<ProjectImageSettings>(['toolSettings', 'project-image-settings', selectedProjectId, undefined])
     : undefined;
-  const referenceCountFromCache = cachedProjectSettings?.references?.length ?? 0;
-  
-  // Track reference count during hydration to prevent skeleton flicker
-  // This is reset on deletion via handleDeleteReference
-  const lastKnownReferenceCount = useRef<number>(0);
-  const currentCount = projectImageSettings?.references?.length ?? referenceCountFromCache;
-  if (currentCount > lastKnownReferenceCount.current) {
-    lastKnownReferenceCount.current = currentCount;
-  }
-  const referenceCount = Math.max(currentCount, lastKnownReferenceCount.current);
-  
   const referencePointers = projectImageSettings?.references ?? cachedProjectSettings?.references ?? [];
+  // Reference count is simply the number of pointers - no complex tracking needed
+  // Skeleton count is managed by comparing referencePointers.length vs hydratedReferences.length
+  const referenceCount = referencePointers.length;
   // Use cache fallback for selection too, so selection is stable during loading
   const selectedReferenceIdByShot = projectImageSettings?.selectedReferenceIdByShot ?? cachedProjectSettings?.selectedReferenceIdByShot ?? {};
   const selectedReferenceId = selectedReferenceIdByShot[effectiveShotId] ?? null;
@@ -414,8 +406,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     });
 
     hasCleanedInvalidReferencePointersRef.current[selectedProjectId] = true;
-    // Reset reference count tracker to match cleaned count
-    lastKnownReferenceCount.current = cleanedReferences.length;
     updateProjectImageSettings('project', {
       references: cleanedReferences,
       selectedReferenceIdByShot: cleanedSelections,
@@ -1821,12 +1811,16 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         // Update settings cache to select the new reference
         // IMPORTANT: Use functional update with prev to avoid race conditions when
         // multiple references are added quickly (each callback would otherwise use stale closure values)
+        // NOTE: Cache stores data in wrapper format { settings: {...}, hasShotSettings: bool }
         queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
-          const currentReferences = prev?.references || [];
-          const currentSelections = prev?.selectedReferenceIdByShot || {};
+          const hasWrapper = prev && 'settings' in prev && 'hasShotSettings' in prev;
+          const prevSettings = hasWrapper ? (prev?.settings ?? {}) : (prev ?? {});
 
-          const next = {
-            ...(prev || {}),
+          const currentReferences = prevSettings?.references || [];
+          const currentSelections = prevSettings?.selectedReferenceIdByShot || {};
+
+          const updatedSettings = {
+            ...prevSettings,
             references: [...currentReferences, newPointer],
             selectedReferenceIdByShot: {
               ...currentSelections,
@@ -1835,16 +1829,21 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           };
           console.log('[RefSettings] ⚡ Applied optimistic cache update for new reference', {
             prevReferencesLength: currentReferences.length,
-            nextReferencesLength: next.references.length
+            nextReferencesLength: updatedSettings.references.length
           });
-          return next;
+          return {
+            settings: updatedSettings,
+            hasShotSettings: hasWrapper ? (prev?.hasShotSettings ?? false) : false
+          };
         });
       } catch (e) {
         console.warn('[RefSettings] Failed to set optimistic cache data', e);
       }
 
       // Read from cache after optimistic update to get current state (avoids race conditions)
-      const currentData = queryClient.getQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined]) as any;
+      const rawCacheData = queryClient.getQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined]) as any;
+      const hasWrapper = rawCacheData && 'settings' in rawCacheData && 'hasShotSettings' in rawCacheData;
+      const currentData = hasWrapper ? (rawCacheData?.settings ?? {}) : (rawCacheData ?? {});
 
       // Add the new pointer and select it for the current shot
       await updateProjectImageSettings('project', {
@@ -1899,18 +1898,20 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
           [effectiveShotId]: existingPointer.id
         };
         
-        // Optimistic Update
+        // Optimistic Update - handle wrapper format { settings: {...}, hasShotSettings }
         try {
           queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
-            return { 
-              ...(prev || {}), 
-              selectedReferenceIdByShot: optimisticUpdate
+            const hasWrapper = prev && 'settings' in prev && 'hasShotSettings' in prev;
+            const prevSettings = hasWrapper ? (prev?.settings ?? {}) : (prev ?? {});
+            return {
+              settings: { ...prevSettings, selectedReferenceIdByShot: optimisticUpdate },
+              hasShotSettings: hasWrapper ? (prev?.hasShotSettings ?? false) : false
             };
           });
-        } catch (e) { 
-          console.warn('[RefBrowser] Failed to set optimistic cache data for existing ref switch', e); 
+        } catch (e) {
+          console.warn('[RefBrowser] Failed to set optimistic cache data for existing ref switch', e);
         }
-        
+
         // Persist
         await updateProjectImageSettings('project', {
           selectedReferenceIdByShot: optimisticUpdate
@@ -1946,41 +1947,46 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       });
       
       // Optimistic UI update - use functional update to get current state
+      // NOTE: Cache stores data in wrapper format { settings: {...}, hasShotSettings: bool }
       try {
         queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
-          const currentReferences = prev?.references || [];
-          const currentSelections = prev?.selectedReferenceIdByShot || {};
-          
+          const hasWrapper = prev && 'settings' in prev && 'hasShotSettings' in prev;
+          const prevSettings = hasWrapper ? (prev?.settings ?? {}) : (prev ?? {});
+
+          const currentReferences = prevSettings?.references || [];
+          const currentSelections = prevSettings?.selectedReferenceIdByShot || {};
+
           const updatedReferences = [...currentReferences, newPointer];
           const updatedSelections = {
             ...currentSelections,
             [effectiveShotId]: newPointer.id
           };
-          
-          console.log('[RefBrowser] ⚡ Applied optimistic cache update for resource link', { 
+
+          console.log('[RefBrowser] ⚡ Applied optimistic cache update for resource link', {
             prevReferencesLength: currentReferences.length,
             nextReferencesLength: updatedReferences.length,
             previouslySelectedForShot: currentSelections[effectiveShotId],
             nowSelectedForShot: newPointer.id
           });
-          
-          return { 
-            ...(prev || {}), 
-            references: updatedReferences,
-            selectedReferenceIdByShot: updatedSelections
+
+          return {
+            settings: { ...prevSettings, references: updatedReferences, selectedReferenceIdByShot: updatedSelections },
+            hasShotSettings: hasWrapper ? (prev?.hasShotSettings ?? false) : false
           };
         });
       } catch (e) {
         console.error('[RefBrowser] ❌ Failed to set optimistic cache data:', e);
       }
-      
+
       // Get current values for persistence using functional pattern
-      const currentData = queryClient.getQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined]) as any;
-      
+      const rawCacheData2 = queryClient.getQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined]) as any;
+      const hasWrapper2 = rawCacheData2 && 'settings' in rawCacheData2 && 'hasShotSettings' in rawCacheData2;
+      const currentData2 = hasWrapper2 ? (rawCacheData2?.settings ?? {}) : (rawCacheData2 ?? {});
+
       console.log('[RefBrowser] 💾 Persisting to database...');
       await updateProjectImageSettings('project', {
-        references: currentData?.references || [],
-        selectedReferenceIdByShot: currentData?.selectedReferenceIdByShot || {}
+        references: currentData2?.references || [],
+        selectedReferenceIdByShot: currentData2?.selectedReferenceIdByShot || {}
       });
       
       console.log('[RefBrowser] ✅ Successfully linked existing resource and persisted to DB');
@@ -2006,19 +2012,22 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       [effectiveShotId]: referenceId
     };
     
+    // Handle wrapper format { settings: {...}, hasShotSettings }
     try {
       queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
-        const next = { 
-          ...(prev || {}), 
-          selectedReferenceIdByShot: optimisticUpdate
+        const hasWrapper = prev && 'settings' in prev && 'hasShotSettings' in prev;
+        const prevSettings = hasWrapper ? (prev?.settings ?? {}) : (prev ?? {});
+        const updatedSettings = { ...prevSettings, selectedReferenceIdByShot: optimisticUpdate };
+        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference selection', { updatedSettings });
+        return {
+          settings: updatedSettings,
+          hasShotSettings: hasWrapper ? (prev?.hasShotSettings ?? false) : false
         };
-        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference selection', { next });
-        return next;
       });
     } catch (e) {
       console.warn('[RefSettings] Failed to set optimistic cache data', e);
     }
-    
+
     // Persist to database (debounced)
     await updateProjectImageSettings('project', {
       selectedReferenceIdByShot: optimisticUpdate
@@ -2062,24 +2071,25 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       }
     });
     
-    // Optimistic UI update
+    // Optimistic UI update - handle wrapper format { settings: {...}, hasShotSettings }
     try {
       queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
-        const next = {
-          ...(prev || {}),
+        const hasWrapper = prev && 'settings' in prev && 'hasShotSettings' in prev;
+        const prevSettings = hasWrapper ? (prev?.settings ?? {}) : (prev ?? {});
+        const updatedSettings = {
+          ...prevSettings,
           references: filteredPointers,
           selectedReferenceIdByShot: updatedSelections
         };
-        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference deletion', { next });
-        return next;
+        console.log('[RefSettings] ⚡ Applied optimistic cache update for reference deletion', { updatedSettings });
+        return {
+          settings: updatedSettings,
+          hasShotSettings: hasWrapper ? (prev?.hasShotSettings ?? false) : false
+        };
       });
     } catch (e) {
       console.warn('[RefSettings] Failed to set optimistic cache data', e);
     }
-
-    // Reset the reference count tracker to match the new count
-    // This prevents stale skeleton placeholders from showing after deletion
-    lastKnownReferenceCount.current = filteredPointers.length;
 
     // Persist to database (debounced)
     await updateProjectImageSettings('project', {
@@ -2205,11 +2215,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     setModelOverride(value);
 
     // Optimistically update settings cache to avoid jump-back while refetching
+    // Handle wrapper format { settings: {...}, hasShotSettings }
     try {
       queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
-        const next = { ...(prev || {}), selectedModel: value };
-        console.log('[ModelFlipIssue] Applied optimistic cache update for selectedModel', { next });
-        return next;
+        const hasWrapper = prev && 'settings' in prev && 'hasShotSettings' in prev;
+        const prevSettings = hasWrapper ? (prev?.settings ?? {}) : (prev ?? {});
+        const updatedSettings = { ...prevSettings, selectedModel: value };
+        console.log('[ModelFlipIssue] Applied optimistic cache update for selectedModel', { updatedSettings });
+        return {
+          settings: updatedSettings,
+          hasShotSettings: hasWrapper ? (prev?.hasShotSettings ?? false) : false
+        };
       });
     } catch (e) {
       console.warn('[ModelFlipIssue] Failed to set optimistic cache data', e);
