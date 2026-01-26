@@ -31,28 +31,58 @@ export function useJoinClips({
   const [addToJoinSuccess, setAddToJoinSuccess] = useState(false);
 
   const handleAddToJoin = useCallback(() => {
-    if (!media || !isVideo) return;
+    console.log('[useJoinClips] handleAddToJoin called', { mediaId: media?.id, isVideo });
+
+    if (!media || !isVideo) {
+      console.warn('[useJoinClips] Early return - no media or not video', { media: !!media, isVideo });
+      return;
+    }
 
     setIsAddingToJoin(true);
     try {
       // Get the video URL from the media object
-      const videoUrl = (media as any).url || media.imageUrl || media.location;
-      const thumbnailUrl = (media as any).thumbUrl || (media as any).thumbnail_url;
+      // For videos, 'location' is the primary storage field
+      const videoUrl = media.location || (media as any).url || media.imageUrl;
+      const thumbnailUrl = media.thumbUrl || (media as any).thumbnail_url;
+
+      console.log('[useJoinClips] Extracted URLs:', {
+        videoUrl,
+        thumbnailUrl,
+        mediaFields: {
+          location: media.location,
+          url: (media as any).url,
+          imageUrl: media.imageUrl,
+          thumbUrl: media.thumbUrl,
+        }
+      });
+
+      if (!videoUrl) {
+        console.error('[useJoinClips] No video URL found on media object!', media);
+        setIsAddingToJoin(false);
+        return;
+      }
 
       // Get existing pending clips or start fresh
       const existingData = localStorage.getItem('pendingJoinClips');
       const pendingClips: Array<{ videoUrl: string; thumbnailUrl?: string; generationId: string; timestamp: number }> =
         existingData ? JSON.parse(existingData) : [];
 
+      console.log('[useJoinClips] Existing pending clips:', pendingClips.length);
+
       // Add new clip (avoid duplicates by generationId)
       if (!pendingClips.some(clip => clip.generationId === media.id)) {
-        pendingClips.push({
+        const newClip = {
           videoUrl,
           thumbnailUrl,
           generationId: media.id,
           timestamp: Date.now(),
-        });
+        };
+        pendingClips.push(newClip);
         localStorage.setItem('pendingJoinClips', JSON.stringify(pendingClips));
+        console.log('[useJoinClips] Added clip to localStorage:', newClip);
+        console.log('[useJoinClips] Total pending clips now:', pendingClips.length);
+      } else {
+        console.log('[useJoinClips] Clip already in pending list, skipping');
       }
 
       setAddToJoinSuccess(true);

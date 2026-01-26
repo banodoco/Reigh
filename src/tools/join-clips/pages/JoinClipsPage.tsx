@@ -419,42 +419,80 @@ const JoinClipsPage: React.FC = () => {
     const checkPendingJoinClips = async () => {
       try {
         const pendingData = localStorage.getItem('pendingJoinClips');
-        if (!pendingData) return;
+        console.log('[JoinClips] checkPendingJoinClips - raw data:', pendingData);
+
+        if (!pendingData) {
+          console.log('[JoinClips] No pending clips in localStorage');
+          return;
+        }
 
         const pendingClips: Array<{ videoUrl: string; thumbnailUrl?: string; generationId: string; timestamp: number }> =
           JSON.parse(pendingData);
 
+        console.log('[JoinClips] Parsed pending clips:', pendingClips);
+
         // Filter to only recent clips (within last 5 minutes)
-        const recentClips = pendingClips.filter(clip => Date.now() - clip.timestamp < 5 * 60 * 1000);
+        const now = Date.now();
+        const recentClips = pendingClips.filter(clip => {
+          const age = now - clip.timestamp;
+          const isRecent = age < 5 * 60 * 1000;
+          console.log('[JoinClips] Clip age check:', {
+            generationId: clip.generationId,
+            ageMs: age,
+            ageSeconds: Math.round(age / 1000),
+            isRecent
+          });
+          return isRecent;
+        });
+
+        console.log('[JoinClips] Recent clips after filter:', recentClips.length);
 
         if (recentClips.length === 0) {
+          console.log('[JoinClips] No recent clips, clearing localStorage');
           localStorage.removeItem('pendingJoinClips');
           return;
         }
 
         // Process each pending clip
-        for (const { videoUrl, thumbnailUrl } of recentClips) {
+        for (const { videoUrl, thumbnailUrl, generationId } of recentClips) {
+          console.log('[JoinClips] Processing clip:', { videoUrl, thumbnailUrl, generationId });
+
+          if (!videoUrl) {
+            console.error('[JoinClips] Clip has no videoUrl, skipping:', generationId);
+            continue;
+          }
+
           // Extract video duration
           const videoElement = document.createElement('video');
           videoElement.preload = 'metadata';
           const durationPromise = new Promise<number>((resolve) => {
             videoElement.onloadedmetadata = () => {
+              console.log('[JoinClips] Video metadata loaded, duration:', videoElement.duration);
               resolve(videoElement.duration);
             };
-            videoElement.onerror = () => {
+            videoElement.onerror = (e) => {
+              console.error('[JoinClips] Video metadata load error:', e, 'URL:', videoUrl);
               resolve(0);
             };
             videoElement.src = videoUrl;
           });
           const durationSeconds = await durationPromise;
+          console.log('[JoinClips] Duration extracted:', durationSeconds);
 
           // Find first empty clip slot or add a new one
           const newClipId = generateUUID();
+          console.log('[JoinClips] About to update clips state with:', { videoUrl, thumbnailUrl, durationSeconds, newClipId });
+
           setClips(prev => {
+            console.log('[JoinClips] setClips callback - previous clips:', prev.length, prev.map(c => ({ id: c.id, hasUrl: !!c.url })));
+
             // Find first clip without a URL
             const emptyClipIndex = prev.findIndex(clip => !clip.url);
+            console.log('[JoinClips] Empty clip slot index:', emptyClipIndex);
+
             if (emptyClipIndex !== -1) {
               // Fill the empty slot
+              console.log('[JoinClips] Filling empty slot at index:', emptyClipIndex);
               return prev.map((clip, idx) =>
                 idx === emptyClipIndex
                   ? {
@@ -469,6 +507,7 @@ const JoinClipsPage: React.FC = () => {
               );
             } else {
               // Add a new clip
+              console.log('[JoinClips] Adding new clip to end of list');
               return [
                 ...prev,
                 {
