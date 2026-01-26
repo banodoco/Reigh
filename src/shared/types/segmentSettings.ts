@@ -57,6 +57,10 @@ export interface SegmentSettings {
   prompt: string;
   /** Negative prompt - things to avoid */
   negativePrompt: string;
+  /** Text prepended to prompt (merged before sending to backend) */
+  textBeforePrompts?: string;
+  /** Text appended to prompt (merged before sending to backend) */
+  textAfterPrompts?: string;
 
   // === MOTION ===
   /** Motion control mode */

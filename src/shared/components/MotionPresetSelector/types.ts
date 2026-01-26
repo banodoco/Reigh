@@ -105,6 +105,8 @@ export interface MotionPresetSelectorProps {
   renderBasicModeContent?: () => React.ReactNode;
   /** Query key prefix for preset fetching (for cache isolation) */
   queryKeyPrefix?: string;
+  /** Optional suffix to show after "Motion Settings" label (e.g., "Default" badge) */
+  labelSuffix?: React.ReactNode;
 }
 
 /**

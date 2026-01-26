@@ -31,6 +31,7 @@ import { MotionPresetSelector } from '@/shared/components/MotionPresetSelector';
 import { detectGenerationMode, BUILTIN_I2V_PRESET, BUILTIN_VACE_PRESET } from './segmentSettingsUtils';
 import { ActiveLoRAsDisplay } from '@/shared/components/ActiveLoRAsDisplay';
 import { LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
+import { DefaultableTextarea } from '@/shared/components/DefaultableTextarea';
 import { usePublicLoras, type LoraModel } from '@/shared/hooks/useResources';
 import { quantizeFrameCount, framesToSeconds } from '@/tools/travel-between-images/components/Timeline/utils/time-utils';
 import type { PhaseConfig } from '@/tools/travel-between-images/settings';
@@ -87,6 +88,8 @@ export interface SegmentSettingsFormProps {
   hasOverride?: {
     prompt: boolean;
     negativePrompt: boolean;
+    textBeforePrompts: boolean;
+    textAfterPrompts: boolean;
     motionMode: boolean;
     amountOfMotion: boolean;
     phaseConfig: boolean;
@@ -100,6 +103,8 @@ export interface SegmentSettingsFormProps {
   shotDefaults?: {
     prompt: string;
     negativePrompt: string;
+    textBeforePrompts: string;
+    textAfterPrompts: string;
     motionMode: 'basic' | 'advanced';
     amountOfMotion: number;
     phaseConfig?: import('@/tools/travel-between-images/settings').PhaseConfig;
@@ -125,6 +130,16 @@ export interface SegmentSettingsFormProps {
     videoTotalFrames: number;
     videoFps: number;
   };
+
+  // Enhanced prompt (AI-generated)
+  /** AI-generated enhanced prompt (stored separately from user settings) */
+  enhancedPrompt?: string;
+  /** Callback to clear the enhanced prompt */
+  onClearEnhancedPrompt?: () => Promise<boolean>;
+  /** Whether to enhance prompt during generation (controlled by parent) */
+  enhancePromptEnabled?: boolean;
+  /** Callback when enhance prompt toggle changes */
+  onEnhancePromptChange?: (enabled: boolean) => void;
 }
 
 // =============================================================================
@@ -260,6 +275,10 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   structureVideoDefaults,
   structureVideoUrl,
   structureVideoFrameRange,
+  enhancedPrompt,
+  onClearEnhancedPrompt,
+  enhancePromptEnabled,
+  onEnhancePromptChange,
 }) => {
   // UI state
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -480,34 +499,84 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
 
       {/* Prompt */}
       {(() => {
-        // Show default when settings.prompt is empty/undefined AND there's a shot default
-        // Once user types anything, settings.prompt becomes truthy and we show their input
-        const isUsingPromptDefault = !settings.prompt && !!shotDefaults?.prompt;
-        const promptDisplayValue = isUsingPromptDefault ? shotDefaults.prompt : (settings.prompt || '');
+        // Priority: settings.prompt > enhancedPrompt > shotDefaults.prompt
+        // Key: check for undefined specifically, not falsiness
+        // - undefined = no override, fall through to enhanced/default
+        // - '' = user explicitly cleared, show empty (no badge)
+        // - 'text' = user typed something, show it (no badge)
+        const userHasSetPrompt = settings.prompt !== undefined;
+        const hasEnhancedPrompt = !!enhancedPrompt?.trim();
+        const hasDefaultPrompt = shotDefaults?.prompt !== undefined;
+
+        // Determine what to display and which badge
+        let promptDisplayValue: string;
+        let badgeType: 'enhanced' | 'default' | null = null;
+
+        if (userHasSetPrompt) {
+          // User has explicitly set a prompt (even if empty)
+          promptDisplayValue = settings.prompt;
+          badgeType = null;
+        } else if (hasEnhancedPrompt) {
+          // AI-enhanced prompt (user hasn't overridden it)
+          promptDisplayValue = enhancedPrompt!;
+          badgeType = 'enhanced';
+        } else if (hasDefaultPrompt) {
+          // Fall back to shot defaults
+          promptDisplayValue = shotDefaults!.prompt;
+          badgeType = 'default';
+        } else {
+          promptDisplayValue = '';
+          badgeType = null;
+        }
+
         return (
           <div className="space-y-2">
-            <Label className="text-xs font-medium">Prompt:</Label>
-            <div className="relative">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs font-medium">Prompt:</Label>
+                {badgeType === 'enhanced' && (
+                  <span className="text-[10px] bg-green-500/15 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded">
+                    Enhanced
+                  </span>
+                )}
+                {badgeType === 'default' && (
+                  <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">
+                    Default
+                  </span>
+                )}
+              </div>
               <Textarea
                 value={promptDisplayValue}
                 onChange={(e) => onChange({ prompt: e.target.value })}
                 className="h-20 text-sm resize-none"
                 placeholder="Describe this segment..."
                 clearable
-                onClear={() => onChange({ prompt: '' })}
+                onClear={() => {
+                  onChange({ prompt: '' });
+                  // Also clear enhanced prompt when clearing the field
+                  onClearEnhancedPrompt?.();
+                }}
                 voiceInput
                 voiceContext="This is a prompt for a video segment. Describe the motion, action, or visual content you want in this part of the video."
                 onVoiceResult={(result) => {
                   onChange({ prompt: result.prompt || result.transcription });
                 }}
               />
-              {/* Default badge - shown when using shot default, positioned bottom left */}
-              {isUsingPromptDefault && (
-                <span className="absolute bottom-2 left-2 text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded z-10 pointer-events-none">
-                  Default
-                </span>
-              )}
             </div>
+
+            {/* Enhance Prompt Toggle */}
+            {onEnhancePromptChange && (
+              <div className="flex items-center space-x-2 p-2 bg-muted/30 rounded-lg border">
+                <Switch
+                  id="enhance-prompt-segment"
+                  checked={enhancePromptEnabled ?? !hasEnhancedPrompt}
+                  onCheckedChange={onEnhancePromptChange}
+                />
+                <Label htmlFor="enhance-prompt-segment" className="text-sm font-medium cursor-pointer flex-1">
+                  Enhance Prompt
+                </Label>
+              </div>
+            )}
           </div>
         );
       })()}
@@ -530,6 +599,32 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
         </CollapsibleTrigger>
         <CollapsibleContent className="-mx-4">
           <div className="space-y-3 p-3 bg-muted/30 border-y border-border/50">
+            {/* Before/After Each Prompt - only show if shot has defaults */}
+            {(shotDefaults?.textBeforePrompts !== undefined || shotDefaults?.textAfterPrompts !== undefined) && (
+              <div className="grid grid-cols-2 gap-2">
+                <DefaultableTextarea
+                  label="Before:"
+                  value={settings.textBeforePrompts}
+                  defaultValue={shotDefaults?.textBeforePrompts}
+                  hasDbOverride={hasOverride?.textBeforePrompts}
+                  onChange={(value) => onChange({ textBeforePrompts: value })}
+                  onClear={() => onChange({ textBeforePrompts: '' })}
+                  className="h-14 text-xs resize-none"
+                  placeholder="Text to prepend..."
+                />
+                <DefaultableTextarea
+                  label="After:"
+                  value={settings.textAfterPrompts}
+                  defaultValue={shotDefaults?.textAfterPrompts}
+                  hasDbOverride={hasOverride?.textAfterPrompts}
+                  onChange={(value) => onChange({ textAfterPrompts: value })}
+                  onClear={() => onChange({ textAfterPrompts: '' })}
+                  className="h-14 text-xs resize-none"
+                  placeholder="Text to append..."
+                />
+              </div>
+            )}
+
             {/* Make Primary Variant Toggle */}
             {isRegeneration && (
               <div className="flex items-center justify-between">
@@ -545,37 +640,22 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
             )}
 
             {/* Negative Prompt */}
-            {(() => {
-              // Show default when settings.negativePrompt is empty/undefined AND there's a shot default
-              const isUsingNegativePromptDefault = !settings.negativePrompt && !!shotDefaults?.negativePrompt;
-              const negativePromptDisplayValue = isUsingNegativePromptDefault ? shotDefaults.negativePrompt : (settings.negativePrompt || '');
-              return (
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-medium">Negative Prompt:</Label>
-                  <div className="relative">
-                    <Textarea
-                      value={negativePromptDisplayValue}
-                      onChange={(e) => onChange({ negativePrompt: e.target.value })}
-                      className="h-16 text-xs resize-none"
-                      placeholder="Things to avoid..."
-                      clearable
-                      onClear={() => onChange({ negativePrompt: '' })}
-                      voiceInput
-                      voiceContext="This is a negative prompt - things to AVOID in video generation. List unwanted qualities as a comma-separated list."
-                      onVoiceResult={(result) => {
-                        onChange({ negativePrompt: result.prompt || result.transcription });
-                      }}
-                    />
-                    {/* Default badge - shown when using shot default, positioned bottom left */}
-                    {isUsingNegativePromptDefault && (
-                      <span className="absolute bottom-2 left-2 text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded z-10 pointer-events-none">
-                        Default
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
+            <DefaultableTextarea
+              label="Negative Prompt:"
+              value={settings.negativePrompt}
+              defaultValue={shotDefaults?.negativePrompt}
+              hasDbOverride={hasOverride?.negativePrompt}
+              onChange={(value) => onChange({ negativePrompt: value })}
+              onClear={() => onChange({ negativePrompt: '' })}
+              className="h-16 text-xs resize-none"
+              placeholder="Things to avoid..."
+              voiceInput
+              voiceContext="This is a negative prompt - things to AVOID in video generation. List unwanted qualities as a comma-separated list."
+              onVoiceResult={(result) => {
+                onChange({ negativePrompt: result.prompt || result.transcription });
+              }}
+              containerClassName="space-y-1.5"
+            />
 
             {/* Model & Resolution Info */}
             <div className="grid grid-cols-2 gap-2 text-xs">
@@ -602,38 +682,61 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
             </div>
 
             {/* Motion Controls */}
-            <MotionPresetSelector
-              builtinPreset={builtinPreset}
-              featuredPresetIds={[]}
-              generationTypeMode={generationMode}
-              selectedPhasePresetId={settings.selectedPhasePresetId ?? shotDefaults?.selectedPhasePresetId ?? null}
-              phaseConfig={settings.phaseConfig ?? shotDefaults?.phaseConfig ?? builtinPreset.metadata.phaseConfig}
-              motionMode={settings.motionMode ?? shotDefaults?.motionMode ?? 'basic'}
-              onPresetSelect={handlePhasePresetSelect}
-              onPresetRemove={handlePhasePresetRemove}
-              onModeChange={handleMotionModeChange}
-              onPhaseConfigChange={handlePhaseConfigChange}
-              availableLoras={availableLoras}
-              randomSeed={settings.randomSeed}
-              onRandomSeedChange={handleRandomSeedChange}
-              queryKeyPrefix={queryKeyPrefix}
-              renderBasicModeContent={() => (
-                <div className="space-y-3">
-                  <ActiveLoRAsDisplay
-                    selectedLoras={effectiveLoras}
-                    onRemoveLora={handleRemoveLora}
-                    onLoraStrengthChange={handleLoraStrengthChange}
-                    availableLoras={availableLoras}
-                  />
-                  <button
-                    onClick={handleAddLoraClick}
-                    className="w-full text-sm text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 rounded-lg py-2 transition-colors"
-                  >
-                    Add or manage LoRAs
-                  </button>
-                </div>
-              )}
-            />
+            {(() => {
+              // Check if using defaults for motion settings
+              const isUsingMotionModeDefault = settings.motionMode === undefined && !!shotDefaults?.motionMode;
+              const isUsingPhaseConfigDefault = settings.phaseConfig === undefined && !!shotDefaults?.phaseConfig;
+              const isUsingLorasDefault = !hasOverride?.loras && (shotDefaults?.loras?.length ?? 0) > 0;
+              const isUsingMotionDefaults = isUsingMotionModeDefault || isUsingPhaseConfigDefault;
+
+              return (
+                <MotionPresetSelector
+                  builtinPreset={builtinPreset}
+                  featuredPresetIds={[]}
+                  generationTypeMode={generationMode}
+                  selectedPhasePresetId={settings.selectedPhasePresetId ?? shotDefaults?.selectedPhasePresetId ?? null}
+                  phaseConfig={settings.phaseConfig ?? shotDefaults?.phaseConfig ?? builtinPreset.metadata.phaseConfig}
+                  motionMode={settings.motionMode ?? shotDefaults?.motionMode ?? 'basic'}
+                  onPresetSelect={handlePhasePresetSelect}
+                  onPresetRemove={handlePhasePresetRemove}
+                  onModeChange={handleMotionModeChange}
+                  onPhaseConfigChange={handlePhaseConfigChange}
+                  availableLoras={availableLoras}
+                  randomSeed={settings.randomSeed}
+                  onRandomSeedChange={handleRandomSeedChange}
+                  queryKeyPrefix={queryKeyPrefix}
+                  labelSuffix={isUsingMotionDefaults ? (
+                    <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">
+                      Default
+                    </span>
+                  ) : undefined}
+                  renderBasicModeContent={() => (
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <ActiveLoRAsDisplay
+                          selectedLoras={effectiveLoras}
+                          onRemoveLora={handleRemoveLora}
+                          onLoraStrengthChange={handleLoraStrengthChange}
+                          availableLoras={availableLoras}
+                        />
+                        {/* Default badge for LoRAs */}
+                        {isUsingLorasDefault && (
+                          <span className="absolute -top-1 -right-1 text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded z-10 pointer-events-none">
+                            Default
+                          </span>
+                        )}
+                      </div>
+                      <button
+                        onClick={handleAddLoraClick}
+                        className="w-full text-sm text-muted-foreground hover:text-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/50 rounded-lg py-2 transition-colors"
+                      >
+                        Add or manage LoRAs
+                      </button>
+                    </div>
+                  )}
+                />
+              );
+            })()}
 
             {/* Structure Video Overrides - only shown when segment has structure video */}
             {structureVideoType && (
@@ -657,12 +760,16 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                 {/* Motion Strength */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-medium">Strength:</Label>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs font-medium">Strength:</Label>
+                      {settings.structureMotionStrength === undefined && (
+                        <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">
+                          Default
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs font-medium">
                       {(settings.structureMotionStrength ?? structureVideoDefaults?.motionStrength ?? 1.2).toFixed(1)}x
-                      {settings.structureMotionStrength === undefined && (
-                        <span className="text-muted-foreground/60 ml-1">(default)</span>
-                      )}
                     </span>
                   </div>
                   <Slider
@@ -684,12 +791,16 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                 {structureVideoType === 'uni3c' && (
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <Label className="text-xs font-medium">End Percent:</Label>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs font-medium">End Percent:</Label>
+                        {settings.structureUni3cEndPercent === undefined && (
+                          <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">
+                            Default
+                          </span>
+                        )}
+                      </div>
                       <span className="text-xs font-medium">
                         {((settings.structureUni3cEndPercent ?? structureVideoDefaults?.uni3cEndPercent ?? 0.1) * 100).toFixed(0)}%
-                        {settings.structureUni3cEndPercent === undefined && (
-                          <span className="text-muted-foreground/60 ml-1">(default)</span>
-                        )}
                       </span>
                     </div>
                     <Slider

@@ -75,6 +75,8 @@ export interface UseSegmentSettingsOptions {
 export interface FieldOverrides {
   prompt: boolean;
   negativePrompt: boolean;
+  textBeforePrompts: boolean;
+  textAfterPrompts: boolean;
   motionMode: boolean;
   amountOfMotion: boolean;
   phaseConfig: boolean;
@@ -94,6 +96,8 @@ export interface ShotDefaults {
   phaseConfig?: import('@/tools/travel-between-images/settings').PhaseConfig;
   loras: import('@/shared/types/segmentSettings').LoraConfig[];
   selectedPhasePresetId: string | null;
+  textBeforePrompts: string;
+  textAfterPrompts: string;
 }
 
 export interface UseSegmentSettingsReturn {
@@ -119,6 +123,10 @@ export interface UseSegmentSettingsReturn {
   hasOverride: FieldOverrides | undefined;
   /** Shot-level default values (for showing as placeholder) */
   shotDefaults: ShotDefaults;
+  /** AI-generated enhanced prompt (stored separately from user settings) */
+  enhancedPrompt: string | undefined;
+  /** Clear the enhanced prompt from metadata */
+  clearEnhancedPrompt: () => Promise<boolean>;
 }
 
 // Track hook instances for debugging
@@ -262,6 +270,8 @@ export function useSegmentSettings({
       // Prompts: undefined if no override, string if override exists
       prompt: pairOverrides.prompt,
       negativePrompt: pairOverrides.negativePrompt,
+      textBeforePrompts: pairOverrides.textBeforePrompts,
+      textAfterPrompts: pairOverrides.textAfterPrompts,
 
       // Motion settings: only include if segment has override (undefined = use shot default)
       motionMode: pairOverrides.motionMode as 'basic' | 'advanced' | undefined,
@@ -302,6 +312,8 @@ export function useSegmentSettings({
       // Check for field existence (not truthiness) so empty strings/arrays are recognized as overrides
       prompt: pairOverrides.prompt !== undefined,
       negativePrompt: pairOverrides.negativePrompt !== undefined,
+      textBeforePrompts: pairOverrides.textBeforePrompts !== undefined,
+      textAfterPrompts: pairOverrides.textAfterPrompts !== undefined,
       motionMode: pairOverrides.motionMode !== undefined,
       amountOfMotion: pairOverrides.amountOfMotion !== undefined,
       phaseConfig: pairOverrides.phaseConfig !== undefined,
@@ -323,12 +335,16 @@ export function useSegmentSettings({
       phaseConfig: shotVideoSettings?.phaseConfig,
       loras: shotVideoSettings?.loras || [],
       selectedPhasePresetId: shotVideoSettings?.selectedPhasePresetId ?? null,
+      textBeforePrompts: shotVideoSettings?.textBeforePrompts || '',
+      textAfterPrompts: shotVideoSettings?.textAfterPrompts || '',
     };
     console.log('[ShotDefaultsDebug] Computing shotDefaultsValue:', {
       hasShotVideoSettings: !!shotVideoSettings,
       shotVideoSettingsPrompt: shotVideoSettings?.prompt?.substring(0, 50) || '(none)',
       resultPrompt: defaults.prompt?.substring(0, 50) || '(empty)',
       resultLoraCount: defaults.loras?.length ?? 0,
+      textBeforePrompts: defaults.textBeforePrompts?.substring(0, 30) || '(empty)',
+      textAfterPrompts: defaults.textAfterPrompts?.substring(0, 30) || '(empty)',
     });
     return defaults;
   }, [shotVideoSettings]);
@@ -464,6 +480,8 @@ export function useSegmentSettings({
       const newMetadata = buildMetadataUpdate(currentMetadata, {
         prompt: settings.prompt,
         negativePrompt: settings.negativePrompt,
+        textBeforePrompts: settings.textBeforePrompts,
+        textAfterPrompts: settings.textAfterPrompts,
         motionMode: settings.motionMode,
         amountOfMotion: settings.amountOfMotion, // Store in 0-100 scale (UI scale) - new format
         phaseConfig: settings.motionMode === 'basic' ? null : settings.phaseConfig,
@@ -665,9 +683,22 @@ export function useSegmentSettings({
   const getSettingsForTaskCreation = useCallback((): SegmentSettings => {
     // Merge settings with shot defaults, respecting override flags
     // For fields without overrides, use shot defaults
+
+    // Get the base prompt (segment override or shot default)
+    const basePrompt = settings.prompt ?? shotDefaultsValue.prompt ?? '';
+
+    // Merge textBeforePrompts and textAfterPrompts into the final prompt
+    // Use segment override if exists, otherwise shot defaults
+    const textBefore = settings.textBeforePrompts ?? shotDefaultsValue.textBeforePrompts ?? '';
+    const textAfter = settings.textAfterPrompts ?? shotDefaultsValue.textAfterPrompts ?? '';
+    const mergedPrompt = [textBefore, basePrompt, textAfter]
+      .map(s => s.trim())
+      .filter(Boolean)
+      .join(' ');
+
     const effectiveSettings: SegmentSettings = {
-      // Prompts: segment override (even empty string) > shot default > empty
-      prompt: settings.prompt ?? shotDefaultsValue.prompt ?? '',
+      // Prompts: merged with before/after text from shot defaults
+      prompt: mergedPrompt,
       negativePrompt: settings.negativePrompt ?? shotDefaultsValue.negativePrompt ?? '',
 
       // Motion settings: segment override > shot default > defaults
@@ -769,7 +800,56 @@ export function useSegmentSettings({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount/unmount
 
-  // Reset to shot defaults by clearing all segment overrides
+  // Clear enhanced prompt from metadata
+  const clearEnhancedPrompt = useCallback(async (): Promise<boolean> => {
+    if (!pairShotGenerationId) {
+      console.warn('[useSegmentSettings] ⚠️ Cannot clear enhanced prompt - no pairShotGenerationId');
+      return false;
+    }
+
+    console.log(`[useSegmentSettings:${instanceId}] 🧹 Clearing enhanced prompt for:`, pairShotGenerationId.substring(0, 8));
+
+    try {
+      // Fetch current metadata
+      const { data: current, error: fetchError } = await supabase
+        .from('shot_generations')
+        .select('metadata')
+        .eq('id', pairShotGenerationId)
+        .single();
+
+      if (fetchError) {
+        console.error('[useSegmentSettings] Error fetching metadata for clear:', fetchError);
+        return false;
+      }
+
+      const currentMetadata = (current?.metadata as Record<string, any>) || {};
+      const updatedMetadata = {
+        ...currentMetadata,
+        enhanced_prompt: '', // Clear the enhanced prompt
+      };
+
+      const { error: updateError } = await supabase
+        .from('shot_generations')
+        .update({ metadata: updatedMetadata })
+        .eq('id', pairShotGenerationId);
+
+      if (updateError) {
+        console.error('[useSegmentSettings] Error clearing enhanced prompt:', updateError);
+        return false;
+      }
+
+      // Invalidate cache
+      await queryClient.invalidateQueries({ queryKey: ['pair-metadata', pairShotGenerationId] });
+
+      console.log(`[useSegmentSettings:${instanceId}] ✅ Enhanced prompt cleared`);
+      return true;
+    } catch (error) {
+      console.error('[useSegmentSettings] Exception clearing enhanced prompt:', error);
+      return false;
+    }
+  }, [pairShotGenerationId, instanceId, queryClient]);
+
+  // Reset to shot defaults by clearing all segment overrides AND enhanced prompt
   // Convention: '' for strings, null for other types = clear the override
   const resetSettings = useCallback(() => {
     const clearedSettings: SegmentSettings = {
@@ -778,6 +858,8 @@ export function useSegmentSettings({
       // null for other types = clear override
       prompt: '',
       negativePrompt: '',
+      textBeforePrompts: '',
+      textAfterPrompts: '',
       motionMode: null as any, // null = clear override
       amountOfMotion: null as any,
       phaseConfig: null,
@@ -796,13 +878,19 @@ export function useSegmentSettings({
       structureUni3cEndPercent: null as any,
     };
 
-    console.log(`[useSegmentSettings:${instanceId}] 🔄 Clearing segment overrides (will use shot defaults):`, {
+    console.log(`[useSegmentSettings:${instanceId}] 🔄 Clearing segment overrides + enhanced prompt (will use shot defaults):`, {
       shotId: shotId?.substring(0, 8) || null,
     });
 
     setLocalSettings(clearedSettings);
     setIsDirty(true); // Mark dirty so cleared state gets saved
-  }, [instanceId, shotId, settings.numFrames]);
+
+    // Also clear the enhanced prompt from metadata (fire and forget)
+    clearEnhancedPrompt();
+  }, [instanceId, shotId, settings.numFrames, clearEnhancedPrompt]);
+
+  // Extract enhanced prompt from pair metadata (AI-generated, stored separately)
+  const enhancedPrompt = (pairMetadata as Record<string, any> | null)?.enhanced_prompt as string | undefined;
 
   return {
     settings,
@@ -817,5 +905,7 @@ export function useSegmentSettings({
     shotBatchSettings: shotBatchSettings ?? null,
     hasOverride,
     shotDefaults: shotDefaultsValue,
+    enhancedPrompt: enhancedPrompt?.trim() || undefined,
+    clearEnhancedPrompt,
   };
 }

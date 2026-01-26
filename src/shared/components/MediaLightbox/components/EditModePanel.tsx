@@ -136,6 +136,9 @@ export interface EditModePanelProps {
  * The panel shown when in edit mode (inpaint/magic-edit/annotate)
  * Uses shared EditPanelLayout for consistent header and variants handling.
  */
+// Default prompt for reposition mode - shown when user hasn't entered a custom prompt
+const REPOSITION_DEFAULT_PROMPT = 'match existing content';
+
 export const EditModePanel: React.FC<EditModePanelProps> = ({
   sourceGenerationData,
   onOpenExternalGeneration,
@@ -318,34 +321,48 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         onDeleteVariant={onDeleteVariant}
       >
           {/* Prompt Field - Hidden for img2img mode (has its own prompt field) */}
-          {editMode !== 'img2img' && (
-          <div className={generationsSpacing}>
-            <SectionLabel>Prompt</SectionLabel>
-            {!isMobile && <label className={`${labelSize} font-medium`}>Prompt:</label>}
-            <Textarea
-              value={inpaintPrompt}
-              onChange={(e) => setInpaintPrompt(e.target.value)}
-              placeholder={
-                editMode === 'text'
-                  ? (isMobile ? "Describe changes..." : "Describe the text-based edit to make...")
-                  : editMode === 'annotate'
-                    ? (isMobile ? "What to generate..." : "Describe what to generate in the annotated regions...")
-                    : editMode === 'reposition'
-                      ? (isMobile ? "How to fill edges (optional)..." : "Optional: describe how to fill the exposed edges (default: match existing content)")
-                      : (isMobile ? "What to generate..." : "Describe what to generate in the masked area...")
-              }
-              className={`w-full ${textareaMinHeight} ${textareaPadding} ${textareaTextSize} resize-none`}
-              rows={textareaRows}
-              clearable
-              onClear={() => setInpaintPrompt('')}
-              voiceInput
-              voiceContext="This is an image editing prompt. Describe what changes to make to the image - what to add, remove, or modify in the selected/masked area. Be specific about the visual result you want."
-              onVoiceResult={(result) => {
-                setInpaintPrompt(result.prompt || result.transcription);
-              }}
-            />
-          </div>
-          )}
+          {editMode !== 'img2img' && (() => {
+            // For reposition mode, show default prompt when user hasn't entered anything
+            const isRepositionMode = editMode === 'reposition';
+            const isUsingDefaultPrompt = isRepositionMode && !inpaintPrompt;
+            const displayPromptValue = isUsingDefaultPrompt ? REPOSITION_DEFAULT_PROMPT : inpaintPrompt;
+
+            return (
+              <div className={generationsSpacing}>
+                <SectionLabel>Prompt</SectionLabel>
+                <div className="flex items-center gap-2">
+                  {!isMobile && <label className={`${labelSize} font-medium`}>Prompt{isRepositionMode ? ' (optional)' : ''}:</label>}
+                  {isUsingDefaultPrompt && (
+                    <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">
+                      Default
+                    </span>
+                  )}
+                </div>
+                <Textarea
+                  value={displayPromptValue}
+                  onChange={(e) => setInpaintPrompt(e.target.value)}
+                  placeholder={
+                    editMode === 'text'
+                      ? (isMobile ? "Describe changes..." : "Describe the text-based edit to make...")
+                      : editMode === 'annotate'
+                        ? (isMobile ? "What to generate..." : "Describe what to generate in the annotated regions...")
+                        : editMode === 'reposition'
+                          ? "" // No placeholder needed - we show default value instead
+                          : (isMobile ? "What to generate..." : "Describe what to generate in the masked area...")
+                  }
+                  className={`w-full ${textareaMinHeight} ${textareaPadding} ${textareaTextSize} resize-none`}
+                  rows={textareaRows}
+                  clearable
+                  onClear={() => setInpaintPrompt('')}
+                  voiceInput
+                  voiceContext="This is an image editing prompt. Describe what changes to make to the image - what to add, remove, or modify in the selected/masked area. Be specific about the visual result you want."
+                  onVoiceResult={(result) => {
+                    setInpaintPrompt(result.prompt || result.transcription);
+                  }}
+                />
+              </div>
+            );
+          })()}
 
           {/* Img2Img Mode Controls */}
           {editMode === 'img2img' && setImg2imgPrompt && setImg2imgStrength && setEnablePromptExpansion && (

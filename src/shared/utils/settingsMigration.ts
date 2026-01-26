@@ -240,6 +240,14 @@ export function readSegmentOverrides(metadata: Record<string, any> | null | unde
     overrides.structureUni3cEndPercent = segmentOverrides.structureUni3cEndPercent;
   }
 
+  // Text before/after prompts
+  if (segmentOverrides.textBeforePrompts !== undefined) {
+    overrides.textBeforePrompts = segmentOverrides.textBeforePrompts;
+  }
+  if (segmentOverrides.textAfterPrompts !== undefined) {
+    overrides.textAfterPrompts = segmentOverrides.textAfterPrompts;
+  }
+
   return overrides;
 }
 
@@ -303,6 +311,13 @@ export function writeSegmentOverrides(
   }
   if (overrides.structureUni3cEndPercent !== undefined) {
     newOverrides.structureUni3cEndPercent = overrides.structureUni3cEndPercent;
+  }
+  // Text before/after prompts
+  if (overrides.textBeforePrompts !== undefined) {
+    newOverrides.textBeforePrompts = overrides.textBeforePrompts;
+  }
+  if (overrides.textAfterPrompts !== undefined) {
+    newOverrides.textAfterPrompts = overrides.textAfterPrompts;
   }
 
   metadata.segmentOverrides = newOverrides;

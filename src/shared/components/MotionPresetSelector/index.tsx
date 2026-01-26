@@ -77,6 +77,7 @@ export const MotionPresetSelector: React.FC<MotionPresetSelectorProps> = ({
   presetTooltip = 'Select a motion preset to control generation settings.\nUse "Custom" to configure your own settings in Advanced mode.',
   renderBasicModeContent,
   queryKeyPrefix = 'motion-presets',
+  labelSuffix,
 }) => {
   // Defensive: some callsites may pass non-functions (e.g. via `any`).
   // Avoid crashing the entire UI; treat invalid callbacks as no-ops.
@@ -150,7 +151,10 @@ export const MotionPresetSelector: React.FC<MotionPresetSelectorProps> = ({
     <div className="space-y-4">
       <Tabs value={normalizedMotionMode} onValueChange={handleModeChange}>
         <div className="flex items-center justify-between mb-3">
-          <Label className="text-sm font-medium">Motion Settings</Label>
+          <div className="flex items-center gap-2">
+            <Label className="text-sm font-medium">Motion Settings</Label>
+            {labelSuffix}
+          </div>
           <TabsList className="grid w-40 grid-cols-2">
             <TabsTrigger value="basic">Basic</TabsTrigger>
             <TabsTrigger 

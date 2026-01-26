@@ -5,12 +5,16 @@
  * Uses the controlled SegmentSettingsForm pattern.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useSegmentSettingsForm } from '@/shared/hooks/useSegmentSettingsForm';
 import { SegmentSettingsForm } from '@/shared/components/SegmentSettingsForm';
 import { buildTaskParams, extractSettingsFromParams } from '@/shared/components/segmentSettingsUtils';
 import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individualTravelSegment';
+import { useIncomingTasks } from '@/shared/contexts/IncomingTasksContext';
+import { useTaskStatusCounts } from '@/shared/hooks/useTasks';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface SegmentRegenerateFormProps {
   /** Generation params from the current video */
@@ -87,7 +91,12 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   structureVideoFrameRange,
 }) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // For background task submission with placeholder
+  const { addIncomingTask, removeIncomingTask } = useIncomingTasks();
+  const { data: taskStatusCounts } = useTaskStatusCounts(projectId ?? undefined);
 
   // Use the combined hook for form props
   const { formProps, getSettingsForTaskCreation, saveSettings, updateSettings, settings } = useSegmentSettingsForm({
@@ -114,6 +123,22 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
     structureVideoUrl,
     structureVideoFrameRange,
   });
+
+  // Extract enhanced prompt from form props
+  const { enhancedPrompt } = formProps;
+
+  // Enhance prompt toggle state
+  // Default: false if enhanced prompt exists, true if not
+  const defaultEnhanceEnabled = useMemo(() => !enhancedPrompt?.trim(), [enhancedPrompt]);
+  const [enhancePromptEnabled, setEnhancePromptEnabled] = useState<boolean | null>(null);
+
+  // Compute effective enhance state (user choice > default)
+  const effectiveEnhanceEnabled = enhancePromptEnabled ?? defaultEnhanceEnabled;
+
+  // Reset enhance state when pair changes
+  useEffect(() => {
+    setEnhancePromptEnabled(null);
+  }, [pairShotGenerationId]);
 
   // Handle frame count change - wrap to include pairShotGenerationId
   const handleFrameCountChange = useCallback((frameCount: number) => {
@@ -178,6 +203,115 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
       return;
     }
 
+    // Get effective settings
+    const effectiveSettings = getSettingsForTaskCreation();
+    const promptToEnhance = effectiveSettings.prompt?.trim() || '';
+
+    // If enhance is enabled, use background submission pattern
+    if (effectiveEnhanceEnabled && promptToEnhance) {
+      console.log('[SegmentRegenerateForm] 🚀 Starting background submission with prompt enhancement');
+
+      // Add placeholder for immediate feedback
+      const taskLabel = `Segment ${segmentIndex + 1}`;
+      const currentBaseline = taskStatusCounts?.processing ?? 0;
+      const incomingTaskId = addIncomingTask({
+        taskType: 'individual_travel_segment',
+        label: taskLabel,
+        baselineCount: currentBaseline,
+      });
+
+      // Fire and forget - run in background
+      (async () => {
+        try {
+          // Save settings first
+          if (pairShotGenerationId) {
+            await saveSettings();
+          }
+
+          // 1. Call edge function to enhance prompt
+          console.log('[SegmentRegenerateForm] 📝 Calling ai-prompt edge function to enhance prompt...');
+          const { data: enhanceResult, error: enhanceError } = await supabase.functions.invoke('ai-prompt', {
+            body: {
+              task: 'enhance_segment_prompt',
+              prompt: promptToEnhance,
+              temperature: 0.7,
+              numFrames: effectiveSettings.numFrames || currentFrameCount || 25,
+            },
+          });
+
+          if (enhanceError) {
+            console.error('[SegmentRegenerateForm] Error enhancing prompt:', enhanceError);
+          }
+
+          const enhancedPromptResult = enhanceResult?.enhanced_prompt?.trim() || promptToEnhance;
+          console.log('[SegmentRegenerateForm] ✅ Enhanced prompt:', enhancedPromptResult.substring(0, 80) + '...');
+
+          // 2. Store enhanced prompt in metadata
+          if (pairShotGenerationId && enhancedPromptResult !== promptToEnhance) {
+            const { data: current } = await supabase
+              .from('shot_generations')
+              .select('metadata')
+              .eq('id', pairShotGenerationId)
+              .single();
+
+            const currentMetadata = (current?.metadata as Record<string, any>) || {};
+            await supabase
+              .from('shot_generations')
+              .update({
+                metadata: {
+                  ...currentMetadata,
+                  enhanced_prompt: enhancedPromptResult,
+                },
+              })
+              .eq('id', pairShotGenerationId);
+
+            queryClient.invalidateQueries({ queryKey: ['pair-metadata', pairShotGenerationId] });
+          }
+
+          // 3. Build task params with enhanced prompt
+          const taskParams = buildTaskParams(
+            { ...effectiveSettings, prompt: enhancedPromptResult },
+            {
+              projectId,
+              shotId,
+              generationId,
+              childGenerationId,
+              segmentIndex,
+              startImageUrl,
+              endImageUrl,
+              startImageGenerationId,
+              endImageGenerationId,
+              pairShotGenerationId,
+              projectResolution,
+            }
+          );
+
+          // 4. Create task
+          const result = await createIndividualTravelSegmentTask(taskParams);
+
+          if (!result.task_id) {
+            throw new Error(result.error || 'Failed to create task');
+          }
+
+          console.log('[SegmentRegenerateForm] ✅ Task created successfully:', result.task_id);
+        } catch (error) {
+          console.error('[SegmentRegenerateForm] Error in background submission:', error);
+          toast({
+            title: "Error",
+            description: (error as Error).message || "Failed to create task",
+            variant: "destructive",
+          });
+        } finally {
+          await queryClient.refetchQueries({ queryKey: ['tasks', 'paginated'] });
+          await queryClient.refetchQueries({ queryKey: ['task-status-counts'] });
+          removeIncomingTask(incomingTaskId);
+        }
+      })();
+
+      return;
+    }
+
+    // Standard submission (no enhancement)
     setIsSubmitting(true);
 
     try {
@@ -187,7 +321,6 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
       }
 
       // Build task params using effective settings (merged with shot defaults)
-      const effectiveSettings = getSettingsForTaskCreation();
       const taskParams = buildTaskParams(effectiveSettings, {
         projectId,
         shotId,
@@ -233,6 +366,11 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
     pairShotGenerationId,
     projectResolution,
     toast,
+    effectiveEnhanceEnabled,
+    addIncomingTask,
+    removeIncomingTask,
+    taskStatusCounts,
+    queryClient,
   ]);
 
   return (
@@ -242,6 +380,8 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
         onSubmit={handleSubmit}
         isSubmitting={isSubmitting}
         onFrameCountChange={handleFrameCountChange}
+        enhancePromptEnabled={effectiveEnhanceEnabled}
+        onEnhancePromptChange={setEnhancePromptEnabled}
       />
     </div>
   );

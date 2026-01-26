@@ -62,6 +62,47 @@ export const BUILTIN_VACE_PRESET: BuiltinPreset = {
 // =============================================================================
 
 /**
+ * Result of computing a defaultable field's display state.
+ */
+export interface DefaultableFieldResult {
+  /** Whether the field is currently showing the default value */
+  isUsingDefault: boolean;
+  /** The value to display in the field */
+  displayValue: string;
+}
+
+/**
+ * Compute display state for a field that can fall back to a default value.
+ *
+ * Semantics:
+ * - `undefined` = no local value set, use default (show badge)
+ * - `''` (empty string) = user explicitly cleared, show empty (no badge)
+ * - `'value'` = user set a value, show it (no badge)
+ *
+ * @param localValue - The current local/settings value (may be undefined)
+ * @param defaultValue - The fallback value from shot defaults
+ * @param hasDbOverride - Whether there's a saved override in the database (optional)
+ */
+export function getDefaultableField(
+  localValue: string | undefined,
+  defaultValue: string | undefined,
+  hasDbOverride?: boolean
+): DefaultableFieldResult {
+  // Key insight: check for `undefined` specifically, not falsiness
+  // Empty string '' means user explicitly cleared - don't show default
+  const isUsingDefault = localValue === undefined && (
+    hasDbOverride !== undefined
+      ? !hasDbOverride && defaultValue !== undefined
+      : defaultValue !== undefined
+  );
+
+  return {
+    isUsingDefault,
+    displayValue: isUsingDefault ? (defaultValue ?? '') : (localValue ?? ''),
+  };
+}
+
+/**
  * Detect generation mode from model name.
  */
 export function detectGenerationMode(modelName?: string): 'i2v' | 'vace' {
@@ -81,6 +122,9 @@ export interface SegmentSettings {
   // Prompts
   prompt: string;
   negativePrompt: string;
+  // Text before/after prompts (merged into final prompt when generating)
+  textBeforePrompts?: string;
+  textAfterPrompts?: string;
   // Motion
   motionMode: 'basic' | 'advanced';
   amountOfMotion: number; // 0-100 (UI scale)
@@ -412,6 +456,8 @@ export function mergeSegmentSettings(
 export interface PairSettingsToSave {
   prompt?: string;
   negativePrompt?: string;
+  textBeforePrompts?: string;
+  textAfterPrompts?: string;
   motionMode?: 'basic' | 'advanced';
   amountOfMotion?: number;
   phaseConfig?: PhaseConfig | null; // null means clear
@@ -626,6 +672,20 @@ export function buildMetadataUpdate(
       fieldsToClear.push('negativePrompt');
     } else {
       overrides.negativePrompt = settings.negativePrompt;
+    }
+  }
+  if (settings.textBeforePrompts !== undefined) {
+    if (settings.textBeforePrompts === '') {
+      fieldsToClear.push('textBeforePrompts');
+    } else {
+      overrides.textBeforePrompts = settings.textBeforePrompts;
+    }
+  }
+  if (settings.textAfterPrompts !== undefined) {
+    if (settings.textAfterPrompts === '') {
+      fieldsToClear.push('textAfterPrompts');
+    } else {
+      overrides.textAfterPrompts = settings.textAfterPrompts;
     }
   }
   // Motion settings: null = clear, undefined = don't touch, value = set

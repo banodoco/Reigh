@@ -24,6 +24,12 @@ if (!apiKey) {
 }
 const groq = new Groq({ apiKey });
 
+// OpenAI API for segment prompt enhancement
+const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+if (!openaiApiKey) {
+  console.error("[ai-prompt] OPENAI_API_KEY not set in env vars");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return jsonResponse({ ok: true });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405);
@@ -212,6 +218,110 @@ Summary:` }],
         });
         const summary = resp.choices[0]?.message?.content?.trim() || null;
         return jsonResponse({ summary, usage: resp.usage });
+      }
+      case "enhance_segment_prompt": {
+        // Enhance a single segment prompt using OpenAI GPT-5 Mini
+        // Uses motion-focused prompt template for video transitions
+        const { prompt = "", temperature = 0.7 } = body;
+
+        if (!prompt.trim()) {
+          return jsonResponse({ error: "prompt is required" }, 400);
+        }
+
+        if (!openaiApiKey) {
+          return jsonResponse({ error: "OpenAI API key not configured" }, 500);
+        }
+
+        console.log(`[ai-prompt] enhance_segment_prompt request:`, {
+          promptPreview: prompt.substring(0, 50),
+          temperature,
+        });
+
+        const systemMsg = `You are an expert at creating motion-focused video generation prompts. You analyze start and end frames and create vivid descriptions of the motion and transitions between them.
+
+CRITICAL RULES:
+- Output ONLY your three-sentence prompt
+- NO quotation marks, labels, explanations, or commentary
+- Do NOT include "SENTENCE 1:", "SENTENCE 2:", etc. labels
+- Just output the three sentences directly`;
+
+        const userMsg = `You are viewing two images side by side: the LEFT image (with GREEN border) shows the STARTING frame, and the RIGHT image (with RED border) shows the ENDING frame of a video sequence.
+
+Your goal is to create a THREE-SENTENCE prompt that describes the MOTION and CHANGES in this transition based on the user's description: '${prompt}'
+
+FOCUS ON MOTION: Describe what MOVES, what CHANGES, and HOW things transition between these frames. Everything should be described in terms of motion and transformation, not static states.
+
+YOUR RESPONSE MUST FOLLOW THIS EXACT STRUCTURE:
+
+SENTENCE 1 (PRIMARY MOTION): Describe the main action, camera movement, and major scene transitions. What is the dominant movement happening?
+
+SENTENCE 2 (MOVING ELEMENTS): Describe how the characters, objects, and environment are moving or changing. Focus on what's in motion and how it moves through space.
+
+SENTENCE 3 (MOTION DETAILS): Describe the subtle motion details - secondary movements, environmental dynamics, particles, lighting shifts, and small-scale motions.
+
+Examples of MOTION-FOCUSED descriptions:
+
+- "The sun rises rapidly above the jagged peaks as the camera tilts upward from the dark valley floor. The silhouette pine trees sway gently against the shifting violet and gold sky as the entire landscape brightens. Wisps of morning mist evaporate and drift upward from the river surface while distant birds circle and glide through the upper left corner."
+
+- "A woman sprints from the kitchen into the bright exterior sunlight as the camera pans right to track her accelerating path. Her vintage floral dress flows and ripples in the wind while colorful playground equipment blurs past in the background. Her hair whips back dynamically and dust particles kick up and swirl around her sneakers as she impacts the gravel."
+
+- "The camera zooms aggressively inward into a macro shot of an eye as the brown horse reflection grows larger and more detailed. The iris textures shift under the changing warm lighting while the biological details come into sharper focus. The pupil constricts and contracts in reaction to the light while the tiny reflected horse tosses its mane and shifts position."
+
+Now create your THREE-SENTENCE MOTION-FOCUSED description based on: '${prompt}'`;
+
+        try {
+          const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${openaiApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "gpt-5-mini",
+              messages: [
+                { role: "system", content: systemMsg },
+                { role: "user", content: userMsg },
+              ],
+              max_completion_tokens: 16000,
+            }),
+          });
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[ai-prompt] OpenAI API error:`, response.status, errorText);
+            return jsonResponse({ error: "OpenAI API error", details: errorText }, response.status);
+          }
+
+          const data = await response.json();
+
+          // Debug: log full API response structure
+          console.log(`[ai-prompt] OpenAI API response:`, {
+            hasChoices: !!data.choices,
+            choicesLength: data.choices?.length,
+            firstChoiceContent: data.choices?.[0]?.message?.content?.substring(0, 100),
+            finishReason: data.choices?.[0]?.finish_reason,
+            model: data.model,
+            usage: data.usage,
+          });
+
+          const enhancedPrompt = data.choices?.[0]?.message?.content?.trim() || prompt;
+          const wasEnhanced = enhancedPrompt !== prompt;
+
+          console.log(`[ai-prompt] enhance_segment_prompt result:`, {
+            originalLength: prompt.length,
+            enhancedLength: enhancedPrompt.length,
+            wasEnhanced,
+            enhancedPreview: enhancedPrompt.substring(0, 100),
+          });
+
+          return jsonResponse({
+            enhanced_prompt: enhancedPrompt,
+            usage: data.usage,
+          });
+        } catch (fetchError: any) {
+          console.error(`[ai-prompt] OpenAI fetch error:`, fetchError?.message || fetchError);
+          return jsonResponse({ error: "Failed to call OpenAI API", details: fetchError?.message }, 500);
+        }
       }
       default:
         return jsonResponse({ error: `Unknown task: ${task}` }, 400);
