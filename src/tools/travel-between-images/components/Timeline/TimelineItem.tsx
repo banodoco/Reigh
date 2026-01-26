@@ -45,6 +45,8 @@ interface TimelineItemProps {
   onTapToMove?: () => void;
   // Just-dropped effect - shows temporary hover state
   isJustDropped?: boolean;
+  // Prefetch callback for task data (called on hover)
+  onPrefetch?: () => void;
 }
 
 // TimelineItem component - simplified without dnd-kit
@@ -76,6 +78,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   isSelectedForMove = false,
   onTapToMove,
   isJustDropped = false,
+  onPrefetch,
 }) => {
   // [ShotNavPerf] Log when TimelineItem mounts/updates
   React.useEffect(() => {
@@ -336,6 +339,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
       }}
       onMouseEnter={() => {
         setIsHovered(true);
+        onPrefetch?.();
       }}
       onMouseLeave={() => {
         setIsHovered(false);

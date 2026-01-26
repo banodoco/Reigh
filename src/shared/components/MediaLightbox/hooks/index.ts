@@ -80,3 +80,11 @@ export type {
   UseImg2ImgModeProps,
   UseImg2ImgModeReturn,
 } from './useImg2ImgMode';
+
+// New extracted hooks
+export { useMediaDimensions } from './useMediaDimensions';
+export { useOverlayDismiss } from './useOverlayDismiss';
+export { useVideoEditMode } from './useVideoEditMode';
+export type { VideoEditSubMode } from './useVideoEditMode';
+export { useSegmentSlotMode } from './useSegmentSlotMode';
+export { useVariantManagement } from './useVariantManagement';

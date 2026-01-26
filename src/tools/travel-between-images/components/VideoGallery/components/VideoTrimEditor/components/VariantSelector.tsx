@@ -7,13 +7,14 @@
  * Allows filtering by relationship and making the current variant primary.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Check, Scissors, Sparkles, Film, Star, Loader2, ArrowDown, ArrowUp, X, ChevronLeft, ChevronRight, ImagePlus, Download, Trash2 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { usePrefetchTaskData } from '@/shared/hooks/useUnifiedGenerations';
 import type { VariantSelectorProps, GenerationVariant } from '../types';
 
 const ITEMS_PER_PAGE = 20;
@@ -102,6 +103,14 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   const [loadedSettingsVariantId, setLoadedSettingsVariantId] = useState<string | null>(null);
   const [deletingVariantId, setDeletingVariantId] = useState<string | null>(null);
   const isMobile = useIsMobile();
+
+  // Prefetch task data on hover (desktop only)
+  const prefetchTaskData = usePrefetchTaskData();
+  const handleVariantMouseEnter = useCallback((generationId: string) => {
+    if (!isMobile && generationId) {
+      prefetchTaskData(generationId);
+    }
+  }, [isMobile, prefetchTaskData]);
 
   // Calculate variant relationships based on source_variant_id in params
   const { parentVariants, childVariants, relationshipMap } = useMemo(() => {
@@ -447,6 +456,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                     onVariantSelect(variant.id);
                   }
                 }}
+                onMouseEnter={() => handleVariantMouseEnter(variant.generation_id)}
                 className={cn(
                   'relative block p-0.5 rounded transition-all w-full touch-manipulation',
                   'hover:bg-muted/80',

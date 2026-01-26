@@ -66,6 +66,11 @@ import {
   useSwipeNavigation,
   useButtonGroupProps,
   useImg2ImgMode,
+  useMediaDimensions,
+  useOverlayDismiss,
+  useVideoEditMode,
+  useSegmentSlotMode,
+  useVariantManagement,
 } from './hooks';
 
 // Import all extracted components
@@ -317,98 +322,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   // ========================================
   // SEGMENT SLOT MODE - Unified segment editor
   // ========================================
-
-  // When in segment slot mode, derive media and navigation from the slot data
-  const isSegmentSlotMode = !!segmentSlotMode;
-  const hasSegmentVideo = isSegmentSlotMode && !!segmentSlotMode.segmentVideo;
-
-  // Flag for simplified form-only rendering (segment slot mode without video)
-  const isFormOnlyMode = isSegmentSlotMode && !hasSegmentVideo;
-
-  // Debug logging for segment slot navigation
-  console.log('[SegmentSlotNav] MediaLightbox render:', {
+  const {
     isSegmentSlotMode,
     hasSegmentVideo,
     isFormOnlyMode,
-    currentIndex: segmentSlotMode?.currentIndex,
-    totalPairs: segmentSlotMode?.totalPairs,
-    hasMediaProp: !!mediaProp,
-    segmentVideoId: segmentSlotMode?.segmentVideo?.id?.substring(0, 8),
+    media,
+    hasNext,
+    hasPrevious,
+    handleSlotNavNext,
+    handleSlotNavPrev,
+  } = useSegmentSlotMode({
+    segmentSlotMode,
+    mediaProp,
+    hasNextProp,
+    hasPreviousProp,
+    onNext,
+    onPrevious,
   });
-
-  // More detailed debug logging with filterable tag
-  if (isSegmentSlotMode) {
-    console.log('[SegmentClickDebug] MediaLightbox opened in segment slot mode:', {
-      currentIndex: segmentSlotMode?.currentIndex,
-      hasSegmentVideo,
-      segmentVideoId: segmentSlotMode?.segmentVideo?.id?.substring(0, 8),
-      segmentVideoLocation: segmentSlotMode?.segmentVideo?.location?.substring(0, 50),
-      segmentVideoType: segmentSlotMode?.segmentVideo?.type,
-      mediaPropId: mediaProp?.id?.substring(0, 8),
-      mediaPropType: mediaProp?.type,
-      mediaPropLocation: mediaProp?.location?.substring(0, 50),
-      pairDataIndex: segmentSlotMode?.pairData?.index,
-      activeChildGenerationId: segmentSlotMode?.activeChildGenerationId?.substring(0, 8),
-    });
-  }
-
-  // Placeholder media for form-only mode - ensures hooks always receive valid data
-  const placeholderMedia: GenerationRow = {
-    id: 'placeholder',
-    type: 'image',
-    imageUrl: '',
-    location: '',
-    thumbUrl: '',
-    contentType: 'image/png',
-    params: {},
-    metadata: {},
-    created_at: new Date().toISOString(),
-  };
-
-  // Raw media: use slot's video if in slot mode, otherwise use prop (can be undefined in form-only mode)
-  const rawMedia = hasSegmentVideo
-    ? segmentSlotMode.segmentVideo!
-    : mediaProp;
-
-  // Media is always defined - use placeholder in form-only mode
-  const media = rawMedia ?? placeholderMedia;
-
-  // Slot-based navigation
-  const hasNext = isSegmentSlotMode
-    ? segmentSlotMode.currentIndex < segmentSlotMode.totalPairs - 1
-    : hasNextProp;
-  const hasPrevious = isSegmentSlotMode
-    ? segmentSlotMode.currentIndex > 0
-    : hasPreviousProp;
-
-  // Navigation handlers for slot mode
-  const handleSlotNavNext = useCallback(() => {
-    console.log('[SegmentSlotNav] handleSlotNavNext called:', {
-      isSegmentSlotMode,
-      hasNext,
-      currentIndex: segmentSlotMode?.currentIndex,
-      targetIndex: (segmentSlotMode?.currentIndex ?? -1) + 1,
-    });
-    if (isSegmentSlotMode && hasNext) {
-      segmentSlotMode.onNavigateToPair(segmentSlotMode.currentIndex + 1);
-    } else if (onNext) {
-      onNext();
-    }
-  }, [isSegmentSlotMode, hasNext, segmentSlotMode, onNext]);
-
-  const handleSlotNavPrev = useCallback(() => {
-    console.log('[SegmentSlotNav] handleSlotNavPrev called:', {
-      isSegmentSlotMode,
-      hasPrevious,
-      currentIndex: segmentSlotMode?.currentIndex,
-      targetIndex: (segmentSlotMode?.currentIndex ?? 1) - 1,
-    });
-    if (isSegmentSlotMode && hasPrevious) {
-      segmentSlotMode.onNavigateToPair(segmentSlotMode.currentIndex - 1);
-    } else if (onPrevious) {
-      onPrevious();
-    }
-  }, [isSegmentSlotMode, hasPrevious, segmentSlotMode, onPrevious]);
 
   // ========================================
   // REFACTORED: All logic extracted to hooks

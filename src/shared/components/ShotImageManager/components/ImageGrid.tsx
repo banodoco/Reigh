@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { GenerationRow, PairLoraConfig, PairMotionSettings } from '@/types/shots';
 import { SortableImageItem } from '@/tools/travel-between-images/components/SortableImageItem';
 import { cn } from '@/shared/lib/utils';
@@ -12,6 +12,7 @@ import type { UseVideoScrubbingReturn } from '@/shared/hooks/useVideoScrubbing';
 import type { PairData } from '@/tools/travel-between-images/components/Timeline/TimelineContainer';
 import { SingleImageDurationIndicator } from './SingleImageDurationIndicator';
 import { Loader2 } from 'lucide-react';
+import { usePrefetchTaskData } from '@/shared/hooks/useUnifiedGenerations';
 
 const FPS = 16;
 
@@ -101,6 +102,15 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   onScrubbingStart,
   scrubbing,
 }) => {
+  // Prefetch task data on hover (desktop only)
+  const prefetchTaskData = usePrefetchTaskData();
+
+  const handleMouseEnter = useCallback((generationId: string | undefined) => {
+    if (!isMobile && generationId) {
+      prefetchTaskData(generationId);
+    }
+  }, [isMobile, prefetchTaskData]);
+
   return (
     <div
       className={cn("grid gap-3 pt-6 overflow-visible", gridColsClass)}
@@ -151,8 +161,16 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
         // Only hide if specifically affected by drag/drop
         const shouldHideIndicator = isDraggingThisItem || isDropTargetGap;
         
+        // Get the actual generation ID for prefetching (shot_generations stores generation_id)
+        const generationId = (image as any).generation_id || image.id;
+
         return (
-          <div key={imageKey} data-sortable-item className="relative">
+          <div
+            key={imageKey}
+            data-sortable-item
+            className="relative"
+            onMouseEnter={() => handleMouseEnter(generationId)}
+          >
             <SortableImageItem
               image={image}
               isSelected={desktopSelected}

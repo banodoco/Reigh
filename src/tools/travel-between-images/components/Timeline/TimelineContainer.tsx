@@ -29,6 +29,7 @@ import { DatasetBrowserModal } from '@/shared/components/DatasetBrowserModal';
 import { Resource, StructureVideoMetadata, useCreateResource } from '@/shared/hooks/useResources';
 import { supabase } from '@/integrations/supabase/client';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
+import { usePrefetchTaskData } from '@/shared/hooks/useUnifiedGenerations';
 
 // Skeleton component for uploading images
 const TimelineSkeletonItem: React.FC<{
@@ -519,7 +520,10 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   const contextTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const isMobile = useIsMobile();
-  
+
+  // Prefetch task data on hover (desktop only)
+  const prefetchTaskData = usePrefetchTaskData();
+
   // Detect tablets - treat them differently from phones for tap-to-move
   const { isTablet } = useDeviceDetection();
   
@@ -1905,6 +1909,10 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 readOnly={readOnly}
                 isSelectedForMove={tapToMove.isItemSelected(imageKey)}
                 onTapToMove={enableTapToMove ? () => tapToMove.handleItemTap(imageKey) : undefined}
+                onPrefetch={!isMobile ? () => {
+                  const generationId = (image as any).generation_id || image.id;
+                  if (generationId) prefetchTaskData(generationId);
+                } : undefined}
               />
             );
           })}

@@ -204,7 +204,7 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
   return (
     <div className="flex flex-col items-center gap-1">
       {/* Top row: selector and buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-0.5">
         <ShotSelectorWithAdd
           imageId={mediaId}
           imageUrl={imageUrl}
@@ -246,7 +246,7 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
                 size="sm"
                 onClick={handleAddWithoutPosition}
                 disabled={isDisabled}
-                className={`h-8 px-3 text-white ${
+                className={`h-8 w-8 ml-1.5 text-white ${
                   isShowingTick
                     ? 'bg-green-600/80 hover:bg-green-600'
                     : 'bg-purple-600/80 hover:bg-purple-600'
@@ -292,7 +292,7 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
                 }}
                 disabled={isAddingVariantAsNew}
                 data-testid="add-variant-as-new-button"
-                className={`h-8 px-3 text-white ${
+                className={`h-8 w-8 text-white ${
                   addedVariantAsNewSuccess
                     ? 'bg-green-600/80 hover:bg-green-600'
                     : 'bg-black/50 hover:bg-black/70'

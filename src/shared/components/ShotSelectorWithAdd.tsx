@@ -165,7 +165,7 @@ export const ShotSelectorWithAdd: React.FC<ShotSelectorWithAddProps> = ({
   
   return (
     <div className={cn(
-      "flex gap-1",
+      "flex gap-1.5",
       isHorizontal ? "flex-row items-center" : "flex-col items-start",
       className
     )}>
