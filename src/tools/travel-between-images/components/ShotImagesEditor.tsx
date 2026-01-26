@@ -540,16 +540,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   const [activeVideoSlot, setActiveVideoSlot] = useState<'A' | 'B'>('A');
   const [preloadedIndex, setPreloadedIndex] = useState<number | null>(null);
   
-  // Preview video effects - handles video segments
-  React.useEffect(() => {
-    if (isPreviewTogetherOpen && previewVideoRef.current) {
-      setIsPreviewVideoLoading(true);
-      previewVideoRef.current.load();
-      previewVideoRef.current.play().catch(() => {});
-    }
-  }, [currentPreviewIndex, isPreviewTogetherOpen]);
-  
-  // Auto-start playback when dialog opens OR when segment changes (for both video and image segments)
+  // Auto-start playback state when dialog opens OR when segment changes (for both video and image segments)
   React.useEffect(() => {
     if (isPreviewTogetherOpen) {
       // Start playing immediately - this triggers on dialog open AND segment change
@@ -579,13 +570,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         clearInterval(crossfadeTimerRef.current);
         crossfadeTimerRef.current = null;
       }
-      // Reset video transition state
-      setVideoTransitionFrame(null);
-      setVideoTransitionOpacity(1);
-      if (videoTransitionTimerRef.current) {
-        clearInterval(videoTransitionTimerRef.current);
-        videoTransitionTimerRef.current = null;
-      }
+      // Reset dual-video state
+      setActiveVideoSlot('A');
+      setPreloadedIndex(null);
     }
   }, [isPreviewTogetherOpen]);
   
@@ -1126,7 +1113,65 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   
   const hasVideosToPreview = previewableSegments.length > 0;
   console.log('[PreviewCrossfade] hasVideosToPreview:', hasVideosToPreview);
-  
+
+  // Preload next video for seamless cuts
+  React.useEffect(() => {
+    if (!isPreviewTogetherOpen || previewableSegments.length <= 1) return;
+
+    const safeIndex = Math.min(currentPreviewIndex, previewableSegments.length - 1);
+    const nextIndex = (safeIndex + 1) % previewableSegments.length;
+    const nextSegment = previewableSegments[nextIndex];
+
+    // Only preload if next segment has video and we haven't already preloaded it
+    if (!nextSegment?.hasVideo || preloadedIndex === nextIndex) return;
+
+    // Get the inactive video element
+    const inactiveVideo = activeVideoSlot === 'A' ? previewVideoRefB.current : previewVideoRef.current;
+    if (!inactiveVideo) return;
+
+    // Preload the next video
+    inactiveVideo.src = nextSegment.videoUrl!;
+    inactiveVideo.load();
+    setPreloadedIndex(nextIndex);
+    console.log('[SeamlessCut] Preloading next video:', { nextIndex, url: nextSegment.videoUrl?.substring(0, 50) });
+  }, [isPreviewTogetherOpen, currentPreviewIndex, previewableSegments, activeVideoSlot, preloadedIndex]);
+
+  // Set active video src and start playback
+  // This runs on dialog open, manual navigation, or slot swap
+  React.useEffect(() => {
+    if (!isPreviewTogetherOpen || previewableSegments.length === 0) return;
+
+    const safeIndex = Math.min(currentPreviewIndex, previewableSegments.length - 1);
+    const currentSegment = previewableSegments[safeIndex];
+
+    // Only handle video segments
+    if (!currentSegment?.hasVideo || !currentSegment.videoUrl) return;
+
+    const activeVideo = activeVideoSlot === 'A' ? previewVideoRef.current : previewVideoRefB.current;
+    if (!activeVideo) return;
+
+    // Check if video already has the correct src (preloaded case)
+    const currentSrc = activeVideo.src;
+    const targetSrc = currentSegment.videoUrl;
+
+    // Compare URLs (handle relative vs absolute)
+    const srcMatches = currentSrc && (currentSrc === targetSrc || currentSrc.endsWith(new URL(targetSrc, window.location.href).pathname));
+
+    if (srcMatches) {
+      // Already has correct src (from preload) - just play
+      console.log('[SeamlessCut] Video already preloaded, playing:', { slot: activeVideoSlot, index: safeIndex });
+      activeVideo.play().catch(() => {});
+      return;
+    }
+
+    // Need to load the video (initial load or manual navigation)
+    console.log('[SeamlessCut] Loading active video:', { slot: activeVideoSlot, index: safeIndex });
+    setIsPreviewVideoLoading(true);
+    activeVideo.src = currentSegment.videoUrl;
+    activeVideo.load();
+    activeVideo.play().catch(() => {});
+  }, [isPreviewTogetherOpen, currentPreviewIndex, previewableSegments, activeVideoSlot]);
+
   // Helper to calculate global time across all segments
   const getGlobalTime = React.useCallback((segmentIndex: number, timeInSegment: number) => {
     if (segmentOffsets.length === 0 || segmentIndex >= segmentOffsets.length) return 0;
@@ -1224,15 +1269,17 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        // Clear transition frame on manual navigation
-        setVideoTransitionFrame(null);
+        // Reset dual-video state on manual navigation
+        setActiveVideoSlot('A');
+        setPreloadedIndex(null);
         setCurrentPreviewIndex(prev =>
           prev > 0 ? prev - 1 : previewableSegments.length - 1
         );
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        // Clear transition frame on manual navigation
-        setVideoTransitionFrame(null);
+        // Reset dual-video state on manual navigation
+        setActiveVideoSlot('A');
+        setPreloadedIndex(null);
         setCurrentPreviewIndex(prev =>
           (prev + 1) % previewableSegments.length
         );
@@ -2682,134 +2729,154 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                         <Skeleton className="w-full h-full bg-muted/20" />
                       </div>
                     )}
-                    {currentSegment.hasVideo ? (
-                      // Video segment
-                      <video
-                        ref={previewVideoRef}
-                        src={currentSegment.videoUrl!}
-                        className="absolute inset-0 w-full h-full object-contain cursor-pointer"
-                        autoPlay
-                        playsInline
-                        onClick={() => {
-                          const video = previewVideoRef.current;
-                          if (video) {
-                            if (video.paused) {
-                              video.play();
-                            } else {
-                              video.pause();
-                            }
-                          }
-                        }}
-                        onPlay={() => {
-                          setPreviewIsPlaying(true);
-                          const audio = previewAudioRef.current;
-                          if (audio && isAudioEnabled && propAudioUrl) {
-                            syncAudioToVideo();
-                          }
-
-                          // Start fading out the transition frame if present
-                          if (videoTransitionFrame) {
-                            // Clear any existing timer
-                            if (videoTransitionTimerRef.current) {
-                              clearInterval(videoTransitionTimerRef.current);
-                            }
-                            const fadeStartTime = Date.now();
-                            const fadeDuration = 300; // 300ms crossfade
-                            videoTransitionTimerRef.current = setInterval(() => {
-                              const elapsed = Date.now() - fadeStartTime;
-                              const progress = Math.min(elapsed / fadeDuration, 1);
-                              setVideoTransitionOpacity(1 - progress);
-                              if (progress >= 1) {
-                                clearInterval(videoTransitionTimerRef.current!);
-                                videoTransitionTimerRef.current = null;
-                                setVideoTransitionFrame(null);
+                    {/* Dual video elements for seamless cuts */}
+                    {currentSegment.hasVideo && (
+                      <>
+                        {/* Video A - visible when activeVideoSlot === 'A' */}
+                        <video
+                          ref={previewVideoRef}
+                          className={`absolute inset-0 w-full h-full object-contain cursor-pointer ${activeVideoSlot !== 'A' ? 'invisible' : ''}`}
+                          playsInline
+                          muted={activeVideoSlot !== 'A'}
+                          onClick={() => {
+                            const video = activeVideoSlot === 'A' ? previewVideoRef.current : previewVideoRefB.current;
+                            if (video) {
+                              if (video.paused) {
+                                video.play();
+                              } else {
+                                video.pause();
                               }
-                            }, 16); // ~60fps
-                          }
-                        }}
-                        onPause={() => {
-                          setPreviewIsPlaying(false);
-                          const audio = previewAudioRef.current;
-                          if (audio) {
-                            audio.pause();
-                          }
-                        }}
-                        onTimeUpdate={() => {
-                          const video = previewVideoRef.current;
-                          if (video) {
-                            // Scale current time by playback rate to show "real" time elapsed
-                            const scaledTime = video.currentTime / (video.playbackRate || 1);
-                            setPreviewCurrentTime(scaledTime);
-                          }
-                        }}
-                        onSeeked={() => {
-                          syncAudioToVideo();
-                        }}
-                        onLoadedMetadata={() => {
-                          const video = previewVideoRef.current;
-                          if (video) {
-                            const actualDuration = video.duration;
-                            const expectedDuration = currentSegment.durationFromFrames || actualDuration;
-
-                            // Adjust playback rate so video matches segment duration
-                            if (expectedDuration > 0 && actualDuration > 0) {
-                              const playbackRate = actualDuration / expectedDuration;
-                              // Clamp to reasonable range (0.25x to 4x)
-                              video.playbackRate = Math.max(0.25, Math.min(4, playbackRate));
-                              console.log('[PreviewVideo] Adjusting playback rate:', {
-                                actual: actualDuration.toFixed(2),
-                                expected: expectedDuration.toFixed(2),
-                                rate: video.playbackRate.toFixed(2),
-                              });
                             }
-
-                            // Show expected duration in UI (what the segment should last)
-                            setPreviewDuration(expectedDuration);
-                            setPreviewCurrentTime(0);
-                            setIsPreviewVideoLoading(false);
-                            syncAudioToVideo();
-                          }
-                        }}
-                        onEnded={() => {
-                          const video = previewVideoRef.current;
-                          const nextIndex = (safeIndex + 1) % previewableSegments.length;
-                          const nextSegment = previewableSegments[nextIndex];
-
-                          // Capture last frame for crossfade if next segment also has video
-                          if (video && nextSegment?.hasVideo) {
-                            try {
-                              // Create canvas if not exists
-                              if (!transitionCanvasRef.current) {
-                                transitionCanvasRef.current = document.createElement('canvas');
-                              }
-                              const canvas = transitionCanvasRef.current;
-                              canvas.width = video.videoWidth;
-                              canvas.height = video.videoHeight;
-                              const ctx = canvas.getContext('2d');
-                              if (ctx) {
-                                ctx.drawImage(video, 0, 0);
-                                const frameUrl = canvas.toDataURL('image/jpeg', 0.8);
-                                setVideoTransitionFrame(frameUrl);
-                                setVideoTransitionOpacity(1);
-                              }
-                            } catch (e) {
-                              console.warn('[VideoTransition] Failed to capture frame:', e);
+                          }}
+                          onPlay={() => {
+                            if (activeVideoSlot !== 'A') return;
+                            setPreviewIsPlaying(true);
+                            const audio = previewAudioRef.current;
+                            if (audio && isAudioEnabled && propAudioUrl) {
+                              syncAudioToVideo();
                             }
-                          }
-
-                          setCurrentPreviewIndex(nextIndex);
-                        }}
-                        key={currentSegment.videoUrl}
-                      />
-                    ) : null}
-                    {/* Video transition frame - fades out over new video */}
-                    {videoTransitionFrame && (
-                      <img
-                        src={videoTransitionFrame}
-                        alt=""
-                        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-                        style={{ opacity: videoTransitionOpacity }}
-                      />
+                          }}
+                          onPause={() => {
+                            if (activeVideoSlot !== 'A') return;
+                            setPreviewIsPlaying(false);
+                            const audio = previewAudioRef.current;
+                            if (audio) {
+                              audio.pause();
+                            }
+                          }}
+                          onTimeUpdate={() => {
+                            if (activeVideoSlot !== 'A') return;
+                            const video = previewVideoRef.current;
+                            if (video) {
+                              const scaledTime = video.currentTime / (video.playbackRate || 1);
+                              setPreviewCurrentTime(scaledTime);
+                            }
+                          }}
+                          onSeeked={() => {
+                            if (activeVideoSlot === 'A') syncAudioToVideo();
+                          }}
+                          onLoadedMetadata={() => {
+                            if (activeVideoSlot !== 'A') return;
+                            const video = previewVideoRef.current;
+                            if (video) {
+                              const actualDuration = video.duration;
+                              const expectedDuration = currentSegment.durationFromFrames || actualDuration;
+                              if (expectedDuration > 0 && actualDuration > 0) {
+                                const playbackRate = actualDuration / expectedDuration;
+                                video.playbackRate = Math.max(0.25, Math.min(4, playbackRate));
+                              }
+                              setPreviewDuration(expectedDuration);
+                              setPreviewCurrentTime(0);
+                              setIsPreviewVideoLoading(false);
+                              syncAudioToVideo();
+                            }
+                          }}
+                          onEnded={() => {
+                            if (activeVideoSlot !== 'A') return;
+                            const nextIndex = (safeIndex + 1) % previewableSegments.length;
+                            const nextSegment = previewableSegments[nextIndex];
+                            if (nextSegment?.hasVideo && preloadedIndex === nextIndex) {
+                              setActiveVideoSlot('B');
+                              setPreloadedIndex(null);
+                              previewVideoRefB.current?.play().catch(() => {});
+                              console.log('[SeamlessCut] Swapping A -> B');
+                            }
+                            setCurrentPreviewIndex(nextIndex);
+                          }}
+                        />
+                        {/* Video B - visible when activeVideoSlot === 'B' */}
+                        <video
+                          ref={previewVideoRefB}
+                          className={`absolute inset-0 w-full h-full object-contain cursor-pointer ${activeVideoSlot !== 'B' ? 'invisible' : ''}`}
+                          playsInline
+                          muted={activeVideoSlot !== 'B'}
+                          onClick={() => {
+                            const video = activeVideoSlot === 'A' ? previewVideoRef.current : previewVideoRefB.current;
+                            if (video) {
+                              if (video.paused) {
+                                video.play();
+                              } else {
+                                video.pause();
+                              }
+                            }
+                          }}
+                          onPlay={() => {
+                            if (activeVideoSlot !== 'B') return;
+                            setPreviewIsPlaying(true);
+                            const audio = previewAudioRef.current;
+                            if (audio && isAudioEnabled && propAudioUrl) {
+                              syncAudioToVideo();
+                            }
+                          }}
+                          onPause={() => {
+                            if (activeVideoSlot !== 'B') return;
+                            setPreviewIsPlaying(false);
+                            const audio = previewAudioRef.current;
+                            if (audio) {
+                              audio.pause();
+                            }
+                          }}
+                          onTimeUpdate={() => {
+                            if (activeVideoSlot !== 'B') return;
+                            const video = previewVideoRefB.current;
+                            if (video) {
+                              const scaledTime = video.currentTime / (video.playbackRate || 1);
+                              setPreviewCurrentTime(scaledTime);
+                            }
+                          }}
+                          onSeeked={() => {
+                            if (activeVideoSlot === 'B') syncAudioToVideo();
+                          }}
+                          onLoadedMetadata={() => {
+                            if (activeVideoSlot !== 'B') return;
+                            const video = previewVideoRefB.current;
+                            if (video) {
+                              const actualDuration = video.duration;
+                              const expectedDuration = currentSegment.durationFromFrames || actualDuration;
+                              if (expectedDuration > 0 && actualDuration > 0) {
+                                const playbackRate = actualDuration / expectedDuration;
+                                video.playbackRate = Math.max(0.25, Math.min(4, playbackRate));
+                              }
+                              setPreviewDuration(expectedDuration);
+                              setPreviewCurrentTime(0);
+                              setIsPreviewVideoLoading(false);
+                              syncAudioToVideo();
+                            }
+                          }}
+                          onEnded={() => {
+                            if (activeVideoSlot !== 'B') return;
+                            const nextIndex = (safeIndex + 1) % previewableSegments.length;
+                            const nextSegment = previewableSegments[nextIndex];
+                            if (nextSegment?.hasVideo && preloadedIndex === nextIndex) {
+                              setActiveVideoSlot('A');
+                              setPreloadedIndex(null);
+                              previewVideoRef.current?.play().catch(() => {});
+                              console.log('[SeamlessCut] Swapping B -> A');
+                            }
+                            setCurrentPreviewIndex(nextIndex);
+                          }}
+                        />
+                      </>
                     )}
                     {!currentSegment.hasVideo ? (
                       // Image crossfade segment
@@ -2888,8 +2955,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                           size="lg"
                           onClick={(e) => {
                             e.stopPropagation();
-                            // Clear transition frame on manual navigation
-                            setVideoTransitionFrame(null);
+                            // Reset dual-video state on manual navigation
+                            setActiveVideoSlot('A');
+                            setPreloadedIndex(null);
                             setCurrentPreviewIndex(prev =>
                               prev > 0 ? prev - 1 : previewableSegments.length - 1
                             );
@@ -2903,8 +2971,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                           size="lg"
                           onClick={(e) => {
                             e.stopPropagation();
-                            // Clear transition frame on manual navigation
-                            setVideoTransitionFrame(null);
+                            // Reset dual-video state on manual navigation
+                            setActiveVideoSlot('A');
+                            setPreloadedIndex(null);
                             setCurrentPreviewIndex(prev =>
                               (prev + 1) % previewableSegments.length
                             );
@@ -3045,8 +3114,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                           }`}
                           style={{ width: 64, height: 36 }}
                           onClick={() => {
-                            // Clear transition frame on manual navigation
-                            setVideoTransitionFrame(null);
+                            // Reset dual-video state on manual navigation
+                            setActiveVideoSlot('A');
+                            setPreloadedIndex(null);
                             setCurrentPreviewIndex(idx);
                           }}
                           aria-label={`Go to segment ${segment.index + 1}`}

@@ -486,6 +486,36 @@ export function flushToolSettingsTarget(scope: SettingsScope, entityId: string, 
   return flushQueueTarget(scope, entityId, toolId);
 }
 
+/**
+ * Helper to extract settings from cache data (handles wrapper format)
+ * Cache stores data as { settings: T, hasShotSettings: boolean }
+ */
+export function extractSettingsFromCache<T>(cacheData: any): T | undefined {
+  if (!cacheData) return undefined;
+  const hasWrapper = cacheData && 'settings' in cacheData && 'hasShotSettings' in cacheData;
+  return hasWrapper ? cacheData.settings : cacheData;
+}
+
+/**
+ * Helper to update settings cache with proper wrapper format
+ * Use this in setQueryData callbacks for optimistic updates
+ *
+ * @param prev - The previous cache value (may be wrapper or flat format)
+ * @param updater - Either an object of updates, or a function that receives prevSettings and returns updates
+ */
+export function updateSettingsCache<T>(
+  prev: any,
+  updater: Partial<T> | ((prevSettings: T) => Partial<T>)
+): { settings: T; hasShotSettings: boolean } {
+  const hasWrapper = prev && 'settings' in prev && 'hasShotSettings' in prev;
+  const prevSettings = (hasWrapper ? (prev?.settings ?? {}) : (prev ?? {})) as T;
+  const updates = typeof updater === 'function' ? updater(prevSettings) : updater;
+  return {
+    settings: { ...prevSettings, ...updates } as T,
+    hasShotSettings: hasWrapper ? (prev?.hasShotSettings ?? false) : false
+  };
+}
+
 // Type overloads
 export function useToolSettings<T>(toolId: string, context?: { projectId?: string; shotId?: string; enabled?: boolean }): {
   settings: T | undefined;
