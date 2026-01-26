@@ -142,29 +142,40 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
   // Reset error/loading state when URL changes, and try to skip the thumbnail
   // if the full image is already cached (prevents "small thumb then normal size" flash).
   React.useLayoutEffect(() => {
-    console.log(`[${debugContext}] 🔄 ========== URL CHANGED ==========`);
-    console.log(`[${debugContext}] newUrl:`, effectiveImageUrl);
-    console.log(`[${debugContext}] hasUrl:`, !!effectiveImageUrl);
-    console.log(`[${debugContext}] ========================================`);
     setImageLoadError(false);
+
+    const isShowingThumbnail = thumbUrl && thumbUrl !== effectiveImageUrl;
+    let newFullImageLoaded = false;
+
     if (!thumbUrl || thumbUrl === effectiveImageUrl) {
-      setFullImageLoaded(true);
-      return;
+      newFullImageLoaded = true;
+    } else {
+      try {
+        const img = new Image();
+        img.src = effectiveImageUrl;
+        if (img.complete) {
+          newFullImageLoaded = true;
+          onImageLoad?.({ width: img.naturalWidth, height: img.naturalHeight });
+        }
+      } catch {
+        // Keep false
+      }
     }
 
-    try {
-      const img = new Image();
-      img.src = effectiveImageUrl;
-      if (img.complete) {
-        setFullImageLoaded(true);
-        onImageLoad?.({ width: img.naturalWidth, height: img.naturalHeight });
-      } else {
-        setFullImageLoaded(false);
-      }
-    } catch {
-      setFullImageLoaded(false);
-    }
-  }, [effectiveImageUrl, thumbUrl, debugContext, onImageLoad]);
+    setFullImageLoaded(newFullImageLoaded);
+
+    // Debug: Log sizing mode
+    const willForceThumbnailSize = imageDimensions && !newFullImageLoaded && isShowingThumbnail;
+    console.log(`[${debugContext}] 📐 Sizing mode:`, {
+      fullImageLoaded: newFullImageLoaded,
+      hasThumbnail: !!thumbUrl,
+      isShowingThumbnail,
+      hasImageDimensions: !!imageDimensions,
+      imageDimensions,
+      willForceThumbnailSize,
+      sizingMode: willForceThumbnailSize ? 'FORCED_FULL_SIZE' : 'NATURAL_SIZE',
+    });
+  }, [effectiveImageUrl, thumbUrl, debugContext, onImageLoad, imageDimensions]);
 
   // Measure the actual image element for Konva Stage size and position
   // This is more accurate than measuring the wrapper because the image has the
@@ -367,16 +378,20 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
                 // Keep image below settings panel during reposition (z-80 is the panel)
                 zIndex: editMode === 'reposition' ? 40 : undefined,
                 position: editMode === 'reposition' ? 'relative' : undefined,
-                // STABILITY FIX: Force thumbnail to display at full size
-                // aspectRatio alone doesn't enlarge the image - we need explicit sizing too
-                // object-fit: contain ensures aspect ratio is preserved while filling the container
-                // This prevents the small thumbnail from displaying at its natural small size
-                ...(imageDimensions ? {
+                // STABILITY FIX: Prevent small thumbnail display
+                // When showing thumbnail (not full image), force it to fill the container
+                // This prevents the jarring size jump when the full image loads
+                // NOTE: Only do this for thumbnails - full images need natural sizing for Konva overlay accuracy
+                ...((imageDimensions && !fullImageLoaded && thumbUrl && thumbUrl !== effectiveImageUrl) ? {
+                  // Thumbnail mode: force full size display
                   width: '100%',
                   height: '100%',
                   objectFit: 'contain' as const,
-                  aspectRatio: `${imageDimensions.width} / ${imageDimensions.height}`,
                 } : {}),
+                // Always set aspectRatio when we have dimensions (helps with sizing calculations)
+                aspectRatio: imageDimensions
+                  ? `${imageDimensions.width} / ${imageDimensions.height}`
+                  : undefined,
               }}
               onLoad={(e) => {
                 const img = e.target as HTMLImageElement;

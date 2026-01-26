@@ -33,6 +33,7 @@ import {
   EmptyState
 } from './components';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
+import { useContainerWidth } from '@/shared/components/ImageGallery/hooks';
 import {
   sortVideoOutputsByDate,
   transformUnifiedGenerationsData,
@@ -176,35 +177,59 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Stable content key to avoid resets during background refetches
   const contentKey = `${shotId ?? ''}:pagination-will-be-handled-by-hook`;
 
-  // Calculate items per page based on project aspect ratio to optimize pagination
-  const itemsPerPage = React.useMemo(() => {
-    if (!projectAspectRatio) {
-      return 6; // Default: 2 rows of 3 items each
+  // Track container width for responsive layout
+  const [galleryContainerRef, containerWidth] = useContainerWidth();
+
+  // Video-specific layout configuration
+  // Videos are larger than images, so we use fewer columns and items per page
+  const VIDEO_LAYOUT = {
+    TARGET_WIDTH: 280, // Target video width in pixels (larger than images)
+    GAP: 16, // Gap between videos (matches gap-4)
+    MIN_COLUMNS: 1,
+    MAX_COLUMNS: 4,
+    ROWS_PER_PAGE: 2, // Show 2 rows of videos per page
+  };
+
+  // Calculate responsive columns based on container width
+  const videoLayout = React.useMemo(() => {
+    // Calculate columns from container width
+    let columns: number;
+    if (containerWidth && containerWidth > 0) {
+      const effectiveWidth = VIDEO_LAYOUT.TARGET_WIDTH + VIDEO_LAYOUT.GAP;
+      columns = Math.floor((containerWidth + VIDEO_LAYOUT.GAP) / effectiveWidth);
+      columns = Math.max(VIDEO_LAYOUT.MIN_COLUMNS, Math.min(VIDEO_LAYOUT.MAX_COLUMNS, columns));
+    } else {
+      // Fallback based on aspect ratio when container width unknown
+      if (!projectAspectRatio) {
+        columns = 2;
+      } else {
+        const [width, height] = projectAspectRatio.split(':').map(Number);
+        if (width && height) {
+          const aspectRatio = width / height;
+          if (aspectRatio >= 16 / 9) {
+            columns = 2; // Wide videos: 2 per row
+          } else if (aspectRatio < 4 / 3) {
+            columns = 3; // Tall videos: 3 per row
+          } else {
+            columns = 2; // Standard: 2 per row
+          }
+        } else {
+          columns = 2;
+        }
+      }
     }
 
-    const [width, height] = projectAspectRatio.split(':').map(Number);
-    if (width && height) {
-      const aspectRatio = width / height;
+    const itemsPerPage = columns * VIDEO_LAYOUT.ROWS_PER_PAGE;
 
-      // For very wide aspect ratios (16:9 and wider), show 2 videos per row
-      // 6 items per page = 3 rows of 2 items each
-      if (aspectRatio >= 16 / 9) {
-        return 6;
-      }
-      // For very narrow aspect ratios (narrower than 4:3), show 4 videos per row
-      // 8 items per page = 2 rows of 4 items each
-      else if (aspectRatio < 4 / 3) {
-        return 8;
-      }
-      // For moderate aspect ratios (4:3 to 16:9), use default
-      // 6 items per page = 2 rows of 3 items each
-      else {
-        return 6;
-      }
-    }
+    return {
+      columns,
+      itemsPerPage,
+      // For skeleton gallery
+      skeletonColumns: { base: Math.min(columns, 2), lg: columns },
+    };
+  }, [containerWidth, projectAspectRatio]);
 
-    return 6; // Fallback
-  }, [projectAspectRatio]);
+  const itemsPerPage = videoLayout.itemsPerPage;
 
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -947,43 +972,14 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     return { aspectRatio: '16/9' }; // Fallback
   }, [projectAspectRatio]);
 
-  // Calculate grid columns based on aspect ratio - used by both skeleton AND actual grid
-  const gridColumnConfig = React.useMemo(() => {
-    const defaultConfig = { 
-      columns: { base: 2, lg: 3 },
-      classes: 'grid-cols-2 lg:grid-cols-3'
-    };
-
-    if (!projectAspectRatio) {
-      return defaultConfig;
-    }
-
-    const [width, height] = projectAspectRatio.split(':').map(Number);
-    if (width && height) {
-      const aspectRatio = width / height;
-
-      // For very wide aspect ratios (16:9 and wider), show 2 videos per row
-      if (aspectRatio >= 16 / 9) {
-        return { 
-          columns: { base: 2, lg: 2 },
-          classes: 'grid-cols-2 lg:grid-cols-2'
-        };
-      }
-      // For very narrow aspect ratios (narrower than 4:3), show 4 videos per row
-      else if (aspectRatio < 4 / 3) {
-        return { 
-          columns: { base: 2, lg: 4 },
-          classes: 'grid-cols-2 lg:grid-cols-4'
-        };
-      }
-      // For moderate aspect ratios (4:3 to 16:9), use default
-      else {
-        return defaultConfig;
-      }
-    }
-
-    return defaultConfig;
-  }, [projectAspectRatio]);
+  // Dynamic grid column style based on calculated layout
+  // Uses inline style for truly responsive columns instead of fixed breakpoint classes
+  const gridStyle = React.useMemo(() => ({
+    display: 'grid',
+    gridTemplateColumns: `repeat(${videoLayout.columns}, minmax(0, 1fr))`,
+    gap: '1rem', // gap-4
+    contain: 'content',
+  }), [videoLayout.columns]);
 
   // ===============================================================================
   // RENDER
@@ -998,7 +994,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   const currentVideo = lightboxIndex !== null ? sortedVideoOutputs[lightboxIndex] : null;
 
   return (
-    <div className="w-full bg-card border rounded-xl p-4 sm:p-6 shadow-sm" data-tour="video-gallery">
+    <div ref={galleryContainerRef} className="w-full bg-card border rounded-xl p-4 sm:p-6 shadow-sm" data-tour="video-gallery">
       <div className="flex flex-col space-y-2 sm:space-y-3">
         <GalleryControls
           sortedVideoOutputs={displaySortedVideoOutputs}
@@ -1018,17 +1014,14 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
             // Prevent accidentally rendering hundreds of skeletons if shot_statistics is off.
             // We already only fetch one page at a time, so cap at the current page size.
             count={Math.min(cachedCount ?? itemsPerPage, itemsPerPage)}
-            columns={gridColumnConfig.columns}
-            gapClasses="gap-2 sm:gap-3 md:gap-4"
+            columns={videoLayout.skeletonColumns}
+            gapClasses="gap-4"
             projectAspectRatio={projectAspectRatio}
           />
         ) : (
           <>
-            {/* Video grid - CSS containment isolates from drag layout recalcs */}
-            <div
-              className={`grid ${gridColumnConfig.classes} gap-2 sm:gap-3 md:gap-4`}
-              style={{ contain: 'content' }}
-            >
+            {/* Video grid - responsive columns based on container width */}
+            <div style={gridStyle}>
               {displaySortedVideoOutputs.map((video, index) => {
                 const originalIndex = sortedVideoOutputs.findIndex(v => v.id === video.id);
 
