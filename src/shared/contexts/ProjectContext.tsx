@@ -26,6 +26,8 @@ interface ProjectContextType {
   isUpdatingProject: boolean;
   deleteProject: (projectId: string) => Promise<boolean>;
   isDeletingProject: boolean;
+  /** Current authenticated user ID, null if not logged in */
+  userId: string | null;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -946,18 +948,19 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const contextValue = useMemo(
     () => {
       // Ensure all required values are defined
-      const value = { 
-        projects: projects || [], 
-        selectedProjectId, 
-        setSelectedProjectId: handleSetSelectedProjectId, 
+      const value = {
+        projects: projects || [],
+        selectedProjectId,
+        setSelectedProjectId: handleSetSelectedProjectId,
         isLoadingProjects,
         fetchProjects,
-        addNewProject, 
+        addNewProject,
         isCreatingProject,
         updateProject,
         isUpdatingProject,
         deleteProject,
-        isDeletingProject
+        isDeletingProject,
+        userId: userId ?? null,
       };
       
       // Defensive check - ensure context value is always valid
@@ -982,7 +985,8 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       updateProject,
       isUpdatingProject,
       deleteProject,
-      isDeletingProject
+      isDeletingProject,
+      userId,
     ]
   );
 
@@ -1013,7 +1017,8 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
         updateProject: async () => false,
         isUpdatingProject: false,
         deleteProject: async () => false,
-        isDeletingProject: false
+        isDeletingProject: false,
+        userId: null,
       }}>
         {children}
       </ProjectContext.Provider>

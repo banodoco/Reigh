@@ -1,8 +1,8 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { useSpecificResources } from '@/shared/hooks/useSpecificResources';
-import { StyleReferenceMetadata, Resource } from '@/shared/hooks/useResources';
+import { StyleReferenceMetadata } from '@/shared/hooks/useResources';
 import { ReferenceImage, HydratedReferenceImage } from '../components/ImageGenerationForm/types';
-import { supabase } from '@/integrations/supabase/client';
+import { useProject } from '@/shared/contexts/ProjectContext';
 
 /**
  * Hook to hydrate reference pointers with full data from resources table
@@ -16,17 +16,9 @@ export const useHydratedReferences = (
   isLoading: boolean;
   hasLegacyReferences: boolean;
 } => {
-  // Get current user ID for ownership check
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setCurrentUserId(session?.user?.id || null);
-    };
-    getUser();
-  }, []);
-  
+  // Get current user ID from context for ownership check (avoids extra auth call)
+  const { userId: currentUserId } = useProject();
+
   // Extract resource IDs we need to fetch
   const resourceIdsToFetch = useMemo(() => {
     if (!referencePointers) return [];
