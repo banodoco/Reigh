@@ -415,7 +415,13 @@ const JoinClipsPage: React.FC = () => {
   }, [selectedProjectId]);
 
   // Check for pending join clips from lightbox "Add to Join" button
+  // Must wait for settingsLoaded to avoid race condition with settings initialization
   useEffect(() => {
+    if (!settingsLoaded) {
+      console.log('[JoinClipsDebug] Waiting for settings to load before checking pending clips');
+      return;
+    }
+
     const checkPendingJoinClips = async () => {
       try {
         const pendingData = localStorage.getItem('pendingJoinClips');
@@ -533,7 +539,7 @@ const JoinClipsPage: React.FC = () => {
     };
 
     checkPendingJoinClips();
-  }, []);
+  }, [settingsLoaded]);
 
   // Transition prompts (one for each pair) - still managed locally as they're tied to clip IDs
   const [transitionPrompts, setTransitionPrompts] = useState<TransitionPrompt[]>([]);
