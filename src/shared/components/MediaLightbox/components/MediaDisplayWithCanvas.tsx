@@ -325,7 +325,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
         // Image with Canvas Overlays
         // Use a single relative container with the image and canvas both using same centering/constraints
         <div
-          className="relative w-full h-full flex items-center justify-center"
+          className={`relative w-full h-full flex items-center justify-center ${!isRepositionMode ? 'pointer-events-none' : ''}`}
           style={{
             // Black background for reposition mode (shows where empty areas will be)
             ...(isRepositionMode ? {
@@ -354,7 +354,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
           */}
           <div
             ref={imageWrapperRef}
-            className="relative w-full h-full flex items-center justify-center overflow-hidden"
+            className={`relative w-full h-full flex items-center justify-center overflow-hidden ${!isRepositionMode ? 'pointer-events-none' : ''}`}
           >
             {/* Use thumbnail or full image based on loading state */}
             <img
