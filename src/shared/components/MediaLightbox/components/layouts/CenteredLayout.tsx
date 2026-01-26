@@ -2,27 +2,25 @@
  * CenteredLayout - Default centered layout for simple media viewing
  *
  * Used on mobile/tablet when not in edit mode and not showing task details.
- * Simple centered media with overlay controls.
+ * Simple centered media with overlay controls and WorkflowControls below.
  */
 
 import React from 'react';
 import { cn } from '@/shared/lib/utils';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { Button } from '@/shared/components/ui/button';
-import { Undo2, X } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { Eraser, Square, Undo2, X, Diamond, Trash2 } from 'lucide-react';
 import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
-import type { LightboxLayoutProps } from './types';
+import type { CenteredLayoutProps } from './types';
 
 // Sub-components
 import { VariantOverlayBadge } from './VariantOverlayBadge';
 import { NewImageOverlayButton } from './NewImageOverlayButton';
-import { AnnotationOverlayControls } from './AnnotationOverlayControls';
 
 // Existing components
 import { FlexContainer } from './FlexContainer';
 import { MediaWrapper } from './MediaWrapper';
 import { NavigationArrows } from '../NavigationArrows';
-import { FloatingToolControls } from '../FloatingToolControls';
 import {
   TopRightControls,
   BottomLeftControls,
@@ -34,24 +32,22 @@ import { MediaDisplayWithCanvas } from '../MediaDisplayWithCanvas';
 import VideoEditModeDisplay from '../VideoEditModeDisplay';
 import VideoTrimModeDisplay from '../VideoTrimModeDisplay';
 
-interface CenteredLayoutProps extends LightboxLayoutProps {}
-
 export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
   const {
     // Core
     onClose,
     readOnly,
     selectedProjectId,
-    actualGenerationId,
     isMobile,
+    actualGenerationId,
 
     // Media
     media,
     isVideo,
     effectiveMediaUrl,
     effectiveVideoUrl,
-    imageDimensions,
     setImageDimensions,
+    effectiveImageDimensions,
 
     // Variants
     variants,
@@ -82,7 +78,9 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
     currentStroke,
     isDrawing,
     isEraseMode,
+    setIsEraseMode,
     brushSize,
+    setBrushSize,
     annotationMode,
     selectedShapeId,
     handleKonvaPointerDown,
@@ -115,15 +113,22 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
     // Button groups
     buttonGroupProps,
 
-    // Workflow
-    workflowProps,
+    // Workflow bar
+    workflowBarProps,
+
+    // Workflow controls (below media)
+    workflowControlsProps,
   } = props;
 
   return (
     <FlexContainer
       onClick={(e) => {
         e.stopPropagation();
-        if (isInpaintMode) return;
+        // Don't close in edit modes to prevent accidental data loss
+        if (isInpaintMode) {
+          return;
+        }
+        // Close if clicking directly on the container background (not children)
         if (e.target === e.currentTarget) {
           onClose();
         }
@@ -133,14 +138,16 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
       <MediaWrapper
         onClick={(e) => {
           e.stopPropagation();
+          // Don't close in edit modes
           if (isInpaintMode) return;
+          // Close if clicking directly on the wrapper background (not the video/image)
           if (e.target === e.currentTarget) {
             onClose();
           }
         }}
         className={cn(
           isMobile && isInpaintMode && "pointer-events-auto",
-          "touch-pan-y"
+          "touch-pan-y" // Allow vertical scrolling, capture horizontal
         )}
         {...swipeNavigation.swipeHandlers}
         style={{
@@ -174,6 +181,7 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
               onTimeUpdate={setTrimCurrentTime}
             />
           ) : (
+            // Normal video display with StyledVideoPlayer
             <StyledVideoPlayer
               src={effectiveVideoUrl}
               poster={activeVariant?.thumbnail_url || media.thumbUrl}
@@ -201,7 +209,7 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
             isInpaintMode={isInpaintMode}
             editMode={editMode}
             repositionTransformStyle={editMode === 'reposition' ? getTransformStyle() : undefined}
-            repositionDragHandlers={editMode === 'reposition' ? repositionDragHandlers || undefined : undefined}
+            repositionDragHandlers={editMode === 'reposition' ? repositionDragHandlers : undefined}
             isRepositionDragging={isRepositionDragging}
             imageContainerRef={imageContainerRef}
             canvasRef={canvasRef}
@@ -211,7 +219,8 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
             variant="regular-centered"
             containerClassName="w-full h-full"
             debugContext="Regular Centered"
-            imageDimensions={imageDimensions}
+            // Konva-based stroke overlay props
+            imageDimensions={effectiveImageDimensions}
             brushStrokes={brushStrokes}
             currentStroke={currentStroke}
             isDrawing={isDrawing}
@@ -227,7 +236,50 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
           />
         )}
 
-        {/* Variant badge */}
+        {/* Delete button and mode toggle for selected annotation */}
+        {selectedShapeId && isAnnotateMode && (() => {
+          const buttonPos = getDeleteButtonPosition();
+          if (!buttonPos) return null;
+
+          // Get selected shape info
+          const selectedShape = brushStrokes.find(s => s.id === selectedShapeId);
+          const isFreeForm = selectedShape?.isFreeForm || false;
+
+          return (
+            <div className="fixed z-[100] flex gap-2" style={{
+              left: `${buttonPos.x}px`,
+              top: `${buttonPos.y}px`,
+              transform: 'translate(-50%, -50%)'
+            }}>
+              {/* Mode toggle button */}
+              <button
+                onClick={handleToggleFreeForm}
+                className={cn(
+                  "rounded-full p-2 shadow-lg transition-colors",
+                  isFreeForm
+                    ? "bg-purple-600 hover:bg-purple-700 text-white"
+                    : "bg-gray-700 hover:bg-gray-600 text-white"
+                )}
+                title={isFreeForm
+                  ? "Switch to rectangle mode (edges move linearly)"
+                  : "Switch to free-form mode (rhombus/non-orthogonal angles)"}
+              >
+                {isFreeForm ? <Diamond className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+              </button>
+
+              {/* Delete button */}
+              <button
+                onClick={handleDeleteSelected}
+                className="bg-red-600 hover:bg-red-700 text-white rounded-full p-2 shadow-lg transition-colors"
+                title="Delete annotation (or press DELETE key)"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          );
+        })()}
+
+        {/* Top Center - Main Variant Badge/Button */}
         <VariantOverlayBadge
           activeVariant={activeVariant}
           variants={variants}
@@ -237,7 +289,7 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
           onMakeMainVariant={handleMakeMainVariant}
         />
 
-        {/* New image button */}
+        {/* Top Left - New image button */}
         <NewImageOverlayButton
           isVideo={isVideo}
           readOnly={readOnly}
@@ -249,62 +301,139 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
           onPromote={handlePromoteToGeneration}
         />
 
-        {/* Annotation overlay controls */}
-        <AnnotationOverlayControls
-          selectedShapeId={selectedShapeId}
-          isAnnotateMode={isAnnotateMode}
-          brushStrokes={brushStrokes}
-          getDeleteButtonPosition={getDeleteButtonPosition}
-          onToggleFreeForm={handleToggleFreeForm}
-          onDeleteSelected={handleDeleteSelected}
-        />
+        {/* Top Left Controls - Edit tools (below New Image button) */}
+        {!readOnly && (
+          <div
+            className="absolute top-20 left-4 z-[70] select-none"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Compact Edit Controls - for special edit mode */}
+            {isSpecialEditMode && editMode !== 'text' && (
+              <div className="mb-2 bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 w-40 border border-border shadow-xl">
+                {/* Brush Size Slider - Only in Inpaint mode */}
+                {editMode === 'inpaint' && (
+                  <div className="space-y-0.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-foreground">Size:</label>
+                      <span className="text-xs text-muted-foreground">{brushSize}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={5}
+                      max={100}
+                      value={brushSize}
+                      onChange={(e) => setBrushSize(parseInt(e.target.value))}
+                      className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    />
+                  </div>
+                )}
 
-        {/* Floating tool controls - for inpaint/annotate mode */}
-        {(isInpaintMode || isAnnotateMode) && (
-          <div className="absolute top-4 left-4 z-[60] select-none" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-2 bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 w-40 border border-border shadow-xl">
-              {/* Brush/Eraser toggle, brush size, undo, clear */}
-              <FloatingToolControls
-                {...buttonGroupProps.topLeft}
-                variant="mobile"
-              />
-            </div>
+                {/* Paint/Erase or Circle/Arrow Toggle */}
+                {editMode === 'inpaint' && (
+                  // Inpaint mode: Paint/Erase
+                  <Button
+                    variant={isEraseMode ? "default" : "secondary"}
+                    size="sm"
+                    onClick={() => setIsEraseMode(!isEraseMode)}
+                    className={cn(
+                      "w-full text-xs h-7",
+                      isEraseMode && "bg-purple-600 hover:bg-purple-700"
+                    )}
+                  >
+                    <Eraser className="h-3 w-3 mr-1" />
+                    {isEraseMode ? 'Erase' : 'Paint'}
+                  </Button>
+                )}
+
+                {editMode === 'annotate' && (
+                  // Annotate mode: Rectangle tool (always active)
+                  <div className="flex gap-1">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="flex-1 text-xs h-7"
+                      disabled
+                    >
+                      <Square className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* Undo | Clear */}
+                <div className="flex items-center gap-1">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleUndo}
+                        disabled={brushStrokes.length === 0}
+                        className="flex-1 text-xs h-7"
+                      >
+                        <Undo2 className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="z-[100001]">Undo</TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleClearMask}
+                        disabled={brushStrokes.length === 0}
+                        className="flex-1 text-xs h-7"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent className="z-[100001]">Clear all</TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Button groups */}
+        {/* Regular Mobile Layout - All button groups (matching desktop) */}
+        {/* Top Right Controls - Download, Delete & Close */}
         <TopRightControls {...buttonGroupProps.topRight} />
+
+        {/* Bottom Left Controls - Edit & Upscale */}
         <BottomLeftControls {...buttonGroupProps.bottomLeft} />
+
+        {/* Bottom Right Controls - Star & Add to References */}
         <BottomRightControls {...buttonGroupProps.bottomRight} />
 
-        {/* Workflow Controls Bar */}
+        {/* Bottom Workflow Controls */}
         <WorkflowControlsBar
-          onAddToShot={workflowProps.onAddToShot}
-          onDelete={workflowProps.onDelete}
-          onApplySettings={workflowProps.onApplySettings}
+          onAddToShot={workflowBarProps.onAddToShot}
+          onDelete={workflowBarProps.onDelete}
+          onApplySettings={workflowBarProps.onApplySettings}
           isSpecialEditMode={isSpecialEditMode}
           isVideo={isVideo}
           mediaId={actualGenerationId}
           imageUrl={effectiveMediaUrl}
           thumbUrl={media.thumbUrl}
-          allShots={workflowProps.allShots}
-          selectedShotId={workflowProps.selectedShotId}
-          onShotChange={workflowProps.onShotChange}
-          onCreateShot={workflowProps.onCreateShot}
-          isAlreadyPositionedInSelectedShot={workflowProps.isAlreadyPositionedInSelectedShot}
-          isAlreadyAssociatedWithoutPosition={workflowProps.isAlreadyAssociatedWithoutPosition}
-          showTickForImageId={workflowProps.showTickForImageId}
-          showTickForSecondaryImageId={workflowProps.showTickForSecondaryImageId}
-          onAddToShotWithoutPosition={workflowProps.onAddToShotWithoutPosition}
-          onShowTick={workflowProps.onShowTick}
-          onShowSecondaryTick={workflowProps.onShowSecondaryTick}
-          onOptimisticPositioned={workflowProps.onOptimisticPositioned}
-          onOptimisticUnpositioned={workflowProps.onOptimisticUnpositioned}
-          contentRef={workflowProps.contentRef}
-          handleApplySettings={workflowProps.handleApplySettings}
-          onNavigateToShot={workflowProps.handleNavigateToShotFromSelector}
+          allShots={workflowBarProps.allShots}
+          selectedShotId={workflowBarProps.selectedShotId}
+          onShotChange={workflowBarProps.onShotChange}
+          onCreateShot={workflowBarProps.onCreateShot}
+          isAlreadyPositionedInSelectedShot={workflowBarProps.isAlreadyPositionedInSelectedShot}
+          isAlreadyAssociatedWithoutPosition={workflowBarProps.isAlreadyAssociatedWithoutPosition}
+          showTickForImageId={workflowBarProps.showTickForImageId}
+          showTickForSecondaryImageId={workflowBarProps.showTickForSecondaryImageId}
+          onAddToShotWithoutPosition={workflowBarProps.onAddToShotWithoutPosition}
+          onShowTick={workflowBarProps.onShowTick}
+          onShowSecondaryTick={workflowBarProps.onShowSecondaryTick}
+          onOptimisticPositioned={workflowBarProps.onOptimisticPositioned}
+          onOptimisticUnpositioned={workflowBarProps.onOptimisticUnpositioned}
+          contentRef={workflowBarProps.contentRef}
+          handleApplySettings={workflowBarProps.handleApplySettings}
+          onNavigateToShot={workflowBarProps.handleNavigateToShotFromSelector}
           onClose={onClose}
-          onAddVariantAsNewGeneration={workflowProps.handleAddVariantAsNewGenerationToShot}
+          onAddVariantAsNewGeneration={workflowBarProps.handleAddVariantAsNewGenerationToShot}
           activeVariantId={activeVariant?.id || primaryVariant?.id}
           currentTimelineFrame={media.timeline_frame}
         />
@@ -330,24 +459,24 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
             thumbUrl={media.thumbUrl}
             isVideo={isVideo}
             isInpaintMode={isInpaintMode}
-            allShots={workflowProps.allShots}
-            selectedShotId={workflowProps.selectedShotId}
-            onShotChange={workflowProps.onShotChange}
-            onCreateShot={workflowProps.onCreateShot}
-            contentRef={workflowProps.contentRef}
-            isAlreadyPositionedInSelectedShot={workflowProps.isAlreadyPositionedInSelectedShot}
-            isAlreadyAssociatedWithoutPosition={workflowProps.isAlreadyAssociatedWithoutPosition}
-            showTickForImageId={workflowProps.showTickForImageId}
-            showTickForSecondaryImageId={workflowProps.showTickForSecondaryImageId}
-            onAddToShot={workflowProps.onAddToShot}
-            onAddToShotWithoutPosition={workflowProps.onAddToShotWithoutPosition}
-            onShowTick={workflowProps.onShowTick}
-            onApplySettings={workflowProps.onApplySettings}
-            handleApplySettings={workflowProps.handleApplySettings}
-            onDelete={workflowProps.onDelete}
-            handleDelete={workflowProps.handleDelete}
-            isDeleting={workflowProps.isDeleting}
-            onNavigateToShot={workflowProps.handleNavigateToShotFromSelector}
+            allShots={workflowControlsProps.allShots}
+            selectedShotId={workflowControlsProps.selectedShotId}
+            onShotChange={workflowControlsProps.onShotChange}
+            onCreateShot={workflowControlsProps.onCreateShot}
+            contentRef={workflowControlsProps.contentRef}
+            isAlreadyPositionedInSelectedShot={workflowControlsProps.isAlreadyPositionedInSelectedShot}
+            isAlreadyAssociatedWithoutPosition={workflowControlsProps.isAlreadyAssociatedWithoutPosition}
+            showTickForImageId={workflowControlsProps.showTickForImageId}
+            showTickForSecondaryImageId={workflowControlsProps.showTickForSecondaryImageId}
+            onAddToShot={workflowControlsProps.onAddToShot}
+            onAddToShotWithoutPosition={workflowControlsProps.onAddToShotWithoutPosition}
+            onShowTick={workflowControlsProps.onShowTick}
+            onApplySettings={workflowControlsProps.onApplySettings}
+            handleApplySettings={workflowControlsProps.handleApplySettings}
+            onDelete={workflowControlsProps.onDelete}
+            handleDelete={workflowControlsProps.handleDelete}
+            isDeleting={workflowControlsProps.isDeleting}
+            onNavigateToShot={workflowControlsProps.handleNavigateToShotFromSelector}
             onClose={onClose}
           />
         </div>

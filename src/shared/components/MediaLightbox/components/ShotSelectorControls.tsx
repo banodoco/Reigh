@@ -195,9 +195,9 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
   const selectedShot = selectedShotId ? allShots.find(s => s.id === selectedShotId) : null;
 
   const handleJumpToShot = () => {
-    if (selectedShot && onNavigateToShot && onClose) {
+    if (selectedShot && onNavigateToShot) {
+      // onNavigateToShot handler already closes the lightbox
       onNavigateToShot(selectedShot);
-      onClose();
     }
   };
 
@@ -270,14 +270,14 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
         );
       })()}
 
-        {/* Add variant as new generation to shot button - always show when variant exists */}
+        {/* Add variant as new generation to shot button - show by default, disable when no variant */}
         {console.log('[VariantToShot] Blue button render check:', {
           hasCallback: !!onAddVariantAsNewGeneration,
           activeVariantId: activeVariantId?.substring(0, 8),
           selectedShotId: selectedShotId?.substring(0, 8),
-          willRender: !!(onAddVariantAsNewGeneration && activeVariantId && selectedShotId)
+          willRender: !!(onAddVariantAsNewGeneration && selectedShotId)
         })}
-        {onAddVariantAsNewGeneration && activeVariantId && selectedShotId && (
+        {onAddVariantAsNewGeneration && selectedShotId && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -290,9 +290,9 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
                 onPointerDown={(e) => {
                   console.log('[VariantToShot] 🔵 BUTTON onPointerDown!');
                 }}
-                disabled={isAddingVariantAsNew}
+                disabled={isAddingVariantAsNew || !activeVariantId}
                 data-testid="add-variant-as-new-button"
-                className={`h-8 w-8 text-white ${
+                className={`h-8 w-8 ml-1 text-white ${
                   addedVariantAsNewSuccess
                     ? 'bg-green-600/80 hover:bg-green-600'
                     : 'bg-black/50 hover:bg-black/70'
@@ -317,12 +317,12 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
       </div>
 
       {/* Jump to shot link - below the buttons */}
-      {selectedShot && onNavigateToShot && onClose && (
+      {selectedShot && onNavigateToShot && (
         <button
           onClick={handleJumpToShot}
           className="flex items-center gap-1.5 px-2.5 py-1 mt-1 text-xs text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors whitespace-nowrap"
         >
-          <span>{selectedShot.name}</span>
+          <span>{selectedShot.name.length > 12 ? `${selectedShot.name.substring(0, 12)}…` : selectedShot.name}</span>
           <ArrowRight className="w-3 h-3" />
         </button>
       )}

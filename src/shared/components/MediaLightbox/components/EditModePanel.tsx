@@ -545,7 +545,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
           {/* Number of Generations + Create as Variant - shown for all image edit modes */}
           {onCreateAsGenerationChange && (
             <div className={cn(
-              "py-1.5 px-1 rounded-md flex items-center gap-2 overflow-hidden",
+              "py-1.5 px-1 rounded-md flex items-center gap-2 overflow-hidden w-[80%]",
               isMobile && "bg-muted/30"
             )}>
               <SectionLabel>Options</SectionLabel>

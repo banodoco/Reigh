@@ -5,7 +5,6 @@
  * - useUpscale: Image upscaling with localStorage persistence
  * - useInpainting: Canvas-based inpainting with mask generation
  * - useRepositionMode: Image repositioning, scaling, rotation, and flipping
- * - useGenerationName: Generation name editing with database sync
  * - useReferences: Adding images to project references with processing
  * - useGenerationLineage: Fetching source/derived generations
  * - useShotCreation: Atomic shot creation with images
@@ -33,7 +32,6 @@ export type { MediaLightboxProps, ShotOption } from './MediaLightbox';
 export {
   useUpscale,
   useInpainting,
-  useGenerationName,
   useReferences,
   useGenerationLineage,
   useShotCreation,

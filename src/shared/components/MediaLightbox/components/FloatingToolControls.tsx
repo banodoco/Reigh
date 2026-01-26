@@ -87,9 +87,9 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
   // Variant-specific styling - widened for 5 mode buttons
   const containerWidth = isTablet ? 'w-48' : 'w-40';
   const leftPosition = isTablet ? 'left-4' : 'left-2';
-  const topBottomPosition = isTablet 
-    ? (panelPosition === 'top' ? 'top-4' : 'bottom-4')
-    : (panelPosition === 'top' ? 'top-2' : 'bottom-2');
+  const topBottomPosition = isTablet
+    ? (panelPosition === 'top' ? 'top-16' : 'bottom-4')
+    : (panelPosition === 'top' ? 'top-14' : 'bottom-2');
   
   const iconSize = isTablet ? 'h-4 w-4' : 'h-3.5 w-3.5';
   

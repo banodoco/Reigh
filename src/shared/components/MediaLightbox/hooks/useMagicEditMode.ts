@@ -283,7 +283,10 @@ export const useMagicEditMode = ({
     addMagicEditPrompt,
     createAsGeneration,
     advancedSettings,
-    qwenEditModel
+    qwenEditModel,
+    activeVariantId,
+    activeVariantLocation,
+    editModeLoRAs,
   ]);
 
   return {

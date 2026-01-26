@@ -4,9 +4,6 @@ export type { UseUpscaleProps, UseUpscaleReturn } from './useUpscale';
 export { useInpainting } from './useInpainting';
 export type { UseInpaintingProps, UseInpaintingReturn } from './useInpainting';
 
-export { useGenerationName } from './useGenerationName';
-export type { UseGenerationNameProps, UseGenerationNameReturn } from './useGenerationName';
-
 export { useReferences } from './useReferences';
 export type { UseReferencesProps, UseReferencesReturn } from './useReferences';
 
@@ -82,10 +79,88 @@ export type {
 } from './useImg2ImgMode';
 
 // New extracted hooks
-export { useMediaDimensions } from './useMediaDimensions';
-export { useOverlayDismiss } from './useOverlayDismiss';
-export { useVideoEditMode } from './useVideoEditMode';
-export type { VideoEditSubMode } from './useVideoEditMode';
+export { useVideoEditModeHandlers } from './useVideoEditModeHandlers';
+export type {
+  UseVideoEditModeHandlersProps,
+  UseVideoEditModeHandlersReturn,
+  VideoEditSubMode,
+} from './useVideoEditModeHandlers';
 export { useSegmentSlotMode } from './useSegmentSlotMode';
-export { useVariantManagement } from './useVariantManagement';
+
+// Media and task details hooks
+export { useEffectiveMedia } from './useEffectiveMedia';
+export type {
+  UseEffectiveMediaProps,
+  UseEffectiveMediaReturn,
+} from './useEffectiveMedia';
+
+export { useAdjustedTaskDetails } from './useAdjustedTaskDetails';
+export type {
+  UseAdjustedTaskDetailsProps,
+  UseAdjustedTaskDetailsReturn,
+} from './useAdjustedTaskDetails';
+
+// Video regenerate mode hook
+export { useVideoRegenerateMode } from './useVideoRegenerateMode';
+export type {
+  UseVideoRegenerateModeProps,
+  UseVideoRegenerateModeReturn,
+  CurrentSegmentImages,
+} from './useVideoRegenerateMode';
+
+// Replace in shot hook
+export { useReplaceInShot } from './useReplaceInShot';
+export type {
+  UseReplaceInShotProps,
+  UseReplaceInShotReturn,
+} from './useReplaceInShot';
+
+// Make main variant hook
+export { useMakeMainVariant } from './useMakeMainVariant';
+export type {
+  UseMakeMainVariantProps,
+  UseMakeMainVariantReturn,
+} from './useMakeMainVariant';
+
+// Panel mode restoration hook
+export { usePanelModeRestore } from './usePanelModeRestore';
+export type {
+  UsePanelModeRestoreProps,
+  UsePanelModeRestoreReturn,
+} from './usePanelModeRestore';
+
+// Edit settings sync hook
+export { useEditSettingsSync } from './useEditSettingsSync';
+export type {
+  UseEditSettingsSyncProps,
+  UseEditSettingsSyncReturn,
+} from './useEditSettingsSync';
+
+// Join clips hook
+export { useJoinClips } from './useJoinClips';
+export type {
+  UseJoinClipsProps,
+  UseJoinClipsReturn,
+} from './useJoinClips';
+
+// Variant selection hook
+export { useVariantSelection } from './useVariantSelection';
+export type {
+  UseVariantSelectionProps,
+  UseVariantSelectionReturn,
+} from './useVariantSelection';
+
+// Variant promotion hook
+export { useVariantPromotion } from './useVariantPromotion';
+export type {
+  UseVariantPromotionProps,
+  UseVariantPromotionReturn,
+} from './useVariantPromotion';
+
+// Layout props hook
 export { useLightboxLayoutProps } from './useLightboxLayoutProps';
+export type {
+  UseLightboxLayoutPropsInput,
+  UseLightboxLayoutPropsReturn,
+} from './useLightboxLayoutProps';
+

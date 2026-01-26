@@ -130,63 +130,9 @@ interface BottomLeftControlsProps extends BaseButtonGroupProps {
   handleToggleUpscaled: () => void; // Kept for API compatibility, but not used
 }
 
-export const BottomLeftControls: React.FC<BottomLeftControlsProps> = ({
-  isVideo,
-  readOnly,
-  isSpecialEditMode,
-  selectedProjectId,
-  isCloudMode,
-  isUpscaling,
-  isPendingUpscale,
-  hasUpscaledVersion,
-  handleUpscale,
-}) => {
-  if (isSpecialEditMode) {
-    return null;
-  }
-
-  // Only show if upscale button should be visible
-  if (readOnly || isVideo || !selectedProjectId || !isCloudMode) {
-    return null;
-  }
-
-  // Don't show button if already upscaled (no toggle functionality)
-  if (hasUpscaledVersion) {
-    return null;
-  }
-
-  return (
-    <div className="absolute bottom-4 left-4 flex items-center space-x-2 z-10">
-      {/* Upscale Button - only shows when not yet upscaled */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleUpscale}
-              disabled={isUpscaling || isPendingUpscale}
-              className={cn(
-                "transition-colors text-white",
-                isPendingUpscale ? "bg-green-600/80 hover:bg-green-600" : "bg-black/50 hover:bg-black/70"
-              )}
-            >
-              {isUpscaling ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : isPendingUpscale ? (
-                <CheckCircle className="h-4 w-4" />
-              ) : (
-                <ArrowUpCircle className="h-4 w-4" />
-              )}
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent className="z-[100001]">
-          {isUpscaling ? 'Creating upscale task...' : isPendingUpscale ? 'Upscale in progress' : 'Upscale image'}
-        </TooltipContent>
-      </Tooltip>
-    </div>
-  );
+export const BottomLeftControls: React.FC<BottomLeftControlsProps> = () => {
+  // Upscale button removed
+  return null;
 };
 
 // ============================================================================

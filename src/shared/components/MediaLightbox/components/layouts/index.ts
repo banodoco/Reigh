@@ -14,16 +14,20 @@ export { CenteredLayout } from './CenteredLayout';
 
 // Types
 export type {
-  LightboxLayoutProps,
-  LightboxLayoutCoreProps,
-  MediaProps,
-  VariantProps,
-  VideoEditProps,
-  EditModeProps,
-  NavigationProps,
-  ButtonGroupProps,
-  WorkflowProps,
-  PanelProps,
-  EditPanelProps,
-  SegmentModeProps,
+  // Core layout props
+  LayoutCoreProps,
+  LayoutMediaProps,
+  LayoutVariantProps,
+  LayoutVideoEditProps,
+  LayoutEditModeProps,
+  LayoutNavigationProps,
+  LayoutButtonGroupProps,
+  LayoutWorkflowBarProps,
+  LayoutFloatingToolProps,
+  LayoutPanelProps,
+  // Composite layout props
+  SidePanelLayoutProps,
+  CenteredLayoutProps,
+  // Re-exported
+  ControlsPanelProps,
 } from './types';

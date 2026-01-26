@@ -28,11 +28,6 @@ interface TaskDetailsPanelProps {
   className?: string;
   basedOnSection?: ReactNode;
   derivedSection?: ReactNode;
-  // Variant name editing
-  generationName?: string;
-  onGenerationNameChange?: (name: string) => void;
-  isEditingGenerationName?: boolean;
-  onEditingGenerationNameChange?: (editing: boolean) => void;
   // Control whether to show user-provided source images
   showUserImage?: boolean;
   // Hide the header (title is shown in parent component)
@@ -51,10 +46,6 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
   className = "",
   basedOnSection,
   derivedSection,
-  generationName,
-  onGenerationNameChange,
-  isEditingGenerationName,
-  onEditingGenerationNameChange,
   showUserImage = true,
   hideHeader = false
 }) => {
@@ -209,10 +200,6 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
                     onShowAllImagesChange={setShowAllImages}
                     showFullPrompt={showFullPrompt}
                     onShowFullPromptChange={setShowFullPrompt}
-                    generationName={generationName}
-                    onGenerationNameChange={onGenerationNameChange}
-                    isEditingGenerationName={isEditingGenerationName}
-                    onEditingGenerationNameChange={onEditingGenerationNameChange}
                     showFullNegativePrompt={showFullNegativePrompt}
                     onShowFullNegativePromptChange={setShowFullNegativePrompt}
                     availableLoras={availableLoras}

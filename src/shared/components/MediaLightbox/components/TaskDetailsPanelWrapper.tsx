@@ -20,13 +20,7 @@ export interface TaskDetailsPanelWrapperProps {
     onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
     onClose?: () => void;
   };
-  
-  // Generation name
-  generationName: string;
-  onGenerationNameChange: (name: string) => void;
-  isEditingGenerationName: boolean;
-  onEditingGenerationNameChange: (editing: boolean) => void;
-  
+
   // State
   replaceImages: boolean;
   onReplaceImagesChange: (replace: boolean) => void;
@@ -60,10 +54,6 @@ export interface TaskDetailsPanelWrapperProps {
  */
 export const TaskDetailsPanelWrapper: React.FC<TaskDetailsPanelWrapperProps> = ({
   taskDetailsData,
-  generationName,
-  onGenerationNameChange,
-  isEditingGenerationName,
-  onEditingGenerationNameChange,
   replaceImages,
   onReplaceImagesChange,
   onClose,
@@ -82,10 +72,6 @@ export const TaskDetailsPanelWrapper: React.FC<TaskDetailsPanelWrapperProps> = (
         onClose(); // Close lightbox after applying settings
       } : undefined}
       className=""
-      generationName={generationName}
-      onGenerationNameChange={onGenerationNameChange}
-      isEditingGenerationName={isEditingGenerationName}
-      onEditingGenerationNameChange={onEditingGenerationNameChange}
       showUserImage={false}
       derivedSection={null}
       hideHeader={true}

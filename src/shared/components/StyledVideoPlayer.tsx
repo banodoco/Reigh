@@ -250,11 +250,11 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
     }
   }, [togglePlayPause]);
 
-  // The wrapper needs explicit height to pass through to the video's max-h-full
-  // When in a flex container, we inherit the height via h-full
+  // The wrapper should shrink to fit the video content so controls overlay the video correctly
+  // Using inline-flex makes the container shrink-wrap the video element
   return (
     <div
-      className={cn("relative h-full flex items-center justify-center", className)}
+      className={cn("relative inline-flex items-center justify-center max-w-full max-h-full", className)}
       style={style}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
@@ -279,7 +279,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
 
       {/* Thumbnail overlay while video is loading */}
       {poster && !isVideoReady && (
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
           <img
             src={getDisplayUrl(poster)}
             alt=""

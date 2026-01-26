@@ -282,6 +282,10 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
       ref={imageContainerRef}
       className={`relative flex items-center justify-center w-full h-full ${containerClassName}`}
       onClick={(e) => {
+        // Don't close if actively drawing to prevent accidental data loss
+        if (isDrawing) {
+          return;
+        }
         // Close if clicking directly on the container background (not on children)
         if (e.target === e.currentTarget && onContainerClick) {
           onContainerClick();
@@ -446,6 +450,8 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
                   top: imageOffset.top,
                   width: displaySize.width,
                   height: displaySize.height,
+                  // CRITICAL: Override parent's pointer-events:none to allow touch/pointer events on canvas
+                  pointerEvents: 'auto',
                 }}
               >
                 <StrokeOverlay

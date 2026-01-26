@@ -809,6 +809,47 @@ export function usePrefetchTaskData() {
   return prefetch;
 }
 
+/**
+ * Hook to prefetch a task directly by task ID.
+ * Use this when you already have the task ID (e.g., from variant.params.source_task_id).
+ */
+export function usePrefetchTaskById() {
+  const queryClient = useQueryClient();
+
+  const prefetch = useCallback(async (taskId: string) => {
+    if (!taskId) return;
+
+    // Check if already cached
+    const cached = queryClient.getQueryData(['tasks', 'single', taskId]);
+    if (cached) {
+      console.log('[TaskPrefetch] Task already cached:', taskId.substring(0, 8));
+      return;
+    }
+
+    console.log('[TaskPrefetch] Prefetching task by ID:', taskId.substring(0, 8));
+    try {
+      await queryClient.fetchQuery({
+        queryKey: ['tasks', 'single', taskId],
+        queryFn: async () => {
+          const { data, error } = await supabase
+            .from('tasks')
+            .select('*')
+            .eq('id', taskId)
+            .single();
+
+          if (error) throw error;
+          return mapDbTaskToTask(data);
+        },
+        staleTime: Infinity,
+      });
+    } catch {
+      // Silently fail - prefetch is best-effort
+    }
+  }, [queryClient]);
+
+  return prefetch;
+}
+
 // Utility to migrate ImageGallery to unified system (optional)
 export function useUnifiedGenerationsForImageGallery(options: {
   projectId: string | null;

@@ -16,6 +16,7 @@ import { InfoPanel } from './InfoPanel';
 import type { VideoEditPanelProps } from './VideoEditPanel';
 import type { EditModePanelProps } from './EditModePanel';
 import type { InfoPanelProps } from './InfoPanel';
+import type { SegmentRegenerateFormProps } from './SegmentRegenerateForm';
 
 // Mode detection props
 interface ModeProps {
@@ -34,7 +35,7 @@ export interface ControlsPanelProps extends ModeProps {
   onEnterReplaceMode: () => void;
   onEnterRegenerateMode: () => void;
   onExitVideoEditMode: () => void;
-  regenerateForm?: React.ReactNode;
+  regenerateFormProps?: SegmentRegenerateFormProps | null;
   // Trim props
   trimState: VideoEditPanelProps['trimState'];
   onStartTrimChange: VideoEditPanelProps['onStartTrimChange'];
@@ -122,10 +123,6 @@ export interface ControlsPanelProps extends ModeProps {
   onEnterVideoEditMode: InfoPanelProps['onEnterVideoEditMode'];
   onClose: InfoPanelProps['onClose'];
   taskDetailsData: InfoPanelProps['taskDetailsData'];
-  generationName: InfoPanelProps['generationName'];
-  onGenerationNameChange: InfoPanelProps['onGenerationNameChange'];
-  isEditingGenerationName: InfoPanelProps['isEditingGenerationName'];
-  onEditingGenerationNameChange: InfoPanelProps['onEditingGenerationNameChange'];
   derivedItems: InfoPanelProps['derivedItems'];
   replaceImages: InfoPanelProps['replaceImages'];
   onReplaceImagesChange: InfoPanelProps['onReplaceImagesChange'];
@@ -167,7 +164,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
     onEnterReplaceMode,
     onEnterRegenerateMode,
     onExitVideoEditMode,
-    regenerateForm,
+    regenerateFormProps,
     trimState,
     onStartTrimChange,
     onEndTrimChange,
@@ -249,10 +246,6 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
     onEnterVideoEditMode,
     onClose,
     taskDetailsData,
-    generationName,
-    onGenerationNameChange,
-    isEditingGenerationName,
-    onEditingGenerationNameChange,
     derivedItems,
     replaceImages,
     onReplaceImagesChange,
@@ -311,7 +304,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         videoEditing={videoEditing}
         projectId={projectId}
         // Regenerate props
-        regenerateForm={regenerateForm}
+        regenerateFormProps={regenerateFormProps}
         // Variants props
         variants={variants}
         activeVariantId={activeVariant?.id || null}
@@ -422,10 +415,6 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
       onClose={onClose}
       // TaskDetails props
       taskDetailsData={taskDetailsData}
-      generationName={generationName}
-      onGenerationNameChange={onGenerationNameChange}
-      isEditingGenerationName={isEditingGenerationName}
-      onEditingGenerationNameChange={onEditingGenerationNameChange}
       derivedItems={derivedItems}
       derivedGenerations={derivedGenerations}
       paginatedDerived={paginatedDerived}

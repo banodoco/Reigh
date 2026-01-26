@@ -18,10 +18,6 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
   onShowFullPromptChange,
   showFullNegativePrompt = false,
   onShowFullNegativePromptChange,
-  generationName,
-  onGenerationNameChange,
-  isEditingGenerationName = false,
-  onEditingGenerationNameChange,
   availableLoras,
 }) => {
   const config = getVariantConfig(variant, isMobile, inputImages.length);
@@ -157,35 +153,6 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
           </div>
         )}
         
-        {/* Variant Name Section */}
-        {!isSegmentTask && (variant === 'modal' || variant === 'panel') && (generationName !== undefined || onGenerationNameChange) && (
-          <div className="space-y-1 pb-3 border-b border-muted-foreground/20">
-            <p className={`${config.textSize} font-medium text-muted-foreground`}>Variant Name</p>
-            {isEditingGenerationName ? (
-              <input
-                type="text"
-                value={generationName || ''}
-                onChange={(e) => onGenerationNameChange?.(e.target.value)}
-                onBlur={() => onEditingGenerationNameChange?.(false)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') onEditingGenerationNameChange?.(false); }}
-                autoFocus
-                placeholder="Enter variant name..."
-                className="flex-1 px-2 py-1 text-base lg:text-sm border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary w-full preserve-case"
-              />
-            ) : (
-              <div 
-                className="flex items-center justify-between group cursor-pointer hover:bg-muted/50 px-2 py-1 rounded transition-colors"
-                onClick={() => onEditingGenerationNameChange?.(true)}
-              >
-                <p className={`${config.textSize} ${config.fontWeight} text-foreground preserve-case ${!generationName && 'text-muted-foreground italic'}`}>
-                  {generationName || 'Click to add variant name...'}
-                </p>
-                <span className="text-xs text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity">Edit</span>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Guidance Images */}
         {effectiveInputImages.length > 0 && (
           <div className="space-y-1.5">

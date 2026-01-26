@@ -36,10 +36,6 @@ export interface InfoPanelProps {
 
   // TaskDetailsPanelWrapper props
   taskDetailsData: any;
-  generationName: string;
-  onGenerationNameChange: (name: string) => void;
-  isEditingGenerationName: boolean;
-  onEditingGenerationNameChange: (editing: boolean) => void;
   derivedItems: any[];
   derivedGenerations: GenerationRow[] | null;
   paginatedDerived: GenerationRow[];
@@ -83,10 +79,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   onClose,
   // TaskDetails props
   taskDetailsData,
-  generationName,
-  onGenerationNameChange,
-  isEditingGenerationName,
-  onEditingGenerationNameChange,
   derivedItems,
   derivedGenerations,
   paginatedDerived,
@@ -273,10 +265,6 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   const renderTaskDetails = () => (
     <TaskDetailsPanelWrapper
       taskDetailsData={taskDetailsData}
-      generationName={generationName}
-      onGenerationNameChange={onGenerationNameChange}
-      isEditingGenerationName={isEditingGenerationName}
-      onEditingGenerationNameChange={onEditingGenerationNameChange}
       derivedItems={derivedItems}
       derivedGenerations={derivedGenerations}
       paginatedDerived={paginatedDerived}

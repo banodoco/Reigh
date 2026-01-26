@@ -14,7 +14,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import { usePrefetchTaskData } from '@/shared/hooks/useUnifiedGenerations';
+import { usePrefetchTaskData, usePrefetchTaskById } from '@/shared/hooks/useUnifiedGenerations';
 import type { VariantSelectorProps, GenerationVariant } from '../types';
 
 const ITEMS_PER_PAGE = 20;
@@ -108,6 +108,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   // For variants, we need to prefetch the source_task_id directly (if available)
   // since that's what MediaLightbox will look up when viewing the variant
   const prefetchTaskData = usePrefetchTaskData();
+  const prefetchTaskById = usePrefetchTaskById();
   const handleVariantMouseEnter = useCallback((variant: GenerationVariant) => {
     if (isMobile) return;
 
@@ -123,14 +124,13 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
     if (validSourceTaskId) {
       // Variant has a source_task_id - prefetch that task directly
       console.log('[VariantPrefetch] Prefetching source task:', validSourceTaskId.substring(0, 8), 'for variant:', variant.id.substring(0, 8));
-      // Prefetch using the task query directly (matches MediaLightbox's query key)
-      prefetchTaskData(variant.generation_id); // This also sets up the cache for generation → task mapping
+      prefetchTaskById(validSourceTaskId);
     } else {
       // No source_task_id - prefetch via generation ID as fallback
       console.log('[VariantPrefetch] No source_task_id, prefetching via generation:', variant.generation_id.substring(0, 8));
       prefetchTaskData(variant.generation_id);
     }
-  }, [isMobile, prefetchTaskData]);
+  }, [isMobile, prefetchTaskData, prefetchTaskById]);
 
   // Calculate variant relationships based on source_variant_id in params
   const { parentVariants, childVariants, relationshipMap } = useMemo(() => {

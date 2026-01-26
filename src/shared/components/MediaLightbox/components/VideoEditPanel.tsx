@@ -9,7 +9,6 @@
 
 import React from 'react';
 import { Scissors, RefreshCw, RotateCcw } from 'lucide-react';
-import { cn } from '@/shared/lib/utils';
 
 // Import video editing components
 import {
@@ -22,6 +21,8 @@ import { DEFAULT_VACE_PHASE_CONFIG } from '@/shared/lib/vaceDefaults';
 import type { UseVideoEditingReturn } from '../hooks/useVideoEditing';
 import { EditPanelLayout } from './EditPanelLayout';
 import { ModeSelector } from './ModeSelector';
+import { SegmentRegenerateForm } from './SegmentRegenerateForm';
+import type { SegmentRegenerateFormProps } from './SegmentRegenerateForm';
 
 export interface VideoEditPanelProps {
   /** Layout variant */
@@ -65,8 +66,8 @@ export interface VideoEditPanelProps {
   videoEditing: UseVideoEditingReturn;
   projectId: string | undefined;
 
-  // Regenerate mode props
-  regenerateForm?: React.ReactNode;
+  // Regenerate mode props - pass props instead of JSX for proper hook pattern
+  regenerateFormProps?: SegmentRegenerateFormProps | null;
 
   // Variants props
   variants: GenerationVariant[];
@@ -109,7 +110,7 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
   videoEditing,
   projectId,
   // Regenerate props
-  regenerateForm,
+  regenerateFormProps,
   // Variants props
   variants,
   activeVariantId,
@@ -133,7 +134,7 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
       icon: <RefreshCw />,
       onClick: onEnterReplaceMode,
     },
-    ...(regenerateForm ? [{
+    ...(regenerateFormProps ? [{
       id: 'regenerate',
       label: 'Regenerate',
       icon: <RotateCcw />,
@@ -238,7 +239,9 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
           hideHeader
         />
       )}
-      {videoEditSubMode === 'regenerate' && regenerateForm}
+      {videoEditSubMode === 'regenerate' && regenerateFormProps && (
+        <SegmentRegenerateForm {...regenerateFormProps} />
+      )}
     </EditPanelLayout>
   );
 };

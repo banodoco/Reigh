@@ -7,34 +7,29 @@
 
 import React from 'react';
 import { cn } from '@/shared/lib/utils';
+import { Trash2, Square, Diamond } from 'lucide-react';
 import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
-import type { LightboxLayoutProps } from './types';
+import type { SidePanelLayoutProps } from './types';
 
 // Sub-components
-import { MediaContentDisplay } from './MediaContentDisplay';
 import { VariantOverlayBadge } from './VariantOverlayBadge';
 import { NewImageOverlayButton } from './NewImageOverlayButton';
-import { AnnotationOverlayControls } from './AnnotationOverlayControls';
 
 // Existing components
+import { NavigationArrows } from '../NavigationArrows';
 import { FloatingToolControls } from '../FloatingToolControls';
 import {
   TopRightControls,
   BottomLeftControls,
   BottomRightControls,
 } from '../ButtonGroups';
-import { EditModePanel } from '../EditModePanel';
-import { VideoEditPanel } from '../VideoEditPanel';
 import { ControlsPanel } from '../ControlsPanel';
-import { InfoPanel } from '../InfoPanel';
 import { MediaDisplayWithCanvas } from '../MediaDisplayWithCanvas';
 import VideoEditModeDisplay from '../VideoEditModeDisplay';
 import VideoTrimModeDisplay from '../VideoTrimModeDisplay';
-import { VariantSelector } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor';
+import { WorkflowControlsBar } from '../WorkflowControlsBar';
 
-interface MobileStackedLayoutProps extends LightboxLayoutProps {}
-
-export const MobileStackedLayout: React.FC<MobileStackedLayoutProps> = (props) => {
+export const MobileStackedLayout: React.FC<SidePanelLayoutProps> = (props) => {
   const {
     // Core
     onClose,
@@ -47,32 +42,23 @@ export const MobileStackedLayout: React.FC<MobileStackedLayoutProps> = (props) =
     isVideo,
     effectiveMediaUrl,
     effectiveVideoUrl,
-    thumbUrl,
-    imageDimensions,
     setImageDimensions,
+    effectiveImageDimensions,
 
     // Variants
     variants,
     activeVariant,
     primaryVariant,
-    isLoadingVariants,
-    setActiveVariantId,
-    setPrimaryVariant,
-    deleteVariant,
     promoteSuccess,
     isPromoting,
     handlePromoteToGeneration,
     isMakingMainVariant,
     canMakeMainVariant,
     handleMakeMainVariant,
-    setVariantParamsToLoad,
-    variantsSectionRef,
 
     // Video edit
     isVideoTrimModeActive,
     isVideoEditModeActive,
-    videoEditSubMode,
-    setVideoEditSubMode,
     trimVideoRef,
     trimState,
     setVideoDuration,
@@ -109,16 +95,24 @@ export const MobileStackedLayout: React.FC<MobileStackedLayoutProps> = (props) =
     isSaving,
 
     // Navigation
+    showNavigation,
+    hasNext,
+    hasPrevious,
+    handleSlotNavNext,
+    handleSlotNavPrev,
     swipeNavigation,
 
     // Button groups
     buttonGroupProps,
 
-    // Edit panel
-    editPanelProps,
+    // Workflow bar
+    workflowBarProps,
 
-    // Task details
-    adjustedTaskDetailsData,
+    // Floating tool controls
+    floatingToolProps,
+
+    // Controls panel
+    controlsPanelProps,
   } = props;
 
   return (
@@ -133,6 +127,7 @@ export const MobileStackedLayout: React.FC<MobileStackedLayoutProps> = (props) =
         }}
         onClick={(e) => {
           e.stopPropagation();
+          // Close if clicking directly on the background (not on children)
           if (e.target === e.currentTarget) {
             onClose();
           }
@@ -192,7 +187,7 @@ export const MobileStackedLayout: React.FC<MobileStackedLayoutProps> = (props) =
             isInpaintMode={isInpaintMode}
             editMode={editMode}
             repositionTransformStyle={editMode === 'reposition' ? getTransformStyle() : undefined}
-            repositionDragHandlers={editMode === 'reposition' ? repositionDragHandlers || undefined : undefined}
+            repositionDragHandlers={editMode === 'reposition' ? repositionDragHandlers : undefined}
             isRepositionDragging={isRepositionDragging}
             imageContainerRef={imageContainerRef}
             canvasRef={canvasRef}
@@ -202,7 +197,8 @@ export const MobileStackedLayout: React.FC<MobileStackedLayoutProps> = (props) =
             variant="mobile-stacked"
             containerClassName="w-full h-full"
             debugContext="Mobile Stacked"
-            imageDimensions={imageDimensions}
+            // Konva-based stroke overlay props
+            imageDimensions={effectiveImageDimensions}
             brushStrokes={brushStrokes}
             currentStroke={currentStroke}
             isDrawing={isDrawing}
@@ -218,17 +214,50 @@ export const MobileStackedLayout: React.FC<MobileStackedLayoutProps> = (props) =
           />
         )}
 
-        {/* Annotation overlay controls */}
-        <AnnotationOverlayControls
-          selectedShapeId={selectedShapeId}
-          isAnnotateMode={isAnnotateMode}
-          brushStrokes={brushStrokes}
-          getDeleteButtonPosition={getDeleteButtonPosition}
-          onToggleFreeForm={handleToggleFreeForm}
-          onDeleteSelected={handleDeleteSelected}
-        />
+        {/* Delete button and mode toggle for selected annotation */}
+        {selectedShapeId && isAnnotateMode && (() => {
+          const buttonPos = getDeleteButtonPosition();
+          if (!buttonPos) return null;
 
-        {/* Variant badge */}
+          // Get selected shape info
+          const selectedShape = brushStrokes.find(s => s.id === selectedShapeId);
+          const isFreeForm = selectedShape?.isFreeForm || false;
+
+          return (
+            <div className="fixed z-[100] flex gap-2" style={{
+              left: `${buttonPos.x}px`,
+              top: `${buttonPos.y}px`,
+              transform: 'translate(-50%, -50%)'
+            }}>
+              {/* Mode toggle button */}
+              <button
+                onClick={handleToggleFreeForm}
+                className={cn(
+                  "rounded-full p-2 shadow-lg transition-colors",
+                  isFreeForm
+                    ? "bg-purple-600 hover:bg-purple-700 text-white"
+                    : "bg-gray-700 hover:bg-gray-600 text-white"
+                )}
+                title={isFreeForm
+                  ? "Switch to rectangle mode (edges move linearly)"
+                  : "Switch to free-form mode (rhombus/non-orthogonal angles)"}
+              >
+                {isFreeForm ? <Diamond className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+              </button>
+
+              {/* Delete button */}
+              <button
+                onClick={handleDeleteSelected}
+                className="bg-red-600 hover:bg-red-700 text-white rounded-full p-2 shadow-lg transition-colors"
+                title="Delete annotation (or press DELETE key)"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          );
+        })()}
+
+        {/* Top Center - Main Variant Badge/Button */}
         <VariantOverlayBadge
           activeVariant={activeVariant}
           variants={variants}
@@ -238,7 +267,7 @@ export const MobileStackedLayout: React.FC<MobileStackedLayoutProps> = (props) =
           onMakeMainVariant={handleMakeMainVariant}
         />
 
-        {/* New image button */}
+        {/* Top Left - New image button */}
         <NewImageOverlayButton
           isVideo={isVideo}
           readOnly={readOnly}
@@ -251,64 +280,101 @@ export const MobileStackedLayout: React.FC<MobileStackedLayoutProps> = (props) =
         />
 
         {/* Floating Tool Controls - Mobile (portrait, no sidebar) */}
-        <FloatingToolControls
-          {...buttonGroupProps.topLeft}
-          variant="mobile"
-        />
-
-        {/* Button groups */}
-        <TopRightControls {...buttonGroupProps.topRight} />
-        <BottomLeftControls {...buttonGroupProps.bottomLeft} />
-        <BottomRightControls {...buttonGroupProps.bottomRight} />
-      </div>
-
-      {/* Controls section - Bottom (50% height) */}
-      <div
-        className="flex-1 overflow-y-auto bg-background/95 border-t border-border"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Video Edit Panel (for trim/replace/regenerate modes) */}
-        {isVideo && (isVideoTrimModeActive || isVideoEditModeActive) ? (
-          <VideoEditPanel
-            trimState={trimState}
-            videoEditSubMode={videoEditSubMode}
-            setVideoEditSubMode={setVideoEditSubMode}
-            onClose={onClose}
+        {isSpecialEditMode && (
+          <FloatingToolControls
+            variant="mobile"
+            editMode={floatingToolProps.editMode}
+            onSetEditMode={floatingToolProps.setEditMode}
+            brushSize={floatingToolProps.brushSize}
+            isEraseMode={floatingToolProps.isEraseMode}
+            onSetBrushSize={floatingToolProps.setBrushSize}
+            onSetIsEraseMode={floatingToolProps.setIsEraseMode}
+            annotationMode={floatingToolProps.editMode === 'annotate' ? floatingToolProps.annotationMode : null}
+            onSetAnnotationMode={floatingToolProps.setAnnotationMode}
+            repositionTransform={floatingToolProps.repositionTransform}
+            onRepositionTranslateXChange={floatingToolProps.setTranslateX}
+            onRepositionTranslateYChange={floatingToolProps.setTranslateY}
+            onRepositionScaleChange={floatingToolProps.setScale}
+            onRepositionRotationChange={floatingToolProps.setRotation}
+            onRepositionFlipH={floatingToolProps.toggleFlipH}
+            onRepositionFlipV={floatingToolProps.toggleFlipV}
+            onRepositionReset={floatingToolProps.resetTransform}
+            imageDimensions={floatingToolProps.effectiveImageDimensions}
+            brushStrokes={floatingToolProps.brushStrokes}
+            onUndo={floatingToolProps.handleUndo}
+            onClearMask={floatingToolProps.handleClearMask}
+            panelPosition={floatingToolProps.inpaintPanelPosition}
+            onSetPanelPosition={floatingToolProps.setInpaintPanelPosition}
           />
-        ) : isSpecialEditMode ? (
-          /* Edit Mode Panel (for inpaint/annotate/reposition) */
-          <EditModePanel
-            editMode={editMode}
-            onClose={onClose}
-            {...editPanelProps}
-          />
-        ) : (
-          /* Default: Controls Panel + Info Panel */
-          <>
-            <ControlsPanel
-              taskDetailsData={adjustedTaskDetailsData}
-              onClose={onClose}
-            />
-            <InfoPanel
-              taskDetailsData={adjustedTaskDetailsData}
-            />
-          </>
         )}
 
-        {/* Variant Selector - Always show at bottom */}
-        <div ref={variantsSectionRef}>
-          <VariantSelector
-            variants={variants || []}
-            activeVariantId={activeVariant?.id || null}
-            onVariantSelect={setActiveVariantId}
-            onMakePrimary={setPrimaryVariant}
-            isLoadingVariants={isLoadingVariants}
-            onPromoteToGeneration={handlePromoteToGeneration}
-            isPromoting={isPromoting}
-            onDeleteVariant={deleteVariant}
-            onLoadVariantSettings={setVariantParamsToLoad}
-          />
-        </div>
+        {/* Mobile Stacked Layout - All button groups */}
+        {/* Top Right Controls - Download, Delete & Close */}
+        <TopRightControls {...buttonGroupProps.topRight} />
+
+        {/* Bottom Left Controls - Edit & Upscale */}
+        <BottomLeftControls {...buttonGroupProps.bottomLeft} />
+
+        {/* Bottom Right Controls - Star & Add to References */}
+        <BottomRightControls {...buttonGroupProps.bottomRight} />
+
+        {/* Bottom Workflow Controls */}
+        <WorkflowControlsBar
+          onAddToShot={workflowBarProps.onAddToShot}
+          onDelete={workflowBarProps.onDelete}
+          onApplySettings={workflowBarProps.onApplySettings}
+          isSpecialEditMode={isSpecialEditMode}
+          isVideo={isVideo}
+          mediaId={actualGenerationId}
+          imageUrl={effectiveMediaUrl}
+          thumbUrl={media.thumbUrl}
+          allShots={workflowBarProps.allShots}
+          selectedShotId={workflowBarProps.selectedShotId}
+          onShotChange={workflowBarProps.onShotChange}
+          onCreateShot={workflowBarProps.onCreateShot}
+          isAlreadyPositionedInSelectedShot={workflowBarProps.isAlreadyPositionedInSelectedShot}
+          isAlreadyAssociatedWithoutPosition={workflowBarProps.isAlreadyAssociatedWithoutPosition}
+          showTickForImageId={workflowBarProps.showTickForImageId}
+          showTickForSecondaryImageId={workflowBarProps.showTickForSecondaryImageId}
+          onAddToShotWithoutPosition={workflowBarProps.onAddToShotWithoutPosition}
+          onShowTick={workflowBarProps.onShowTick}
+          onShowSecondaryTick={workflowBarProps.onShowSecondaryTick}
+          onOptimisticPositioned={workflowBarProps.onOptimisticPositioned}
+          onOptimisticUnpositioned={workflowBarProps.onOptimisticUnpositioned}
+          contentRef={workflowBarProps.contentRef}
+          handleApplySettings={workflowBarProps.handleApplySettings}
+          onNavigateToShot={workflowBarProps.handleNavigateToShotFromSelector}
+          onClose={onClose}
+          onAddVariantAsNewGeneration={workflowBarProps.handleAddVariantAsNewGenerationToShot}
+          activeVariantId={activeVariant?.id || primaryVariant?.id}
+          currentTimelineFrame={media.timeline_frame}
+        />
+
+        {/* Navigation Arrows */}
+        <NavigationArrows
+          showNavigation={showNavigation}
+          readOnly={readOnly}
+          onPrevious={handleSlotNavPrev}
+          onNext={handleSlotNavNext}
+          hasPrevious={hasPrevious}
+          hasNext={hasNext}
+          variant="mobile"
+        />
+      </div>
+
+      {/* Task Details / Inpaint / Magic Edit Panel - Bottom (50% height) */}
+      <div
+        data-task-details-panel
+        className={cn(
+          "bg-background border-t border-border overflow-y-auto relative z-[60]"
+          // Removed flex centering to prevent top clipping with long content
+        )}
+        style={{ height: '50%' }}
+      >
+        <ControlsPanel
+          variant="mobile"
+          {...controlsPanelProps}
+        />
       </div>
     </div>
   );

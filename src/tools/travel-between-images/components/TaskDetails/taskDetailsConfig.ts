@@ -15,11 +15,6 @@ export interface TaskDetailsProps {
   onShowFullPromptChange?: (show: boolean) => void;
   showFullNegativePrompt?: boolean;
   onShowFullNegativePromptChange?: (show: boolean) => void;
-  // Variant name editing (only for modal variant)
-  generationName?: string;
-  onGenerationNameChange?: (name: string) => void;
-  isEditingGenerationName?: boolean;
-  onEditingGenerationNameChange?: (editing: boolean) => void;
   // Available LoRAs for proper name display
   availableLoras?: LoraModel[];
 }

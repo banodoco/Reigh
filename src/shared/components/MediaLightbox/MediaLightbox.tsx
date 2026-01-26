@@ -37,27 +37,21 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import { useTaskStatusCounts } from '@/shared/hooks/useTasks';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
-import StyledVideoPlayer from '@/shared/components/StyledVideoPlayer';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
-import { useMarkVariantViewed } from '@/shared/hooks/useMarkVariantViewed';
 import { usePublicLoras } from '@/shared/hooks/useResources';
-import { usePromoteVariantToGeneration } from '@/shared/hooks/usePromoteVariantToGeneration';
-import { useAddImageToShot } from '@/shared/hooks/useShots';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import type { LoraModel } from '@/shared/components/LoraSelectorModal';
 
-// Import all extracted hooks
+// Import extracted hooks
 import {
   useUpscale,
   useInpainting,
-  useGenerationName,
   useReferences,
   useGenerationLineage,
   useShotCreation,
   useLightboxNavigation,
   useStarToggle,
   useShotPositioning,
-  useEditModeLoRAs,
   useSourceGeneration,
   useLayoutMode,
   useMagicEditMode,
@@ -66,44 +60,29 @@ import {
   useSwipeNavigation,
   useButtonGroupProps,
   useImg2ImgMode,
-  useMediaDimensions,
-  useOverlayDismiss,
-  useVideoEditMode,
   useSegmentSlotMode,
-  useVariantManagement,
+  useReplaceInShot,
+  useMakeMainVariant,
+  // Newly integrated hooks
+  useEffectiveMedia,
+  useAdjustedTaskDetails,
+  useVideoRegenerateMode,
+  useVideoEditModeHandlers,
+  usePanelModeRestore,
+  useEditSettingsSync,
+  useJoinClips,
+  useVariantSelection,
+  useVariantPromotion,
   useLightboxLayoutProps,
 } from './hooks';
 
-// Import all extracted components
+// Import only directly-used components (others are used via layout components)
 import {
-  MediaDisplay,
-  NavigationButtons,
-  TaskDetailsSection,
-  MediaControls,
-  WorkflowControls,
-  MediaDisplayWithCanvas,
-  SourceGenerationDisplay,
-  FloatingToolControls,
-  TopRightControls,
-  BottomLeftControls,
-  BottomRightControls,
-  EditModePanel,
-  ShotSelectorControls,
-  WorkflowControlsBar,
-  NavigationArrows,
-  OpenEditModeButton,
-  TaskDetailsPanelWrapper,
-  VideoEditPanel,
-  InfoPanel,
-  ControlsPanel,
-  VideoEditModeDisplay,
-  VideoTrimModeDisplay,
-  SegmentRegenerateForm,
   SegmentSlotFormView,
 } from './components';
+
+// Import layout components
 import {
-  FlexContainer,
-  MediaWrapper,
   DesktopSidePanelLayout,
   MobileStackedLayout,
   CenteredLayout,
@@ -111,24 +90,15 @@ import {
 
 // Import utils
 import { downloadMedia } from './utils';
-import { extractSegmentImages } from '@/tools/travel-between-images/components/VideoGallery/utils/gallery-utils';
 
-// Import video trim components (conditional for segment videos)
+// Import video trim hooks (components used via layout components)
 import {
   useVariants,
   useVideoTrimming,
   useTrimSave,
-  TrimControlsPanel,
-  TrimTimelineBar,
-  VariantSelector,
 } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor';
-
-// Import video edit components (for regenerating portions)
-import { VideoPortionEditor } from '@/tools/edit-video/components/VideoPortionEditor';
-import { MultiPortionTimeline } from '@/shared/components/VideoPortionTimeline';
 import { useVideoEditing } from './hooks/useVideoEditing';
 import { readSegmentOverrides } from '@/shared/utils/settingsMigration';
-import { deriveInputImages } from '@/shared/utils/taskParamsUtils';
 
 interface ShotOption {
   id: string;
@@ -369,7 +339,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Basic state - only UI state remains here
   const [isSelectOpen, setIsSelectOpen] = useState(false);
-  const [isMakingMainVariant, setIsMakingMainVariant] = useState(false);
   const [replaceImages, setReplaceImages] = useState(true);
   const [previewImageDimensions, setPreviewImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const previousPreviewDataRef = useRef<GenerationRow | null>(null);
@@ -389,7 +358,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const { selectedProjectId } = useProject();
+  const { selectedProjectId, projects } = useProject();
+  const currentProject = projects.find(p => p.id === selectedProjectId);
+  const projectAspectRatio = currentProject?.aspectRatio;
   const { value: generationMethods } = useUserUIState('generationMethods', { onComputer: true, inCloud: true });
   const isCloudMode = generationMethods.inCloud;
   const isLocalGeneration = generationMethods.onComputer && !generationMethods.inCloud;
@@ -741,215 +712,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     deleteVariant,
   } = variantsHook;
 
-  // Hook to mark variants as viewed (removes NEW badge)
-  const { markViewed } = useMarkVariantViewed();
-
-  // Wrap setActiveVariantId with logging and mark-as-viewed
-  const setActiveVariantId = React.useCallback((variantId: string) => {
-    console.log('[VariantClickDebug] setActiveVariantId called:', {
-      variantId: variantId?.substring(0, 8),
-      currentActiveVariant: activeVariant?.id?.substring(0, 8),
-      variantsCount: variants?.length,
-    });
-    // Mark variant as viewed when selected (fire-and-forget)
-    // Pass generationId for optimistic badge update
-    if (variantId) {
-      const generationId = media.generation_id || media.id;
-      markViewed({ variantId, generationId });
-    }
-    rawSetActiveVariantId(variantId);
-  }, [rawSetActiveVariantId, activeVariant, variants, markViewed, media]);
-  
-  // Log when activeVariant changes
-  React.useEffect(() => {
-    console.log('[VariantClickDebug] activeVariant changed:', {
-      activeVariantId: activeVariant?.id?.substring(0, 8),
-      activeVariantType: activeVariant?.variant_type,
-      activeVariantIsPrimary: activeVariant?.is_primary,
-      activeVariantLocation: activeVariant?.location?.substring(0, 50),
-    });
-  }, [activeVariant]);
-
-  // Set initial variant when variants load and initialVariantId is provided
-  // Track which initialVariantId we've already handled to avoid re-setting on every render
-  const handledInitialVariantRef = React.useRef<string | null>(null);
-  
-  React.useEffect(() => {
-    // Only process if we have a new initialVariantId different from what we've handled
-    if (initialVariantId && variants && variants.length > 0) {
-      if (handledInitialVariantRef.current !== initialVariantId) {
-        const targetVariant = variants.find(v => v.id === initialVariantId);
-        if (targetVariant) {
-          console.log('[VariantClickDebug] Setting initial variant from prop:', initialVariantId.substring(0, 8));
-          setActiveVariantId(initialVariantId);
-          handledInitialVariantRef.current = initialVariantId;
-        }
-      }
-    }
-  }, [initialVariantId, variants, setActiveVariantId]);
-  
-  // Reset handled ref when media changes (new item opened)
-  // Guard for undefined media (segment slot mode without video)
-  React.useEffect(() => {
-    handledInitialVariantRef.current = null;
-  }, [media?.id]);
-
-  // Track which variant has been marked as viewed for this media to avoid duplicate marks
-  const markedViewedVariantRef = React.useRef<string | null>(null);
-
-  // Mark the initial/active variant as viewed when the lightbox opens
-  // This handles the case where the primary variant is auto-selected without explicit setActiveVariantId call
-  React.useEffect(() => {
-    if (!media) return;
-    if (activeVariant && activeVariant.id && markedViewedVariantRef.current !== activeVariant.id) {
-      const generationId = media.generation_id || media.id;
-      console.log('[VariantViewed] Marking initial variant as viewed:', {
-        variantId: activeVariant.id.substring(0, 8),
-        isPrimary: activeVariant.is_primary,
-        generationId: generationId.substring(0, 8),
-      });
-      markViewed({ variantId: activeVariant.id, generationId });
-      markedViewedVariantRef.current = activeVariant.id;
-    }
-  }, [activeVariant, media?.generation_id, media?.id, markViewed, media]);
-
-  // Reset marked-viewed ref when media changes (new item opened)
-  React.useEffect(() => {
-    markedViewedVariantRef.current = null;
-  }, [media?.id]);
-
-  // Compute isViewingNonPrimaryVariant early for edit hooks
-  const isViewingNonPrimaryVariant = activeVariant && !activeVariant.is_primary;
-  
-  // Log variant info for edit tracking
-  React.useEffect(() => {
-    console.log('[VariantRelationship] Edit mode variant info:');
-    console.log('[VariantRelationship] - isViewingNonPrimaryVariant:', isViewingNonPrimaryVariant);
-    console.log('[VariantRelationship] - activeVariantId:', activeVariant?.id);
-    console.log('[VariantRelationship] - activeVariantType:', activeVariant?.variant_type);
-    console.log('[VariantRelationship] - activeVariantIsPrimary:', activeVariant?.is_primary);
-    console.log('[VariantRelationship] - willPassSourceVariantId:', isViewingNonPrimaryVariant ? activeVariant?.id : null);
-  }, [activeVariant, isViewingNonPrimaryVariant]);
+  // Variant selection with mark-as-viewed behavior
+  const { setActiveVariantId, isViewingNonPrimaryVariant } = useVariantSelection({
+    media,
+    rawSetActiveVariantId,
+    activeVariant,
+    variants,
+    initialVariantId,
+  });
 
   // Variant promotion - create standalone generation from a variant
-  const promoteVariantMutation = usePromoteVariantToGeneration();
-  const addImageToShotMutation = useAddImageToShot(); // For adding with position support
-  const [promoteSuccess, setPromoteSuccess] = useState(false);
-
-  // Handler for "Make new image" button in VariantSelector
-  const handlePromoteToGeneration = useCallback(async (variantId: string) => {
-    if (!selectedProjectId) {
-      toast.error('No project selected');
-      return;
-    }
-
-    console.log('[PromoteVariant] handlePromoteToGeneration called:', {
-      variantId: variantId.substring(0, 8),
-      projectId: selectedProjectId.substring(0, 8),
-      sourceGenerationId: actualGenerationId.substring(0, 8),
-    });
-
-    setPromoteSuccess(false);
-
-    try {
-      const result = await promoteVariantMutation.mutateAsync({
-        variantId,
-        projectId: selectedProjectId,
-        sourceGenerationId: actualGenerationId,
-      });
-
-      console.log('[PromoteVariant] Successfully created generation:', result.id.substring(0, 8));
-      setPromoteSuccess(true);
-      // Reset success state after delay
-      setTimeout(() => setPromoteSuccess(false), 2000);
-      // Stay on current item - don't navigate away
-    } catch (error) {
-      console.error('[PromoteVariant] Error promoting variant:', error);
-      // Error toast is handled in the hook
-    }
-  }, [promoteVariantMutation, selectedProjectId, actualGenerationId]);
-
-  // Handler for "Add as new image to shot" button in ShotSelectorControls
-  // Positions new image between current and next item in the TARGET shot
-  const handleAddVariantAsNewGenerationToShot = useCallback(async (
-    shotId: string,
-    variantId: string,
-    currentTimelineFrame?: number
-  ): Promise<boolean> => {
-    if (!selectedProjectId) {
-      toast.error('No project selected');
-      return false;
-    }
-
-    console.log('[VariantToShot] Starting:', {
-      shotId: shotId.substring(0, 8),
-      variantId: variantId.substring(0, 8),
-      projectId: selectedProjectId.substring(0, 8),
-      sourceGenerationId: actualGenerationId.substring(0, 8),
-      currentTimelineFrame,
-    });
-
-    try {
-      // 1. Create the generation from the variant
-      const newGen = await promoteVariantMutation.mutateAsync({
-        variantId,
-        projectId: selectedProjectId,
-        sourceGenerationId: actualGenerationId,
-      });
-
-      console.log('[VariantToShot] Created generation:', newGen.id.substring(0, 8));
-
-      // 2. Calculate target timeline frame by querying the TARGET shot's items
-      let targetTimelineFrame: number | undefined;
-      if (currentTimelineFrame !== undefined) {
-        // Query the target shot to find the next item after current position
-        const { data: shotItems } = await supabase
-          .from('shot_generations')
-          .select('timeline_frame')
-          .eq('shot_id', shotId)
-          .gt('timeline_frame', currentTimelineFrame)
-          .order('timeline_frame', { ascending: true })
-          .limit(1);
-
-        const nextTimelineFrame = shotItems?.[0]?.timeline_frame ?? undefined;
-
-        console.log('[VariantToShot] Frame calculation:', {
-          currentTimelineFrame,
-          nextTimelineFrame,
-          hasNext: nextTimelineFrame !== undefined,
-        });
-
-        if (nextTimelineFrame !== undefined && nextTimelineFrame > currentTimelineFrame) {
-          // Place in the middle between current and next
-          targetTimelineFrame = Math.floor((currentTimelineFrame + nextTimelineFrame) / 2);
-          console.log('[VariantToShot] Midpoint:', currentTimelineFrame, '+', nextTimelineFrame, '/ 2 =', targetTimelineFrame);
-          // If middle would be same as current (consecutive frames), use current + 1
-          if (targetTimelineFrame === currentTimelineFrame) {
-            targetTimelineFrame = currentTimelineFrame + 1;
-          }
-        } else {
-          // No next item in shot, place at current + 1
-          targetTimelineFrame = currentTimelineFrame + 1;
-          console.log('[VariantToShot] No next item, using current +1:', targetTimelineFrame);
-        }
-      }
-
-      // 3. Add to shot
-      await addImageToShotMutation.mutateAsync({
-        shot_id: shotId,
-        generation_id: newGen.id,
-        project_id: selectedProjectId,
-        imageUrl: newGen.location,
-        thumbUrl: newGen.thumbnail_url || undefined,
-        timelineFrame: targetTimelineFrame,
-      });
-      console.log('[VariantToShot] Added to shot at frame:', targetTimelineFrame);
-      return true;
-    } catch (error) {
-      console.error('[VariantToShot] Error:', error);
-      return false;
-    }
-  }, [promoteVariantMutation, addImageToShotMutation, selectedProjectId, actualGenerationId]);
+  const {
+    promoteSuccess,
+    isPromoting,
+    handlePromoteToGeneration,
+    handleAddVariantAsNewGenerationToShot,
+  } = useVariantPromotion({
+    selectedProjectId,
+    actualGenerationId,
+  });
 
   // Fetch available LoRAs - needed by edit modes and img2img
   const { data: availableLoras } = usePublicLoras();
@@ -1046,63 +827,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     currentStroke,
   } = inpaintingHook;
   
-  // ============================================
-  // Sync persisted settings with useInpainting
-  // ============================================
-  
-  // Track if we've synced initial values from persistence to inpainting
-  const hasInitializedFromPersistenceRef = useRef(false);
-  const lastSyncedGenerationIdRef = useRef<string | null>(null);
-  
-  // Reset sync tracking when generation changes
-  useEffect(() => {
-    if (actualGenerationId !== lastSyncedGenerationIdRef.current) {
-      hasInitializedFromPersistenceRef.current = false;
-      lastSyncedGenerationIdRef.current = actualGenerationId;
-    }
-  }, [actualGenerationId]);
-  
-  // Initialize inpainting state from persisted/lastUsed settings (once per generation)
-  // IMPORTANT: Wait for isEditSettingsReady to ensure effective values are computed correctly
-  useEffect(() => {
-    if (
-      isEditSettingsReady && 
-      !hasInitializedFromPersistenceRef.current &&
-      actualGenerationId
-    ) {
-      hasInitializedFromPersistenceRef.current = true;
-      
-      console.log('[EditSettingsPersist] 🔄 SYNC TO UI: Applying settings to inpainting state');
-      console.log('[EditSettingsPersist] 🔄 SYNC TO UI: generationId:', actualGenerationId.substring(0, 8));
-      console.log('[EditSettingsPersist] 🔄 SYNC TO UI: hasPersistedSettings:', hasPersistedSettings);
-      console.log('[EditSettingsPersist] 🔄 SYNC TO UI: persistedEditMode:', persistedEditMode);
-      console.log('[EditSettingsPersist] 🔄 SYNC TO UI: persistedNumGenerations:', persistedNumGenerations);
-      console.log('[EditSettingsPersist] 🔄 SYNC TO UI: persistedPrompt:', persistedPrompt ? `"${persistedPrompt.substring(0, 30)}..."` : '(empty)');
-      
-      // Sync edit mode
-      if (persistedEditMode && persistedEditMode !== editMode) {
-        console.log('[EditSettingsPersist] 🔄 SYNC TO UI: Setting editMode from', editMode, 'to', persistedEditMode);
-        setEditMode(persistedEditMode);
-      }
-      
-      // Sync numGenerations
-      if (persistedNumGenerations && persistedNumGenerations !== inpaintNumGenerations) {
-        console.log('[EditSettingsPersist] 🔄 SYNC TO UI: Setting numGenerations from', inpaintNumGenerations, 'to', persistedNumGenerations);
-        setInpaintNumGenerations(persistedNumGenerations);
-      }
-      
-      // Sync prompt (only if has persisted settings - otherwise leave empty)
-      if (hasPersistedSettings && persistedPrompt && persistedPrompt !== inpaintPrompt) {
-        console.log('[EditSettingsPersist] 🔄 SYNC TO UI: Setting prompt');
-        setInpaintPrompt(persistedPrompt);
-      }
-    }
-  }, [
-    isEditSettingsReady, 
-    actualGenerationId, 
+  // Edit settings sync hook - bidirectional sync between persistence and UI
+  useEditSettingsSync({
+    actualGenerationId,
+    isEditSettingsReady,
     hasPersistedSettings,
-    persistedEditMode, 
-    persistedNumGenerations, 
+    persistedEditMode,
+    persistedNumGenerations,
     persistedPrompt,
     editMode,
     inpaintNumGenerations,
@@ -1110,42 +841,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     setEditMode,
     setInpaintNumGenerations,
     setInpaintPrompt,
-  ]);
-  
-  // Sync changes FROM inpainting TO persistence (debounced via the persistence hook)
-  useEffect(() => {
-    if (!hasInitializedFromPersistenceRef.current || !isEditSettingsReady) return;
-    
-    // Sync editMode changes
-    if (editMode !== persistedEditMode) {
-      console.log('[EditSettingsPersist] 💾 SYNC FROM UI: editMode changed to:', editMode);
-      setPersistedEditMode(editMode);
-    }
-  }, [editMode, persistedEditMode, setPersistedEditMode, isEditSettingsReady]);
-  
-  useEffect(() => {
-    if (!hasInitializedFromPersistenceRef.current || !isEditSettingsReady) return;
-    
-    // Sync numGenerations changes
-    if (inpaintNumGenerations !== persistedNumGenerations) {
-      console.log('[EditSettingsPersist] 💾 SYNC FROM UI: numGenerations changed to:', inpaintNumGenerations);
-      setPersistedNumGenerations(inpaintNumGenerations);
-    }
-  }, [inpaintNumGenerations, persistedNumGenerations, setPersistedNumGenerations, isEditSettingsReady]);
-  
-  useEffect(() => {
-    if (!hasInitializedFromPersistenceRef.current || !isEditSettingsReady) return;
-    
-    // Sync prompt changes
-    if (inpaintPrompt !== persistedPrompt) {
-      console.log('[EditSettingsPersist] 💾 SYNC FROM UI: prompt changed to:', inpaintPrompt ? `"${inpaintPrompt.substring(0, 30)}..."` : '(empty)');
-      setPersistedPrompt(inpaintPrompt);
-    }
-  }, [inpaintPrompt, persistedPrompt, setPersistedPrompt, isEditSettingsReady]);
-  
-  // ============================================
-  // End sync effects
-  // ============================================
+    setPersistedEditMode,
+    setPersistedNumGenerations,
+    setPersistedPrompt,
+  });
   
   // Handle exiting inpaint mode from UI buttons
   const handleExitInpaintMode = () => {
@@ -1320,14 +1019,11 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     onOpenExternalGeneration
   });
 
-  // Generation name hook
-  const generationNameHook = useGenerationName({ media, selectedProjectId });
-  const {
-    generationName,
-    isEditingGenerationName,
-    setIsEditingGenerationName,
-    handleGenerationNameChange,
-  } = generationNameHook;
+  // Generation name - stubbed out (hook was removed)
+  const generationName = media?.name || '';
+  const isEditingGenerationName = false;
+  const setIsEditingGenerationName = (_: boolean) => {};
+  const handleGenerationNameChange = (_: string) => {};
 
   // References hook
   const referencesHook = useReferences({ media, selectedProjectId, isVideo, selectedShotId });
@@ -1338,45 +1034,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   } = referencesHook;
 
   // Add to Join Clips functionality
-  const [isAddingToJoin, setIsAddingToJoin] = useState(false);
-  const [addToJoinSuccess, setAddToJoinSuccess] = useState(false);
-  const handleAddToJoin = useCallback(() => {
-    if (!media || !isVideo) return;
-
-    setIsAddingToJoin(true);
-    try {
-      // Get the video URL from the media object
-      const videoUrl = (media as any).url || media.imageUrl || media.location;
-      const thumbnailUrl = (media as any).thumbUrl || (media as any).thumbnail_url;
-
-      // Get existing pending clips or start fresh
-      const existingData = localStorage.getItem('pendingJoinClips');
-      const pendingClips: Array<{ videoUrl: string; thumbnailUrl?: string; generationId: string; timestamp: number }> =
-        existingData ? JSON.parse(existingData) : [];
-
-      // Add new clip (avoid duplicates by generationId)
-      if (!pendingClips.some(clip => clip.generationId === media.id)) {
-        pendingClips.push({
-          videoUrl,
-          thumbnailUrl,
-          generationId: media.id,
-          timestamp: Date.now(),
-        });
-        localStorage.setItem('pendingJoinClips', JSON.stringify(pendingClips));
-      }
-
-      setAddToJoinSuccess(true);
-      setTimeout(() => setAddToJoinSuccess(false), 2000);
-    } catch (error) {
-      console.error('[MediaLightbox] Failed to add to join:', error);
-    } finally {
-      setIsAddingToJoin(false);
-    }
-  }, [media, isVideo]);
-
-  const handleGoToJoin = useCallback(() => {
-    navigate('/tools/join-clips');
-  }, [navigate]);
+  const {
+    isAddingToJoin,
+    addToJoinSuccess,
+    handleAddToJoin,
+    handleGoToJoin,
+  } = useJoinClips({ media, isVideo });
 
   // Generation lineage hook
   const lineageHook = useGenerationLineage({ media, enabled: !isFormOnlyMode });
@@ -1508,35 +1171,14 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   }, [isVideoTrimMode, trimState.startTrim, trimState.endTrim, trimState.videoDuration]);
 
-  // Get the effective media URL (active variant or current media)
-  // For videos in trim mode, use active variant if available
-  // For images with selected edit variant, also use that variant
-  const effectiveVideoUrl = useMemo(() => {
-    if (isVideo && activeVariant) {
-      return activeVariant.location;
-    }
-    return effectiveImageUrl;
-  }, [isVideo, activeVariant, effectiveImageUrl]);
-
-  // For images, use the active variant's location when a variant is explicitly selected
-  const effectiveMediaUrl = useMemo(() => {
-    console.log('[VariantClickDebug] effectiveMediaUrl computing:', {
-      hasActiveVariant: !!activeVariant,
-      activeVariantId: activeVariant?.id?.substring(0, 8),
-      activeVariantIsPrimary: activeVariant?.is_primary,
-      activeVariantLocation: activeVariant?.location?.substring(0, 50),
-      effectiveImageUrl: effectiveImageUrl?.substring(0, 50),
-    });
-    
-    // If an active variant is set (any variant, including primary), use its location
-    if (activeVariant && activeVariant.location) {
-      console.log('[VariantClickDebug] ✅ Using active variant location:', activeVariant.location.substring(0, 50));
-      return activeVariant.location;
-    }
-    // Otherwise use the standard effective image URL
-    console.log('[VariantClickDebug] Using effectiveImageUrl:', effectiveImageUrl?.substring(0, 50));
-    return effectiveImageUrl;
-  }, [activeVariant, effectiveImageUrl]);
+  // Effective media hook - computes effective URLs and dimensions
+  const { effectiveVideoUrl, effectiveMediaUrl, effectiveImageDimensions } = useEffectiveMedia({
+    isVideo,
+    activeVariant,
+    effectiveImageUrl,
+    imageDimensions,
+    projectAspectRatio,
+  });
 
   // Trim save hook - handle saving trimmed video
   const trimSaveHook = useTrimSave({
@@ -1562,12 +1204,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     saveTrimmedVideo,
   } = trimSaveHook;
 
-  // Video Edit Mode hooks and state (for regenerating portions)
-  // Get project for resolution
-  const { projects } = useProject();
-  const currentProject = projects.find(p => p.id === selectedProjectId);
-  const projectAspectRatio = currentProject?.aspectRatio;
-
   // Video editing hook - handles all video edit state, validation, and generation
   const videoEditing = useVideoEditing({
     media,
@@ -1582,706 +1218,50 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     },
   });
 
-  // Compute effective dimensions that are GUARANTEED to have a value
-  // This is computed synchronously during render, so there's no flicker
-  // Priority: extracted/loaded dimensions > project aspect ratio > 16:9 default
-  const effectiveImageDimensions = React.useMemo(() => {
-    // Use actual dimensions if we have them
-    if (imageDimensions) {
-      return imageDimensions;
-    }
-
-    // Fallback to project aspect ratio
-    if (projectAspectRatio) {
-      const resolution = ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio];
-      if (resolution && resolution.includes('x')) {
-        const [w, h] = resolution.split('x').map(Number);
-        if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
-          console.log('[LightboxDimensions] Using project aspect ratio for effective dims:', {
-            projectAspectRatio,
-            resolution,
-          });
-          return { width: w, height: h };
-        }
-      }
-    }
-
-    // Absolute last resort: 16:9 default
-    console.log('[LightboxDimensions] Using 16:9 default for effective dims');
-    return { width: 1920, height: 1080 };
-  }, [imageDimensions, projectAspectRatio]);
-
-  // Extract source_task_id and check if variant already has orchestrator_details
-  const { variantSourceTaskId, variantHasOrchestratorDetails } = useMemo(() => {
-    const variantParams = activeVariant?.params as Record<string, any> | undefined;
-    // Try multiple possible field names for the source task ID
-    const taskId = variantParams?.source_task_id ||
-                   variantParams?.orchestrator_task_id ||
-                   variantParams?.task_id ||
-                   null;
-    // Validate it's a UUID before using (some params have non-UUID identifiers)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const validTaskId = taskId && uuidRegex.test(taskId) ? taskId : null;
-    const hasOrchestratorDetails = !!variantParams?.orchestrator_details;
-    return { variantSourceTaskId: validTaskId, variantHasOrchestratorDetails: hasOrchestratorDetails };
-  }, [activeVariant?.params, activeVariant?.id, activeVariant?.variant_type]);
-
-  // Fetch the variant's source task when it differs from taskDetailsData
-  // Skip fetch if variant already has orchestrator_details (e.g., clip_join variants)
-  // NOTE: Uses ['tasks', 'single', taskId] query key to share cache with usePrefetchTaskData
-  const { data: variantSourceTask, isLoading: isLoadingVariantTask } = useQuery({
-    queryKey: ['tasks', 'single', variantSourceTaskId],
-    queryFn: async () => {
-      if (!variantSourceTaskId) return null;
-      console.log('[VariantTaskDetails] Fetching task:', variantSourceTaskId.substring(0, 8));
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('id', variantSourceTaskId)
-        .single();
-      if (error) {
-        console.error('[VariantTaskDetails] Error fetching source task:', error);
-        return null;
-      }
-      return data;
-    },
-    // Don't fetch if: no task ID, already have matching taskDetailsData, or variant has orchestrator_details
-    enabled: !!variantSourceTaskId && variantSourceTaskId !== taskDetailsData?.taskId && !variantHasOrchestratorDetails,
-    staleTime: Infinity, // Task data is immutable - cache forever (matches prefetch)
+  // Adjusted task details hook - shows variant's source task instead of original generation's task
+  const { adjustedTaskDetailsData } = useAdjustedTaskDetails({
+    activeVariant,
+    taskDetailsData,
+    isLoadingVariants,
+    initialVariantId,
   });
 
-  // For variants, show the variant's source task params instead of the original task
-  // But ALWAYS preserve onApplySettingsFromTask so the Apply button shows
-  const adjustedTaskDetailsData = useMemo(() => {
-    // Check if we're viewing a variant that was created by a task (has source_task_id in params)
-    const variantParams = activeVariant?.params as Record<string, any> | undefined;
-    const isTaskCreatedVariant = activeVariant && variantParams && (
-      variantParams.source_task_id ||
-      variantParams.created_from ||
-      (activeVariant.variant_type && activeVariant.variant_type !== 'original')
-    );
-
-    if (isTaskCreatedVariant && variantParams) {
-      // Check if taskDetailsData already has the correct task (e.g., when opened from TasksPane)
-      const hasMatchingTaskData = taskDetailsData?.taskId === variantParams.source_task_id && taskDetailsData?.task?.params;
-
-      // Determine the best source of task params:
-      // 1. If taskDetailsData matches, use its params (already have full data)
-      // 2. If we fetched the source task, use its params
-      // 3. Fall back to variant params (may be incomplete)
-      // IMPORTANT: Use variant_type for display (e.g., 'clip_join'), NOT tool_type
-      // tool_type is the tool that launched the task (e.g., 'travel-between-images'),
-      // which is different from what kind of variant this is
-      let effectiveParams = variantParams;
-      const effectiveTaskType = activeVariant.variant_type || 'variant';
-
-      if (hasMatchingTaskData) {
-        effectiveParams = taskDetailsData.task.params;
-      } else if (!variantParams.orchestrator_details && variantSourceTask?.params) {
-        // Only use fetched task params if variant doesn't already have orchestrator_details
-        // clip_join variants store orchestrator_details directly, so we don't want to overwrite
-        effectiveParams = typeof variantSourceTask.params === 'string'
-          ? JSON.parse(variantSourceTask.params)
-          : variantSourceTask.params;
-      }
-      // Otherwise keep variantParams which may already have orchestrator_details (e.g., clip_join)
-
-      // Extract input images using shared utility
-      // This handles segment tasks (only segment images) vs full timeline tasks
-      const variantInputImages = deriveInputImages(effectiveParams);
-
-      return {
-        task: {
-          id: activeVariant.id,
-          taskType: effectiveTaskType,
-          params: effectiveParams,
-          status: 'Complete',
-          createdAt: activeVariant.created_at,
-        },
-        isLoading: isLoadingVariantTask,
-        error: null,
-        inputImages: variantInputImages,
-        taskId: variantParams.source_task_id || activeVariant.id,
-        // ALWAYS preserve onApplySettingsFromTask so Apply button shows for all variants
-        onApplySettingsFromTask: taskDetailsData?.onApplySettingsFromTask,
-      };
-    }
-
-    // If variants are still loading AND we don't have task data yet, show loading
-    // But if we already have task data cached, show it immediately rather than blocking on variants
-    // This provides better UX when task data is prefetched/cached
-    // ALSO check if we're waiting for initialVariantId to be applied (clicked a specific variant)
-    const waitingForInitialVariant = initialVariantId &&
-      (!activeVariant || activeVariant.id !== initialVariantId);
-
-    // Only override to loading if:
-    // 1. Waiting for a specific variant (user clicked a variant)
-    // 2. Variants loading AND no active variant AND task details still loading
-    //    (If task details finished - either has task or knows there's none - don't block on variants)
-    const shouldShowLoading = waitingForInitialVariant ||
-      (isLoadingVariants && !activeVariant && taskDetailsData?.isLoading);
-
-    if (shouldShowLoading) {
-      return taskDetailsData ? { ...taskDetailsData, isLoading: true } : taskDetailsData;
-    }
-
-    // For all other cases, use the generation's task details as-is
-    return taskDetailsData;
-  }, [taskDetailsData, activeVariant, variantSourceTask, isLoadingVariantTask, isLoadingVariants, initialVariantId]);
-
-  // Fetch shot's aspect ratio AND structure videos for regeneration
-  // Structure videos are stored in shots.settings['travel-structure-video'] (via useStructureVideo hook)
-  const { data: shotDataForRegen, isLoading: isLoadingShotAspectRatio } = useQuery({
-    queryKey: ['shot-regen-data', shotId],
-    queryFn: async () => {
-      if (!shotId) return null;
-      console.log('[StructureVideoFix] 🔍 [MediaLightbox] QUERY START - Fetching shot data for:', shotId?.substring(0, 8));
-      const { data, error } = await supabase
-        .from('shots')
-        .select('aspect_ratio, settings')
-        .eq('id', shotId)
-        .single();
-      if (error) {
-        console.warn('[StructureVideoFix] ❌ [MediaLightbox] QUERY FAILED:', error);
-        return null;
-      }
-      
-      // DEBUG: Log ALL keys in settings to see where data actually lives
-      const allSettings = data?.settings as Record<string, any>;
-      const settingsKeys = allSettings ? Object.keys(allSettings) : [];
-      console.log('[StructureVideoFix] 🗃️ [MediaLightbox] ALL SETTINGS KEYS:', settingsKeys);
-      
-      // NOTE: Structure videos are stored under 'travel-structure-video' key (via useStructureVideo hook)
-      const structureVideoSettings = allSettings?.['travel-structure-video'] ?? {};
-      // Also check wrong key for debugging
-      const wrongKeySettings = allSettings?.['travel-between-images'] ?? {};
-      
-      console.log('[StructureVideoFix] 📦 [MediaLightbox] QUERY COMPLETE - Shot data fetched:', {
-        shotId: shotId?.substring(0, 8),
-        aspectRatio: data?.aspect_ratio,
-        // Correct key (travel-structure-video)
-        hasStructureVideos: !!(structureVideoSettings.structure_videos?.length > 0),
-        structureVideosCount: structureVideoSettings.structure_videos?.length ?? 0,
-        hasStructureGuidance: !!structureVideoSettings.structure_guidance,
-        firstVideoPath: structureVideoSettings.structure_videos?.[0]?.path?.substring(0, 50) ?? '(none)',
-        // Wrong key check (travel-between-images) 
-        wrongKeyHasStructureVideos: !!(wrongKeySettings.structure_videos?.length > 0),
-        wrongKeyCount: wrongKeySettings.structure_videos?.length ?? 0,
-      });
-      return {
-        aspect_ratio: data?.aspect_ratio,
-        structure_videos: structureVideoSettings.structure_videos ?? null,
-        structure_guidance: structureVideoSettings.structure_guidance ?? null,
-      };
-    },
-    enabled: !!shotId && isVideo,
-    staleTime: 60000, // Cache for 1 minute
+  // Video regenerate mode hook - handles shot data, canRegenerate, and regenerateFormProps
+  const { canRegenerate, regenerateFormProps } = useVideoRegenerateMode({
+    isVideo,
+    media,
+    shotId,
+    selectedProjectId,
+    actualGenerationId,
+    adjustedTaskDetailsData,
+    primaryVariant,
+    currentSegmentImages,
+    segmentSlotMode,
+    variantParamsToLoad,
+    setVariantParamsToLoad,
+    onSegmentFrameCountChange,
+    currentFrameCount,
   });
 
-  // Extract aspect ratio from combined query (backward compat)
-  const shotAspectRatioData = shotDataForRegen?.aspect_ratio;
-
-  // Compute effective resolution for regeneration: shot > project > stale params
-  const effectiveRegenerateResolution = useMemo(() => {
-    // Handle both cached formats: string (from this query) or object (from ChildGenerationsView cache)
-    const aspectRatio = typeof shotAspectRatioData === 'string'
-      ? shotAspectRatioData
-      : shotAspectRatioData?.aspect_ratio;
-
-    console.log('[MediaLightbox] [ResolutionDebug] Computing effectiveRegenerateResolution:', {
-      shotId: shotId?.substring(0, 8),
-      shotAspectRatioData,
-      resolvedAspectRatio: aspectRatio,
-      isLoadingShotAspectRatio,
-      isVideo,
-    });
-
-    // Priority 1: Shot's aspect ratio
-    if (aspectRatio) {
-      const shotResolution = ASPECT_RATIO_TO_RESOLUTION[aspectRatio];
-      console.log('[MediaLightbox] [ResolutionDebug] Shot aspect ratio lookup:', {
-        aspectRatio,
-        mappedResolution: shotResolution,
-        availableRatios: Object.keys(ASPECT_RATIO_TO_RESOLUTION),
-      });
-      if (shotResolution) {
-        console.log('[MediaLightbox] [ResolutionDebug] ✅ Using SHOT resolution for regeneration:', {
-          shotId: shotId?.substring(0, 8),
-          aspectRatio,
-          resolution: shotResolution
-        });
-        return shotResolution;
-      }
-    }
-    // Priority 2: Fall back to project resolution (handled in SegmentRegenerateForm)
-    console.log('[MediaLightbox] [ResolutionDebug] ⚠️ No shot resolution, will use project/params fallback');
-    return undefined;
-  }, [shotAspectRatioData, shotId, isLoadingShotAspectRatio, isVideo]);
-
-  // Determine if regenerate mode is available for this video
-  // Used to auto-fallback when persisted mode is 'regenerate' but it's not available
-  const canRegenerate = useMemo(() => {
-    if (!isVideo) return false;
-
-    // Root parent videos (no parent_generation_id) cannot be regenerated
-    const isRootParent = !(media as any).parent_generation_id;
-    if (isRootParent) return false;
-
-    // Join-clips outputs cannot be regenerated
-    const mediaParams = (media as any).params as Record<string, any> | undefined;
-    const toolType = (media.metadata as any)?.tool_type || mediaParams?.tool_type;
-    if (toolType === 'join-clips') return false;
-
-    // Need task params to regenerate
-    const taskDataParams = adjustedTaskDetailsData?.task?.params;
-    if (!taskDataParams && !mediaParams) return false;
-
-    return true;
-  }, [isVideo, media, adjustedTaskDetailsData]);
-
-  // Create regenerate form for video edit panel
-  // IMPORTANT: Use PRIMARY variant's params for regeneration, not the active variant's
-  // This ensures regeneration respects the "main" variant's settings (e.g., LoRAs)
-  const regenerateForm = useMemo(() => {
-    // Use media.params as fallback when task params aren't available
-    // This handles race conditions where task data hasn't loaded yet
-    const mediaParams = (media as any).params as Record<string, any> | undefined;
-    const taskDataParams = adjustedTaskDetailsData?.task?.params;
-
-    // Don't show regenerate for root parent videos (final videos)
-    // They don't have a parent_generation_id and regeneration doesn't make sense for them
-    const isRootParent = !(media as any).parent_generation_id;
-    if (isRootParent) {
-      console.log('[MediaLightbox] [ResolutionDebug] regenerateForm: skipping (root parent video)');
-      return null;
-    }
-
-    // Don't show regenerate for join-clips outputs - they don't have segments to regenerate
-    const toolType = (media.metadata as any)?.tool_type || mediaParams?.tool_type;
-    if (toolType === 'join-clips') {
-      console.log('[MediaLightbox] [ResolutionDebug] regenerateForm: skipping (join-clips output)');
-      return null;
-    }
-
-    if (!isVideo || (!taskDataParams && !mediaParams)) {
-      console.log('[MediaLightbox] [ResolutionDebug] regenerateForm: skipping (not video or no params)', {
-        isVideo,
-        hasTaskParams: !!taskDataParams,
-        hasMediaParams: !!mediaParams,
-      });
-      return null;
-    }
-
-    // Prefer primary variant's params if it has task data (source_task_id or orchestrator_details)
-    // This ensures regeneration uses the "main" variant's settings, not whatever variant is being viewed
-    const primaryParams = primaryVariant?.params as Record<string, any> | undefined;
-    const primaryHasTaskData = primaryParams && (
-      primaryParams.source_task_id ||
-      primaryParams.orchestrator_details ||
-      primaryParams.additional_loras
-    );
-
-    // Priority: primaryVariant params > task data params > media params (fallback)
-    let taskParams = primaryHasTaskData
-      ? primaryParams
-      : (taskDataParams ?? mediaParams) as Record<string, any>;
-
-    // Determine source for logging
-    const paramsSource = primaryHasTaskData
-      ? 'primaryVariant'
-      : (taskDataParams ? 'adjustedTaskDetailsData' : 'mediaParams');
-
-    console.log('[StructureVideoFix] [MediaLightbox] [RegenerateParams] Using params from:', {
-      source: paramsSource,
-      primaryVariantId: primaryVariant?.id?.substring(0, 8),
-      primaryHasTaskData,
-      hasAdditionalLoras: !!(taskParams.additional_loras || taskParams.orchestrator_details?.additional_loras),
-    });
-
-    // CRITICAL: Inject CURRENT shot's structure videos/guidance into params
-    // The task params may be stale (from when the segment was created), but the shot
-    // may now have a structure video configured. Use the shot's current config.
-    //
-    // NEW UNIFIED FORMAT: structure_guidance contains videos array inside it:
-    // {
-    //   "structure_guidance": {
-    //     "target": "uni3c" | "vace",
-    //     "videos": [{ path, start_frame, end_frame, treatment }],
-    //     "strength": 1.0,
-    //     // Uni3C: step_window, frame_policy, zero_empty_frames
-    //     // VACE: preprocessing, canny_intensity, depth_contrast
-    //   }
-    // }
-    const shotStructureVideos = shotDataForRegen?.structure_videos;
-    let shotStructureGuidance: Record<string, unknown> | null = null;
-    
-    // Build unified structure_guidance from structure_videos array
-    if (shotStructureVideos?.length > 0) {
-      const firstVideo = shotStructureVideos[0];
-      const isUni3cTarget = firstVideo.structure_type === 'uni3c';
-      
-      // Transform videos to the new format (strip structure_type, motion_strength, uni3c_* from each video)
-      const cleanedVideos = shotStructureVideos.map((v: Record<string, unknown>) => ({
-        path: v.path,
-        start_frame: v.start_frame ?? 0,
-        end_frame: v.end_frame ?? null,
-        treatment: v.treatment ?? 'adjust',
-        ...(v.metadata ? { metadata: v.metadata } : {}),
-        ...(v.resource_id ? { resource_id: v.resource_id } : {}),
-      }));
-      
-      shotStructureGuidance = {
-        target: isUni3cTarget ? 'uni3c' : 'vace',
-        videos: cleanedVideos,
-        strength: firstVideo.motion_strength ?? 1.0,
-      };
-      
-      if (isUni3cTarget) {
-        // Uni3C specific params
-        shotStructureGuidance.step_window = [
-          firstVideo.uni3c_start_percent ?? 0,
-          firstVideo.uni3c_end_percent ?? 1.0,
-        ];
-        shotStructureGuidance.frame_policy = 'fit';
-        shotStructureGuidance.zero_empty_frames = true;
-      } else {
-        // VACE specific params
-        const preprocessingMap: Record<string, string> = {
-          'flow': 'flow',
-          'canny': 'canny',
-          'depth': 'depth',
-          'raw': 'none',
-        };
-        shotStructureGuidance.preprocessing = preprocessingMap[firstVideo.structure_type ?? 'flow'] ?? 'flow';
-        // Include optional VACE params if present
-        if (firstVideo.canny_intensity != null) {
-          shotStructureGuidance.canny_intensity = firstVideo.canny_intensity;
-        }
-        if (firstVideo.depth_contrast != null) {
-          shotStructureGuidance.depth_contrast = firstVideo.depth_contrast;
-        }
-      }
-      
-      console.log('[StructureVideoFix] 🔧 [MediaLightbox] BUILT unified structure_guidance:', {
-        target: shotStructureGuidance.target,
-        videosCount: cleanedVideos.length,
-        strength: shotStructureGuidance.strength,
-        stepWindow: shotStructureGuidance.step_window,
-        preprocessing: shotStructureGuidance.preprocessing,
-        firstVideoPath: cleanedVideos[0]?.path?.substring(0, 50),
-      });
-    }
-    
-    // DEBUG: Always log the state of shotDataForRegen
-    console.log('[StructureVideoFix] 🎯 [MediaLightbox] regenerateForm - shotDataForRegen state:', {
-      shotId: shotId?.substring(0, 8),
-      isLoadingShotAspectRatio,
-      hasShotDataForRegen: !!shotDataForRegen,
-      shotStructureVideosCount: shotStructureVideos?.length ?? 0,
-      shotStructureGuidanceTarget: shotStructureGuidance?.target ?? '(none)',
-      willInject: !!shotStructureGuidance,
-    });
-    
-    if (shotStructureGuidance) {
-      console.log('[StructureVideoFix] ✅ [MediaLightbox] INJECTING unified structure_guidance:', {
-        target: shotStructureGuidance.target,
-        videosCount: (shotStructureGuidance.videos as unknown[])?.length ?? 0,
-        strength: shotStructureGuidance.strength,
-      });
-      
-      // CLEANUP: Remove legacy structure params from orchestrator_details before injecting new unified format
-      const cleanedOrchestratorDetails = { ...(taskParams.orchestrator_details || {}) };
-      const legacyStructureParams = [
-        'structure_type', 'structure_videos', 'structure_video_path', 'structure_video_treatment',
-        'structure_video_motion_strength', 'structure_video_type', 'structure_canny_intensity',
-        'structure_depth_contrast', 'structure_guidance_video_url', 'structure_guidance_frame_offset',
-        'use_uni3c', 'uni3c_guide_video', 'uni3c_strength', 'uni3c_start_percent', 
-        'uni3c_end_percent', 'uni3c_guidance_frame_offset',
-      ];
-      for (const param of legacyStructureParams) {
-        delete cleanedOrchestratorDetails[param];
-      }
-      
-      taskParams = {
-        ...taskParams,
-        // Include structure_guidance at top level for standalone segments
-        structure_guidance: shotStructureGuidance,
-        orchestrator_details: {
-          ...cleanedOrchestratorDetails,
-          // Also include in orchestrator_details for orchestrator tasks
-          structure_guidance: shotStructureGuidance,
-        },
-      };
-    } else {
-      console.log('[StructureVideoFix] ⚠️ [MediaLightbox] NOT injecting - no structure videos from shot query');
-    }
-
-    const orchestratorDetails = taskParams.orchestrator_details || {};
-
-    // Use shared utility to extract segment images (handles explicit URLs and array formats)
-    const segmentIndex = taskParams.segment_index ?? 0;
-    let segmentImageInfo = extractSegmentImages(taskParams, segmentIndex);
-
-    // Priority 1: Use currentSegmentImages prop if provided (fresh timeline data)
-    // This ensures regeneration uses the CURRENT timeline images, not stale stored params
-    if (currentSegmentImages && (currentSegmentImages.startUrl || currentSegmentImages.endUrl)) {
-        console.log('[MediaLightbox] [RegenerateImages] Using currentSegmentImages from timeline (overriding stored params):', {
-          startUrl: currentSegmentImages.startUrl?.substring(0, 50),
-          endUrl: currentSegmentImages.endUrl?.substring(0, 50),
-        });
-        segmentImageInfo = {
-            startUrl: currentSegmentImages.startUrl,
-            endUrl: currentSegmentImages.endUrl,
-            startGenId: currentSegmentImages.startGenerationId,
-            endGenId: currentSegmentImages.endGenerationId,
-            hasImages: !!(currentSegmentImages.startUrl || currentSegmentImages.endUrl),
-        };
-    }
-    // Priority 2: Fall back to passed inputImages if task params don't have them
-    // This is critical for parent videos after "Join Segments" - the join task
-    // doesn't have original input images, but the caller derives them from generation params
-    else if (!segmentImageInfo.hasImages && adjustedTaskDetailsData?.inputImages?.length > 0) {
-        console.log('[MediaLightbox] [RegenerateImages] Using passed inputImages as fallback:', adjustedTaskDetailsData.inputImages.length);
-        const passedImages = adjustedTaskDetailsData.inputImages;
-        segmentImageInfo = {
-            startUrl: passedImages[0],
-            endUrl: passedImages.length > 1 ? passedImages[passedImages.length - 1] : passedImages[0],
-            startGenId: undefined,
-            endGenId: undefined,
-            hasImages: passedImages.length > 0,
-        };
-    }
-
-    const { startUrl: startImageUrl, endUrl: endImageUrl, startGenId: startImageGenId, endGenId: endImageGenId } = segmentImageInfo;
-
-    console.log('[MediaLightbox] [RegenerateImages] Image extraction:', {
-      segmentIndex,
-      hasImages: segmentImageInfo.hasImages,
-      finalStartUrl: startImageUrl?.substring(0, 50),
-      finalEndUrl: endImageUrl?.substring(0, 50),
-    });
-
-    // IMPORTANT: Only pass shot resolution, NOT stale params!
-    // If shot resolution is undefined, let task creation logic (resolveProjectResolution)
-    // fetch the correct resolution from the project. This prevents race conditions where
-    // stale params have a different resolution than the current project/shot.
-    const staleResolution = taskParams.parsed_resolution_wh || orchestratorDetails.parsed_resolution_wh;
-
-    // For child segments, use the parent generation ID (not the segment's own ID)
-    // This ensures new regenerations are linked to the correct parent
-    // Priority: media field > orchestrator/task params > fall back to actualGenerationId
-    const parentGenerationId = (media as any).parent_generation_id ||
-                               orchestratorDetails.parent_generation_id ||
-                               taskParams.parent_generation_id ||
-                               actualGenerationId;
-
-    console.log('[MediaLightbox] [ResolutionDebug] regenerateForm resolution computation:', {
-      effectiveRegenerateResolution,
-      taskParamsResolution: taskParams.parsed_resolution_wh,
-      orchestratorResolution: orchestratorDetails.parsed_resolution_wh,
-      staleResolution,
-      finalResolution: effectiveRegenerateResolution || '(will be fetched by task creation)',
-      source: effectiveRegenerateResolution ? 'SHOT' : 'TASK_CREATION_WILL_FETCH',
-      mediaParentGenerationId: (media as any).parent_generation_id,
-      parentGenerationId,
-      actualGenerationId,
-      isChildSegment: parentGenerationId !== actualGenerationId,
-    });
-
-    // Safe substring helper for debug logging (handles non-strings)
-    const safeSubstr = (val: unknown): string => {
-      if (typeof val === 'string') return val.substring(0, 8);
-      if (val === null || val === undefined) return 'null';
-      return `[${typeof val}]`;
-    };
-
-    // Extract pair_shot_generation_id for reading/writing per-pair metadata
-    // This links regeneration to the specific timeline pair's settings
-    // IMPORTANT: Prefer currentSegmentImages (live timeline) over stored params (may be stale)
-    const orchPairIds = taskParams.orchestrator_details?.pair_shot_generation_ids;
-    // Priority: segmentSlotMode (if available) > currentSegmentImages > task params
-    const pairShotGenerationId = [
-      segmentSlotMode?.pairData?.startImage?.id,  // Segment slot mode (highest priority - has fresh timeline data)
-      currentSegmentImages?.startShotGenerationId,  // Live timeline prop
-      taskParams.pair_shot_generation_id,
-      taskParams.individual_segment_params?.pair_shot_generation_id,
-      Array.isArray(orchPairIds) ? orchPairIds[segmentIndex] : undefined,
-    ].find(v => typeof v === 'string') || undefined;
-
-    // Debug: log pairShotGenerationId resolution
-    console.log('[SegmentIdDebug] MediaLightbox pairShotGenerationId resolution:', {
-      result: pairShotGenerationId?.substring(0, 8) || '(none)',
-      sources: {
-        segmentSlotMode_startImage_id: segmentSlotMode?.pairData?.startImage?.id?.substring(0, 8) || '(none)',
-        currentSegmentImages_startShotGenerationId: currentSegmentImages?.startShotGenerationId?.substring(0, 8) || '(none)',
-        taskParams_pair_shot_generation_id: taskParams.pair_shot_generation_id?.substring(0, 8) || '(none)',
-        individual_segment_params: taskParams.individual_segment_params?.pair_shot_generation_id?.substring(0, 8) || '(none)',
-        orchPairIds_segmentIndex: (Array.isArray(orchPairIds) ? orchPairIds[segmentIndex] : undefined)?.substring(0, 8) || '(none)',
-      },
-      hasSegmentSlotMode: !!segmentSlotMode,
-      hasCurrentSegmentImages: !!currentSegmentImages,
-      segmentIndex,
-    });
-
-    // Get the correct childGenerationId for regeneration
-    // PRIMARY: Use activeChildGenerationId from slot (matched by pair_shot_generation_id in SegmentOutputStrip)
-    // FALLBACK: If currentSegmentImages not provided, check if viewed media is a child segment
-    // SAFETY: Validate video's pair_shot_generation_id matches current slot (defense against stale data)
-    const isChildSegment = parentGenerationId !== actualGenerationId;
-    const videoPairShotGenId = taskParams.pair_shot_generation_id ||
-                               taskParams.individual_segment_params?.pair_shot_generation_id;
-    const videoMatchesCurrentSlot = !pairShotGenerationId || !videoPairShotGenId ||
-                                    pairShotGenerationId === videoPairShotGenId;
-
-    // Use slot's activeChildGenerationId (source of truth), with fallback and safety check
-    const childGenerationId = videoMatchesCurrentSlot
-      ? (currentSegmentImages?.activeChildGenerationId || (isChildSegment ? actualGenerationId : undefined))
-      : undefined;
-
-    console.log('[MediaLightbox] childGenerationId resolution:', {
-      activeChildFromSlot: safeSubstr(currentSegmentImages?.activeChildGenerationId),
-      actualGenerationId: safeSubstr(actualGenerationId),
-      isChildSegment,
-      pairShotGenerationId: safeSubstr(pairShotGenerationId),
-      videoPairShotGenId: safeSubstr(videoPairShotGenId),
-      videoMatchesCurrentSlot,
-      final: safeSubstr(childGenerationId) || 'null (will create new child)',
-    });
-
-    console.log('[PairMetadata] 🔗 MediaLightbox pairShotGenerationId sources (priority order):', {
-      '1_fromCurrentSegmentImages': safeSubstr(currentSegmentImages?.startShotGenerationId),
-      '2_fromTaskParams': safeSubstr(taskParams.pair_shot_generation_id),
-      '3_fromIndividualSegmentParams': safeSubstr(taskParams.individual_segment_params?.pair_shot_generation_id),
-      '4_fromOrchestratorDetails': Array.isArray(orchPairIds) ? safeSubstr(orchPairIds[segmentIndex]) : 'null',
-      final: safeSubstr(pairShotGenerationId),
-    });
-
-    // Extract structure video props for the form
-    const firstStructureVideo = shotStructureVideos?.[0];
-    const structureVideoType = firstStructureVideo?.structure_type as 'uni3c' | 'flow' | 'canny' | 'depth' | undefined;
-    const structureVideoDefaults = firstStructureVideo ? {
-      motionStrength: firstStructureVideo.motion_strength ?? 1.2,
-      treatment: (firstStructureVideo.treatment ?? 'adjust') as 'adjust' | 'clip',
-      uni3cEndPercent: firstStructureVideo.uni3c_end_percent ?? 0.1,
-    } : undefined;
-    const structureVideoUrl = firstStructureVideo?.path;
-
-    return (
-      <SegmentRegenerateForm
-        params={taskParams}
-        projectId={selectedProjectId || null}
-        generationId={parentGenerationId}
-        shotId={shotId}
-        childGenerationId={childGenerationId}
-        segmentIndex={taskParams.segment_index ?? 0}
-        startImageUrl={startImageUrl}
-        endImageUrl={endImageUrl}
-        startImageGenerationId={startImageGenId}
-        endImageGenerationId={endImageGenId}
-        projectResolution={effectiveRegenerateResolution}
-        pairShotGenerationId={pairShotGenerationId}
-        onFrameCountChange={onSegmentFrameCountChange}
-        currentFrameCount={currentFrameCount}
-        variantParamsToLoad={variantParamsToLoad}
-        onVariantParamsLoaded={() => setVariantParamsToLoad(null)}
-        structureVideoType={structureVideoType}
-        structureVideoDefaults={structureVideoDefaults}
-        structureVideoUrl={structureVideoUrl}
-      />
-    );
-  }, [isVideo, adjustedTaskDetailsData, selectedProjectId, actualGenerationId, effectiveRegenerateResolution, media, primaryVariant, shotDataForRegen, shotId, currentSegmentImages, onSegmentFrameCountChange, currentFrameCount, variantParamsToLoad, setVariantParamsToLoad, segmentSlotMode]);
-
-  // Handle entering video edit mode (unified) - restores last used sub-mode
-  const handleEnterVideoEditMode = useCallback(() => {
-    // Restore from persisted value (defaults to 'trim' if not set)
-    let restoredMode = persistedVideoEditSubMode || 'trim';
-
-    // Auto-fallback: if restoring to 'regenerate' but it's not available, use 'trim' instead
-    if (restoredMode === 'regenerate' && !canRegenerate) {
-      console.log('[EDIT_DEBUG] 🎬 handleEnterVideoEditMode: regenerate unavailable, falling back to trim');
-      restoredMode = 'trim';
-    }
-
-    console.log('[EDIT_DEBUG] 🎬 handleEnterVideoEditMode: restoring to', restoredMode, '(persisted:', persistedVideoEditSubMode, ', canRegenerate:', canRegenerate, ')');
-    setVideoEditSubMode(restoredMode);
-    console.log('[PanelRestore] SAVING panelMode: edit (video entered edit mode)');
-    setPersistedPanelMode('edit');
-
-    // Set the appropriate mode flags based on restored sub-mode
-    if (restoredMode === 'trim') {
-      videoEditing.setIsVideoEditMode(false);
-      onTrimModeChange?.(true);
-    } else if (restoredMode === 'replace') {
-      videoEditing.setIsVideoEditMode(true);
-      resetTrim();
-    } else if (restoredMode === 'regenerate') {
-      videoEditing.setIsVideoEditMode(false);
-      resetTrim();
-    }
-
-    // Try to capture video duration from already-loaded video element
-    setTimeout(() => {
-      const videoElements = document.querySelectorAll('video');
-      videoElements.forEach((video) => {
-        if (Number.isFinite(video.duration) && video.duration > 0) {
-          setVideoDuration(video.duration);
-        }
-      });
-    }, 100);
-  }, [onTrimModeChange, setVideoDuration, persistedVideoEditSubMode, setVideoEditSubMode, setPersistedPanelMode, canRegenerate, videoEditing, resetTrim]);
-
-  // Handle exiting video edit mode entirely
-  const handleExitVideoEditMode = useCallback(() => {
-    console.log('[EDIT_DEBUG] 🎬 handleExitVideoEditMode: switching to Info panel');
-    setVideoEditSubMode(null);
-    console.log('[PanelRestore] SAVING panelMode: info (exited video edit mode)');
-    setPersistedPanelMode('info');
-    resetTrim();
-    videoEditing.setIsVideoEditMode(false);
-    onTrimModeChange?.(false);
-  }, [resetTrim, videoEditing, onTrimModeChange, setVideoEditSubMode, setPersistedPanelMode]);
-
-  // Handle switching to trim sub-mode
-  const handleEnterVideoTrimMode = useCallback(() => {
-    console.log('[EDIT_DEBUG] 🎬 handleEnterVideoTrimMode');
-    setVideoEditSubMode('trim');
-    videoEditing.setIsVideoEditMode(false);
-    onTrimModeChange?.(true);
-
-    // Try to capture video duration
-    setTimeout(() => {
-      const videoElements = document.querySelectorAll('video');
-      videoElements.forEach((video) => {
-        if (Number.isFinite(video.duration) && video.duration > 0) {
-          setVideoDuration(video.duration);
-        }
-      });
-    }, 100);
-  }, [videoEditing, onTrimModeChange, setVideoDuration, setVideoEditSubMode]);
-
-  // Handle switching to replace (portion) sub-mode
-  const handleEnterVideoReplaceMode = useCallback(() => {
-    console.log('[EDIT_DEBUG] 🎬 handleEnterVideoReplaceMode');
-    setVideoEditSubMode('replace');
-    videoEditing.setIsVideoEditMode(true);
-    resetTrim();
-  }, [videoEditing, resetTrim, setVideoEditSubMode]);
-
-  // Handle switching to regenerate (full segment) sub-mode
-  const handleEnterVideoRegenerateMode = useCallback(() => {
-    console.log('[EDIT_DEBUG] 🎬 handleEnterVideoRegenerateMode');
-    setVideoEditSubMode('regenerate');
-    videoEditing.setIsVideoEditMode(false);
-    resetTrim();
-  }, [videoEditing, resetTrim, setVideoEditSubMode]);
-
-  // Legacy handler for exiting trim mode specifically
-  const handleExitVideoTrimMode = useCallback(() => {
-    console.log('[EDIT_DEBUG] 🎬 handleExitVideoTrimMode');
-    setVideoEditSubMode(null);
-    resetTrim();
-    onTrimModeChange?.(false);
-  }, [resetTrim, onTrimModeChange, setVideoEditSubMode]);
+  // Video edit mode handlers hook - provides enter/exit handlers for video edit modes
+  const videoEditModeHandlers = useVideoEditModeHandlers({
+    setVideoEditSubMode,
+    persistedVideoEditSubMode,
+    canRegenerate,
+    setPersistedPanelMode,
+    videoEditingSetIsVideoEditMode: videoEditing.setIsVideoEditMode,
+    onTrimModeChange,
+    resetTrim,
+    setVideoDuration,
+  });
+  const {
+    handleEnterVideoEditMode,
+    handleExitVideoEditMode,
+    handleEnterVideoTrimMode,
+    handleEnterVideoReplaceMode,
+    handleEnterVideoRegenerateMode,
+    handleExitVideoTrimMode,
+  } = videoEditModeHandlers;
 
   // Track if we're in any video edit sub-mode (trim, replace, or regenerate)
   const isVideoTrimModeActive = isVideo && isVideoTrimMode;
@@ -2331,68 +1311,18 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     });
   }, [media.id, variantFetchGenerationId, variants, isLoadingVariants, shouldShowSidePanel, shouldShowSidePanelWithTrim, isVideoTrimModeActive, isVideoEditModeActive, isSpecialEditMode, showTaskDetails, isVideo]);
 
-  // ========================================
-  // AUTO-RESTORE PANEL MODE - Restore Edit mode if that was last used
-  // ========================================
-  const hasRestoredPanelModeRef = useRef(false);
-
-  useEffect(() => {
-    console.log('[PanelRestore] Effect triggered', {
-      hasRestoredAlready: hasRestoredPanelModeRef.current,
-      persistedPanelMode,
-      isVideo,
-      isSpecialEditMode,
-      isInVideoEditMode,
-      initialVideoTrimMode,
-      autoEnterInpaint,
-    });
-
-    // Only restore once per media (prevent loops)
-    if (hasRestoredPanelModeRef.current) {
-      console.log('[PanelRestore] Skipping: already restored for this media');
-      return;
-    }
-
-    // Don't restore if initialVideoTrimMode or autoEnterInpaint is set (explicit modes take precedence)
-    if (initialVideoTrimMode || autoEnterInpaint) {
-      console.log('[PanelRestore] Skipping: explicit mode requested', {
-        initialVideoTrimMode,
-        autoEnterInpaint,
-      });
-      hasRestoredPanelModeRef.current = true;
-      return;
-    }
-
-    // Don't restore if already in edit mode
-    if (isSpecialEditMode || isInVideoEditMode) {
-      console.log('[PanelRestore] Skipping: already in edit mode', {
-        isSpecialEditMode,
-        isInVideoEditMode,
-      });
-      hasRestoredPanelModeRef.current = true;
-      return;
-    }
-
-    if (persistedPanelMode === 'edit') {
-      hasRestoredPanelModeRef.current = true;
-      if (isVideo) {
-        console.log('[PanelRestore] Restoring VIDEO to edit mode');
-        setTimeout(() => handleEnterVideoEditMode(), 0);
-      } else {
-        console.log('[PanelRestore] Restoring IMAGE to edit mode (calling handleEnterMagicEditMode)');
-        setTimeout(() => handleEnterMagicEditMode(), 0);
-      }
-    } else {
-      console.log('[PanelRestore] Staying in INFO mode (persistedPanelMode:', persistedPanelMode, ')');
-      hasRestoredPanelModeRef.current = true;
-    }
-  }, [persistedPanelMode, isVideo, handleEnterVideoEditMode, handleEnterMagicEditMode, initialVideoTrimMode, autoEnterInpaint, isSpecialEditMode, isInVideoEditMode]);
-
-  // Reset restore flag when media changes
-  useEffect(() => {
-    console.log('[PanelRestore] Media changed, resetting restore flag', { mediaId: media.id?.substring(0, 8) });
-    hasRestoredPanelModeRef.current = false;
-  }, [media.id]);
+  // Panel mode restore hook - restores edit/info mode when opening media
+  usePanelModeRestore({
+    mediaId: media.id,
+    persistedPanelMode,
+    isVideo,
+    isSpecialEditMode,
+    isInVideoEditMode,
+    initialVideoTrimMode,
+    autoEnterInpaint,
+    handleEnterVideoEditMode,
+    handleEnterMagicEditMode,
+  });
 
   // ========================================
   // SWIPE NAVIGATION - Mobile/iPad gesture support
@@ -2515,73 +1445,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
   }, [onNavigateToShot, onClose]);
   
-  // Replace in shot handler - swaps timeline position from parent to current image
-  const handleReplaceInShot = React.useCallback(async (
-    parentGenerationId: string,
-    currentMediaId: string,
-    parentTimelineFrame: number,
-    shotIdParam: string
-  ) => {
-    console.log('[ReplaceInShot] Handler started', {
-      parentId: parentGenerationId.substring(0, 8),
-      currentId: currentMediaId.substring(0, 8),
-      frame: parentTimelineFrame,
-      shotId: shotIdParam.substring(0, 8)
-    });
-    
-    try {
-      // 1. Remove timeline_frame from parent's shot_generation record
-      const { error: removeError } = await supabase
-        .from('shot_generations')
-        .update({ timeline_frame: null })
-        .eq('generation_id', parentGenerationId)
-        .eq('shot_id', shotIdParam);
-      
-      if (removeError) throw removeError;
-      
-      // 2. Update or create shot_generation for current image with the timeline_frame
-      // First check if current image already has a shot_generation for this shot
-      const { data: existingAssoc } = await supabase
-        .from('shot_generations')
-        .select('id')
-        .eq('generation_id', currentMediaId)
-        .eq('shot_id', shotIdParam)
-        .single();
-      
-      if (existingAssoc) {
-        // Update existing
-        const { error: updateError } = await supabase
-          .from('shot_generations')
-          .update({ 
-            timeline_frame: parentTimelineFrame,
-            metadata: { user_positioned: true, drag_source: 'replace_parent' }
-          })
-          .eq('id', existingAssoc.id);
-        
-        if (updateError) throw updateError;
-      } else {
-        // Create new
-        const { error: createError } = await supabase
-          .from('shot_generations')
-          .insert({
-            shot_id: shotIdParam,
-            generation_id: currentMediaId,
-            timeline_frame: parentTimelineFrame,
-            metadata: { user_positioned: true, drag_source: 'replace_parent' }
-          });
-        
-        if (createError) throw createError;
-      }
-      
-      console.log('[ReplaceInShot] Handler completed successfully');
-      
-      // Close lightbox to force refresh when reopened
-      onClose();
-    } catch (error) {
-      console.error('[ReplaceInShot] Handler failed:', error);
-      throw error;
-    }
-  }, [onClose]);
+  // Use the extracted hook for replace in shot functionality
+  const { handleReplaceInShot } = useReplaceInShot({ onClose });
 
   // Determine if current view can show "Make main variant" button
   // Case 1: Viewing a child generation that's based on something
@@ -2604,111 +1469,245 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     hasMediaLocation: !!media.location,
   });
 
-  // Make main variant handler - handles two cases:
-  // 1. Viewing a child generation: creates a variant on the parent with child's content
-  // 2. Viewing a non-primary variant: sets that variant as primary
-  const handleMakeMainVariant = React.useCallback(async () => {
-    console.log('[VariantClickDebug] handleMakeMainVariant called in MediaLightbox', {
-      canMakeMainVariantFromChild,
-      canMakeMainVariantFromVariant,
-      activeVariantId: activeVariant?.id?.substring(0, 8),
-    });
-
-    setIsMakingMainVariant(true);
-    try {
-      // Case 2: We're viewing a non-primary variant - just set it as primary
-      if (canMakeMainVariantFromVariant && activeVariant) {
-        console.log('[VariantClickDebug] Setting existing variant as primary:', activeVariant.id.substring(0, 8));
-        await setPrimaryVariant(activeVariant.id);
-        console.log('[VariantClickDebug] Successfully set variant as primary');
-        // Refetch variants to update UI
-        refetchVariants();
-        return;
-      }
-
-      // Case 1: We're viewing a child generation - create variant on parent
-      if (!sourceGenerationData || !media.location) {
-        console.log('[VariantClickDebug] handleMakeMainVariant bailing - missing data:', {
-          hasSourceGenerationData: !!sourceGenerationData,
-          hasMediaLocation: !!media.location,
-        });
-        return;
-      }
-
-      const parentGenId = sourceGenerationData.id;
-      console.log('[VariantClickDebug] Creating variant on parent generation', {
-        parentId: parentGenId.substring(0, 8),
-        currentId: media.id.substring(0, 8),
-        currentLocation: media.location.substring(0, 50)
-      });
-      // 1. Create a new variant on the parent generation with current media's location
-      const { data: insertedVariant, error: insertError } = await supabase
-        .from('generation_variants')
-        .insert({
-          generation_id: parentGenId,
-          location: media.location,
-          thumbnail_url: media.thumbUrl || (media as any).thumbnail_url || null,
-          is_primary: true,
-          variant_type: 'child_promoted',
-          name: null,
-          params: {
-            source_generation_id: media.id,
-            promoted_at: new Date().toISOString()
-          }
-        })
-        .select('id')
-        .single();
-
-      if (insertError) {
-        console.error('[VariantClickDebug] Failed to create variant:', insertError);
-        throw insertError;
-      }
-
-      console.log('[VariantClickDebug] Created variant:', insertedVariant?.id?.substring(0, 8));
-
-      // 2. Update the parent generation's location and thumbnail
-      const { error: updateError } = await supabase
-        .from('generations')
-        .update({
-          location: media.location,
-          thumbnail_url: media.thumbUrl || (media as any).thumbnail_url
-        })
-        .eq('id', parentGenId);
-
-      if (updateError) {
-        console.warn('[VariantClickDebug] Failed to update parent generation:', updateError);
-      }
-
-      console.log('[VariantClickDebug] Successfully made current media the main variant');
-
-      // Invalidate caches so all views update (timeline, shot editor, galleries, variants list).
-      // Use selectedShotId if available (most likely current context), else fall back to shotId.
-      await invalidateVariantChange(queryClient, {
-        generationId: parentGenId,
-        shotId: selectedShotId || shotId,
-        reason: 'child-promoted-to-primary',
-      });
-
-      // Close the lightbox (UI will now reflect updated data without refresh)
-      onClose();
-    } catch (error) {
-      console.error('[VariantClickDebug] handleMakeMainVariant failed:', error);
-    } finally {
-      setIsMakingMainVariant(false);
-    }
-  }, [
-    sourceGenerationData,
+  // Use the extracted hook for make main variant functionality
+  const { isMakingMainVariant, handleMakeMainVariant } = useMakeMainVariant({
     media,
-    onClose,
+    sourceGenerationData,
     canMakeMainVariantFromChild,
     canMakeMainVariantFromVariant,
     activeVariant,
     setPrimaryVariant,
     refetchVariants,
-    queryClient,
+    shotId,
+    selectedShotId,
+    onClose,
+  });
+
+
+  // ==========================================================================
+  // LAYOUT PROPS BUILDING (via hook)
+  // ==========================================================================
+  const {
+    controlsPanelProps,
+    workflowBarProps,
+    floatingToolProps,
+    sidePanelLayoutProps,
+    centeredLayoutProps,
+  } = useLightboxLayoutProps({
+    // Core
+    onClose,
+    readOnly,
+    selectedProjectId,
+    isMobile,
+    actualGenerationId,
+
+    // Media
+    media,
+    isVideo,
+    effectiveMediaUrl,
+    effectiveVideoUrl,
+    imageDimensions,
+    setImageDimensions,
+    effectiveImageDimensions,
+
+    // Variants
+    variants,
+    activeVariant,
+    primaryVariant,
+    isLoadingVariants,
+    setActiveVariantId,
+    setPrimaryVariant,
+    deleteVariant,
+    promoteSuccess,
+    isPromoting,
+    handlePromoteToGeneration,
+    isMakingMainVariant,
+    canMakeMainVariant,
+    handleMakeMainVariant,
+    variantParamsToLoad,
+    setVariantParamsToLoad,
+    variantsSectionRef,
+
+    // Video edit
+    isVideoTrimModeActive,
+    isVideoEditModeActive,
+    isInVideoEditMode,
+    videoEditSubMode,
+    trimVideoRef,
+    trimState,
+    setStartTrim,
+    setEndTrim,
+    resetTrim,
+    trimmedDuration,
+    hasTrimChanges,
+    saveTrimmedVideo,
+    isSavingTrim,
+    trimSaveProgress,
+    trimSaveError,
+    trimSaveSuccess,
+    setVideoDuration,
+    setTrimCurrentTime,
+    trimCurrentTime,
+    videoEditing,
+    handleEnterVideoTrimMode,
+    handleEnterVideoReplaceMode,
+    handleEnterVideoRegenerateMode,
+    handleExitVideoEditMode,
+    handleEnterVideoEditMode,
+    regenerateFormProps,
+
+    // Edit mode
+    isInpaintMode,
+    isAnnotateMode,
+    isSpecialEditMode,
+    editMode,
+    setEditMode,
+    setIsInpaintMode,
+    brushStrokes,
+    currentStroke,
+    isDrawing,
+    isEraseMode,
+    setIsEraseMode,
+    brushSize,
+    setBrushSize,
+    annotationMode,
+    setAnnotationMode,
+    selectedShapeId,
+    handleKonvaPointerDown,
+    handleKonvaPointerMove,
+    handleKonvaPointerUp,
+    handleShapeClick,
+    strokeOverlayRef,
+    handleUndo,
+    handleClearMask,
+    getDeleteButtonPosition,
+    handleToggleFreeForm,
+    handleDeleteSelected,
+    isRepositionDragging,
+    repositionDragHandlers,
+    getTransformStyle,
+    repositionTransform,
+    setTranslateX,
+    setTranslateY,
+    setScale,
+    setRotation,
+    toggleFlipH,
+    toggleFlipV,
+    resetTransform,
+    imageContainerRef,
+    canvasRef: displayCanvasRef,
+    maskCanvasRef,
+    isFlippedHorizontally,
+    isSaving,
+    handleExitInpaintMode,
+    inpaintPanelPosition,
+    setInpaintPanelPosition,
+
+    // Edit form props
+    inpaintPrompt,
+    setInpaintPrompt,
+    inpaintNumGenerations,
+    setInpaintNumGenerations,
+    loraMode,
+    setLoraMode,
+    customLoraUrl,
+    setCustomLoraUrl,
+    isGeneratingInpaint,
+    inpaintGenerateSuccess,
+    isCreatingMagicEditTasks,
+    magicEditTasksCreated,
+    handleExitMagicEditMode,
+    handleUnifiedGenerate,
+    handleGenerateAnnotatedEdit,
+    handleGenerateReposition,
+    isGeneratingReposition,
+    repositionGenerateSuccess,
+    hasTransformChanges,
+    handleSaveAsVariant,
+    isSavingAsVariant,
+    saveAsVariantSuccess,
+    createAsGeneration,
+    setCreateAsGeneration,
+
+    // Img2Img props
+    img2imgPrompt,
+    setImg2imgPrompt,
+    img2imgStrength,
+    setImg2imgStrength,
+    enablePromptExpansion,
+    setEnablePromptExpansion,
+    isGeneratingImg2Img,
+    img2imgGenerateSuccess,
+    handleGenerateImg2Img,
+    img2imgLoraManager,
+    availableLoras,
+    editLoraManager,
+    advancedSettings,
+    setAdvancedSettings,
+    isLocalGeneration,
+    qwenEditModel,
+    setQwenEditModel,
+
+    // Info panel props
+    showImageEditTools,
+    adjustedTaskDetailsData,
+    generationName,
+    handleGenerationNameChange,
+    isEditingGenerationName,
+    setIsEditingGenerationName,
+    derivedItems,
+    derivedGenerations,
+    paginatedDerived,
+    derivedPage,
+    derivedTotalPages,
+    setDerivedPage,
+    replaceImages,
+    setReplaceImages,
+    sourceGenerationData,
+    sourcePrimaryVariant,
+    onOpenExternalGeneration,
+
+    // Navigation
+    showNavigation,
+    hasNext,
+    hasPrevious,
+    handleSlotNavNext,
+    handleSlotNavPrev,
+    swipeNavigation,
+
+    // Panel
+    effectiveTasksPaneOpen,
+    effectiveTasksPaneWidth,
+
+    // Button group props (pre-built)
+    buttonGroupProps,
+
+    // Workflow props
+    allShots,
     selectedShotId,
     shotId,
-  ]);
+    onAddToShot,
+    onAddToShotWithoutPosition,
+    onDelete,
+    onApplySettings,
+    onShotChange,
+    onCreateShot,
+    showTickForImageId,
+    showTickForSecondaryImageId,
+    onShowTick,
+    onShowSecondaryTick,
+    onOptimisticPositioned,
+    onOptimisticUnpositioned,
+    isAlreadyPositionedInSelectedShot,
+    isAlreadyAssociatedWithoutPosition,
+    contentRef,
+    handleApplySettings,
+    handleNavigateToShotFromSelector,
+    handleAddVariantAsNewGenerationToShot,
+    handleReplaceInShot,
+    isDeleting,
+    handleDelete,
+  });
 
   return (
     <TooltipProvider delayDuration={500}>
@@ -3295,1182 +2294,25 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 hasNext={hasNext}
               />
             ) : shouldShowSidePanelWithTrim ? (
-              // Tablet/Desktop layout with side panel (task details, inpaint, magic edit, or video trim)
-              <div
-                className="w-full h-full flex bg-black/90"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Close if clicking directly on the background (not on children)
-                  if (e.target === e.currentTarget) {
-                    onClose();
-                  }
-                }}
-              >
-                {/* Media section - Left side (60% width) */}
-                <div
-                  className="flex-1 flex items-center justify-center relative"
-                  style={{ width: '60%' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Close if clicking directly on the background (not on children)
-                    if (e.target === e.currentTarget) {
-                      onClose();
-                    }
-                  }}
-                >
-                  {/* Navigation Arrows */}
-                  <NavigationArrows
-                    showNavigation={showNavigation}
-                    readOnly={readOnly}
-                    onPrevious={handleSlotNavPrev}
-                    onNext={handleSlotNavNext}
-                    hasPrevious={hasPrevious}
-                    hasNext={hasNext}
-                    variant="desktop"
-                  />
-
-                  {/* Media Content */}
-                  {isVideo && isVideoEditModeActive ? (
-                    <VideoEditModeDisplay
-                      videoRef={videoEditing.videoRef}
-                      videoUrl={effectiveVideoUrl}
-                      posterUrl={activeVariant?.thumbnail_url || media.thumbUrl}
-                      videoDuration={trimState.videoDuration}
-                      onLoadedMetadata={setVideoDuration}
-                      selections={videoEditing.selections}
-                      activeSelectionId={videoEditing.activeSelectionId}
-                      onSelectionChange={videoEditing.handleUpdateSelection}
-                      onSelectionClick={videoEditing.setActiveSelectionId}
-                      onRemoveSelection={videoEditing.handleRemoveSelection}
-                      onAddSelection={videoEditing.handleAddSelection}
-                    />
-                  ) : isVideo && isVideoTrimModeActive ? (
-                    <VideoTrimModeDisplay
-                      videoRef={trimVideoRef}
-                      videoUrl={effectiveVideoUrl}
-                      posterUrl={activeVariant?.thumbnail_url || media.thumbUrl}
-                      trimState={trimState}
-                      onLoadedMetadata={setVideoDuration}
-                      onTimeUpdate={setTrimCurrentTime}
-                    />
-                  ) : (
-                    <MediaDisplayWithCanvas
-                      effectiveImageUrl={isVideo ? effectiveVideoUrl : effectiveMediaUrl}
-                      thumbUrl={activeVariant?.thumbnail_url || media.thumbUrl}
-                      isVideo={isVideo}
-                      isFlippedHorizontally={isFlippedHorizontally}
-                      isSaving={isSaving}
-                      isInpaintMode={isInpaintMode}
-                      editMode={editMode}
-                      repositionTransformStyle={editMode === 'reposition' ? getTransformStyle() : undefined}
-                      repositionDragHandlers={editMode === 'reposition' ? repositionDragHandlers : undefined}
-                      isRepositionDragging={isRepositionDragging}
-                      imageContainerRef={imageContainerRef}
-                      canvasRef={canvasRef}
-                      maskCanvasRef={maskCanvasRef}
-                      onImageLoad={setImageDimensions}
-                      onVideoLoadedMetadata={(e) => {
-                        const video = e.currentTarget;
-                        if (Number.isFinite(video.duration) && video.duration > 0) {
-                          setVideoDuration(video.duration);
-                        }
-                      }}
-                      onContainerClick={onClose}
-                      variant="desktop-side-panel"
-                      containerClassName="max-w-full max-h-full"
-                      tasksPaneWidth={effectiveTasksPaneOpen && !isMobile ? effectiveTasksPaneWidth : 0}
-                      debugContext="Desktop"
-                      // Konva-based stroke overlay props
-                      imageDimensions={effectiveImageDimensions}
-                      brushStrokes={brushStrokes}
-                      currentStroke={currentStroke}
-                      isDrawing={isDrawing}
-                      isEraseMode={isEraseMode}
-                      brushSize={brushSize}
-                      annotationMode={editMode === 'annotate' ? annotationMode : null}
-                      selectedShapeId={selectedShapeId}
-                      onStrokePointerDown={handleKonvaPointerDown}
-                      onStrokePointerMove={handleKonvaPointerMove}
-                      onStrokePointerUp={handleKonvaPointerUp}
-                      onShapeClick={handleShapeClick}
-                      strokeOverlayRef={strokeOverlayRef}
-                    />
-                  )}
-
-                  {/* Delete button and mode toggle for selected annotation */}
-                  {selectedShapeId && isAnnotateMode && (() => {
-                    const buttonPos = getDeleteButtonPosition();
-                    if (!buttonPos) return null;
-                    
-                    // Get selected shape info
-                    const selectedShape = brushStrokes.find(s => s.id === selectedShapeId);
-                    const isFreeForm = selectedShape?.isFreeForm || false;
-                    
-                    return (
-                      <div className="fixed z-[100] flex gap-2" style={{
-                        left: `${buttonPos.x}px`,
-                        top: `${buttonPos.y}px`,
-                        transform: 'translate(-50%, -50%)'
-                      }}>
-                        {/* Mode toggle button */}
-                        <button
-                          onClick={handleToggleFreeForm}
-                          className={cn(
-                            "rounded-full p-2 shadow-lg transition-colors",
-                            isFreeForm 
-                              ? "bg-purple-600 hover:bg-purple-700 text-white" 
-                              : "bg-gray-700 hover:bg-gray-600 text-white"
-                          )}
-                          title={isFreeForm 
-                            ? "Switch to rectangle mode (edges move linearly)" 
-                            : "Switch to free-form mode (rhombus/non-orthogonal angles)"}
-                        >
-                          {isFreeForm ? <Diamond className="h-4 w-4" /> : <Square className="h-4 w-4" />}
-                        </button>
-                        
-                        {/* Delete button */}
-                        <button
-                          onClick={handleDeleteSelected}
-                          className="bg-red-600 hover:bg-red-700 text-white rounded-full p-2 shadow-lg transition-colors"
-                          title="Delete annotation (or press DELETE key)"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    );
-                  })()}
-
-                    {/* Top Center - Main Variant Badge/Button */}
-                    {!readOnly && activeVariant && variants && (
-                      <div
-                        className="absolute top-8 md:top-16 left-1/2 transform -translate-x-1/2 z-[60] select-none"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex items-center gap-2">
-                          {/* Main variant badge - only show when multiple variants exist */}
-                          {variants.length > 1 && activeVariant.is_primary && (
-                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-500/90 text-white text-sm font-medium shadow-lg">
-                              <Check className="w-4 h-4" />
-                              <span>Main variant</span>
-                            </div>
-                          )}
-                          {/* Make main button - only show for non-primary variants */}
-                          {!activeVariant.is_primary && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleMakeMainVariant}
-                              disabled={isMakingMainVariant || !canMakeMainVariant}
-                              className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
-                            >
-                              {isMakingMainVariant ? (
-                                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                              ) : (
-                                <Star className="w-4 h-4 mr-1.5" />
-                              )}
-                              Make main
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Top Left - New image button */}
-                    {!isVideo && !readOnly && (
-                      <div
-                        className="absolute top-4 left-4 z-[70] select-none"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handlePromoteToGeneration(activeVariant?.id || primaryVariant?.id || '')}
-                          disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId || !(activeVariant?.id || primaryVariant?.id)}
-                          className={cn(
-                            "bg-black/50 hover:bg-black/70 text-white",
-                            promoteSuccess && "bg-green-500/90 hover:bg-green-500/90"
-                          )}
-                          title="Create a standalone image from this variant"
-                        >
-                          {promoteVariantMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                          ) : promoteSuccess ? (
-                            <Check className="w-4 h-4 mr-1.5" />
-                          ) : (
-                            <Plus className="w-4 h-4 mr-1.5" />
-                          )}
-                          {promoteSuccess ? 'Created' : 'New image'}
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Floating Tool Controls - Tablet (landscape with sidebar) */}
-                    {isSpecialEditMode && shouldShowSidePanel && (
-                      <FloatingToolControls
-                        variant="tablet"
-                        editMode={editMode}
-                        onSetEditMode={setEditMode}
-                        brushSize={brushSize}
-                        isEraseMode={isEraseMode}
-                        onSetBrushSize={setBrushSize}
-                        onSetIsEraseMode={setIsEraseMode}
-                        annotationMode={editMode === 'annotate' ? annotationMode : null}
-                        onSetAnnotationMode={setAnnotationMode}
-                        repositionTransform={repositionTransform}
-                        onRepositionTranslateXChange={setTranslateX}
-                        onRepositionTranslateYChange={setTranslateY}
-                        onRepositionScaleChange={setScale}
-                        onRepositionRotationChange={setRotation}
-                        onRepositionFlipH={toggleFlipH}
-                        onRepositionFlipV={toggleFlipV}
-                        onRepositionReset={resetTransform}
-                        imageDimensions={effectiveImageDimensions}
-                        brushStrokes={brushStrokes}
-                        onUndo={handleUndo}
-                        onClearMask={handleClearMask}
-                        panelPosition={inpaintPanelPosition}
-                        onSetPanelPosition={setInpaintPanelPosition}
-                      />
-                    )}
-
-                    {/* Bottom Left Controls - Edit & Upscale */}
-                    <BottomLeftControls {...buttonGroupProps.bottomLeft} />
-
-                    {/* Bottom Right Controls - Star & Add to References */}
-                    <BottomRightControls {...buttonGroupProps.bottomRight} />
-
-                    {/* Top Right Controls - Download, Delete & Close */}
-                    <TopRightControls {...buttonGroupProps.topRight} />
-
-                    {/* Bottom Workflow Controls (hidden in special edit modes) */}
-                    <WorkflowControlsBar
-                      onAddToShot={onAddToShot}
-                      onDelete={onDelete}
-                      onApplySettings={onApplySettings}
-                      isSpecialEditMode={isSpecialEditMode}
-                      isVideo={isVideo}
-                      mediaId={actualGenerationId}
-                      imageUrl={effectiveMediaUrl}
-                      thumbUrl={media.thumbUrl}
-                      allShots={allShots}
-                      selectedShotId={selectedShotId}
-                      onShotChange={onShotChange}
-                      onCreateShot={onCreateShot}
-                      isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
-                      isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
-                      showTickForImageId={showTickForImageId}
-                      showTickForSecondaryImageId={showTickForSecondaryImageId}
-                      onAddToShotWithoutPosition={onAddToShotWithoutPosition}
-                      onShowTick={onShowTick}
-                      onShowSecondaryTick={onShowSecondaryTick}
-                      onOptimisticPositioned={onOptimisticPositioned}
-                      onOptimisticUnpositioned={onOptimisticUnpositioned}
-                      contentRef={contentRef}
-                      handleApplySettings={handleApplySettings}
-                      onNavigateToShot={handleNavigateToShotFromSelector}
-                      onClose={onClose}
-                      onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
-                      activeVariantId={activeVariant?.id || primaryVariant?.id}
-                      currentTimelineFrame={media.timeline_frame}
-                    />
-                  </div>
-
-                {/* Task Details / Inpaint / Magic Edit / Video Trim Panel - Right side (40% width) */}
-                <div 
-                  data-task-details-panel
-                  className={cn(
-                    "bg-background border-l border-border h-full overflow-hidden relative z-[60]"
-                    // h-full constrains height so TaskDetailsPanel's footer stays visible
-                    // overflow-hidden lets child components handle their own scrolling
-                  )}
-                  style={{ width: '40%' }}
-                >
-                  <ControlsPanel
-                    variant="desktop"
-                    isInVideoEditMode={isInVideoEditMode}
-                    isSpecialEditMode={isSpecialEditMode}
-                    // VideoEditPanel props
-                    videoEditSubMode={videoEditSubMode}
-                    onEnterTrimMode={handleEnterVideoTrimMode}
-                    onEnterReplaceMode={handleEnterVideoReplaceMode}
-                    onEnterRegenerateMode={handleEnterVideoRegenerateMode}
-                    onExitVideoEditMode={handleExitVideoEditMode}
-                    trimState={trimState}
-                    onStartTrimChange={setStartTrim}
-                    onEndTrimChange={setEndTrim}
-                    onResetTrim={resetTrim}
-                    trimmedDuration={trimmedDuration}
-                    hasTrimChanges={hasTrimChanges}
-                    onSaveTrim={saveTrimmedVideo}
-                    isSavingTrim={isSavingTrim}
-                    trimSaveProgress={trimSaveProgress}
-                    trimSaveError={trimSaveError}
-                    trimSaveSuccess={trimSaveSuccess}
-                    videoUrl={effectiveVideoUrl}
-                    trimCurrentTime={trimCurrentTime}
-                    trimVideoRef={trimVideoRef}
-                    videoEditing={videoEditing}
-                    projectId={selectedProjectId}
-                    regenerateForm={regenerateForm}
-                    // EditModePanel props
-                    sourceGenerationData={sourceGenerationData}
-                    onOpenExternalGeneration={onOpenExternalGeneration}
-                    allShots={allShots}
-                    isCurrentMediaPositioned={isAlreadyPositionedInSelectedShot}
-                    onReplaceInShot={handleReplaceInShot}
-                    sourcePrimaryVariant={sourcePrimaryVariant}
-                    onMakeMainVariant={handleMakeMainVariant}
-                    canMakeMainVariant={canMakeMainVariant}
-                    editMode={editMode}
-                    setEditMode={setEditMode}
-                    setIsInpaintMode={setIsInpaintMode}
-                    inpaintPrompt={inpaintPrompt}
-                    setInpaintPrompt={setInpaintPrompt}
-                    inpaintNumGenerations={inpaintNumGenerations}
-                    setInpaintNumGenerations={setInpaintNumGenerations}
-                    loraMode={loraMode}
-                    setLoraMode={setLoraMode}
-                    customLoraUrl={customLoraUrl}
-                    setCustomLoraUrl={setCustomLoraUrl}
-                    isGeneratingInpaint={isGeneratingInpaint}
-                    inpaintGenerateSuccess={inpaintGenerateSuccess}
-                    isCreatingMagicEditTasks={isCreatingMagicEditTasks}
-                    magicEditTasksCreated={magicEditTasksCreated}
-                    brushStrokes={brushStrokes}
-                    handleExitMagicEditMode={handleExitMagicEditMode}
-                    handleUnifiedGenerate={handleUnifiedGenerate}
-                    handleGenerateAnnotatedEdit={handleGenerateAnnotatedEdit}
-                    handleGenerateReposition={handleGenerateReposition}
-                    isGeneratingReposition={isGeneratingReposition}
-                    repositionGenerateSuccess={repositionGenerateSuccess}
-                    hasTransformChanges={hasTransformChanges}
-                    handleSaveAsVariant={handleSaveAsVariant}
-                    isSavingAsVariant={isSavingAsVariant}
-                    saveAsVariantSuccess={saveAsVariantSuccess}
-                    createAsGeneration={createAsGeneration}
-                    onCreateAsGenerationChange={setCreateAsGeneration}
-                    // Img2Img props
-                    img2imgPrompt={img2imgPrompt}
-                    setImg2imgPrompt={setImg2imgPrompt}
-                    img2imgStrength={img2imgStrength}
-                    setImg2imgStrength={setImg2imgStrength}
-                    enablePromptExpansion={enablePromptExpansion}
-                    setEnablePromptExpansion={setEnablePromptExpansion}
-                    isGeneratingImg2Img={isGeneratingImg2Img}
-                    img2imgGenerateSuccess={img2imgGenerateSuccess}
-                    handleGenerateImg2Img={handleGenerateImg2Img}
-                    img2imgLoraManager={img2imgLoraManager}
-                    availableLoras={availableLoras}
-                    editLoraManager={editLoraManager}
-                    // Advanced settings for two-pass generation
-                    advancedSettings={advancedSettings}
-                    setAdvancedSettings={setAdvancedSettings}
-                    isLocalGeneration={isLocalGeneration}
-                    // Model selection for cloud mode
-                    qwenEditModel={qwenEditModel}
-                    setQwenEditModel={setQwenEditModel}
-                    // InfoPanel props
-                    isVideo={isVideo}
-                    showImageEditTools={showImageEditTools}
-                    readOnly={readOnly}
-                    isInpaintMode={isInpaintMode}
-                    onExitInpaintMode={handleExitInpaintMode}
-                    onEnterInpaintMode={() => {
-                      setIsInpaintMode(true);
-                      setEditMode('inpaint');
-                    }}
-                    onEnterVideoEditMode={handleEnterVideoEditMode}
-                    onClose={onClose}
-                    taskDetailsData={adjustedTaskDetailsData}
-                    generationName={generationName}
-                    onGenerationNameChange={handleGenerationNameChange}
-                    isEditingGenerationName={isEditingGenerationName}
-                    onEditingGenerationNameChange={setIsEditingGenerationName}
-                    derivedItems={derivedItems}
-                    replaceImages={replaceImages}
-                    onReplaceImagesChange={setReplaceImages}
-                    onSwitchToPrimary={primaryVariant ? () => setActiveVariantId(primaryVariant.id) : undefined}
-                    variantsSectionRef={variantsSectionRef}
-                    // Shared props
-                    currentMediaId={media.id}
-                    currentShotId={selectedShotId || shotId}
-                    derivedGenerations={derivedGenerations}
-                    paginatedDerived={paginatedDerived}
-                    derivedPage={derivedPage}
-                    derivedTotalPages={derivedTotalPages}
-                    onSetDerivedPage={setDerivedPage}
-                    variants={variants}
-                    activeVariant={activeVariant}
-                    primaryVariant={primaryVariant}
-                    onVariantSelect={setActiveVariantId}
-                    onMakePrimary={setPrimaryVariant}
-                    isLoadingVariants={isLoadingVariants}
-                    onPromoteToGeneration={handlePromoteToGeneration}
-                    isPromoting={promoteVariantMutation.isPending}
-                    onDeleteVariant={deleteVariant}
-                    onLoadVariantSettings={setVariantParamsToLoad}
-                  />
-                </div>
-              </div>
+              // Tablet/Desktop layout with side panel
+              <DesktopSidePanelLayout {...sidePanelLayoutProps} />
             ) : (showTaskDetails || isSpecialEditMode || isVideoTrimModeActive || isVideoEditModeActive || (isSegmentSlotMode && hasSegmentVideo)) && isMobile ? (
-              // Mobile layout with task details, special edit modes, video edit modes, or segment slot mode - stacked
-              <div className="w-full h-full flex flex-col bg-black/90">
-                {/* Media section - Top (50% height) with swipe navigation */}
-                <div
-                  className="flex-none flex items-center justify-center relative touch-pan-y z-10"
-                  style={{
-                    height: '50%',
-                    transform: swipeNavigation.isSwiping ? `translateX(${swipeNavigation.swipeOffset}px)` : undefined,
-                    transition: swipeNavigation.isSwiping ? 'none' : 'transform 0.2s ease-out',
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Close if clicking directly on the background (not on children)
-                    if (e.target === e.currentTarget) {
-                      onClose();
-                    }
-                  }}
-                  {...swipeNavigation.swipeHandlers}
-                >
-                  {/* Media Content - same as above but adapted for mobile */}
-                    {isVideo ? (
-                      isVideoEditModeActive ? (
-                        <VideoEditModeDisplay
-                          videoRef={videoEditing.videoRef}
-                          videoUrl={effectiveVideoUrl}
-                          posterUrl={activeVariant?.thumbnail_url || media.thumbUrl}
-                          videoDuration={trimState.videoDuration}
-                          onLoadedMetadata={setVideoDuration}
-                          selections={videoEditing.selections}
-                          activeSelectionId={videoEditing.activeSelectionId}
-                          onSelectionChange={videoEditing.handleUpdateSelection}
-                          onSelectionClick={videoEditing.setActiveSelectionId}
-                          onRemoveSelection={videoEditing.handleRemoveSelection}
-                          onAddSelection={videoEditing.handleAddSelection}
-                        />
-                      ) : isVideoTrimModeActive ? (
-                        <VideoTrimModeDisplay
-                          videoRef={trimVideoRef}
-                          videoUrl={effectiveVideoUrl}
-                          posterUrl={activeVariant?.thumbnail_url || media.thumbUrl}
-                          trimState={trimState}
-                          onLoadedMetadata={setVideoDuration}
-                          onTimeUpdate={setTrimCurrentTime}
-                        />
-                      ) : (
-                        <StyledVideoPlayer
-                          src={effectiveVideoUrl}
-                          poster={activeVariant?.thumbnail_url || media.thumbUrl}
-                          loop
-                          muted
-                          autoPlay
-                          playsInline
-                          preload="auto"
-                          className="max-w-full max-h-full shadow-wes border border-border/20"
-                          onLoadedMetadata={(e) => {
-                            const video = e.currentTarget;
-                            if (Number.isFinite(video.duration) && video.duration > 0) {
-                              setVideoDuration(video.duration);
-                            }
-                          }}
-                        />
-                      )
-                    ) : (
-                    <MediaDisplayWithCanvas
-                      effectiveImageUrl={effectiveMediaUrl}
-                      thumbUrl={activeVariant?.thumbnail_url || media.thumbUrl}
-                      isVideo={false}
-                      isFlippedHorizontally={isFlippedHorizontally}
-                      isSaving={isSaving}
-                      isInpaintMode={isInpaintMode}
-                      editMode={editMode}
-                      repositionTransformStyle={editMode === 'reposition' ? getTransformStyle() : undefined}
-                      repositionDragHandlers={editMode === 'reposition' ? repositionDragHandlers : undefined}
-                      isRepositionDragging={isRepositionDragging}
-                      imageContainerRef={imageContainerRef}
-                      canvasRef={canvasRef}
-                      maskCanvasRef={maskCanvasRef}
-                      onImageLoad={setImageDimensions}
-                      onContainerClick={onClose}
-                      variant="mobile-stacked"
-                      containerClassName="w-full h-full"
-                      debugContext="Mobile Stacked"
-                      // Konva-based stroke overlay props
-                      imageDimensions={effectiveImageDimensions}
-                      brushStrokes={brushStrokes}
-                      currentStroke={currentStroke}
-                      isDrawing={isDrawing}
-                      isEraseMode={isEraseMode}
-                      brushSize={brushSize}
-                      annotationMode={editMode === 'annotate' ? annotationMode : null}
-                      selectedShapeId={selectedShapeId}
-                      onStrokePointerDown={handleKonvaPointerDown}
-                      onStrokePointerMove={handleKonvaPointerMove}
-                      onStrokePointerUp={handleKonvaPointerUp}
-                      onShapeClick={handleShapeClick}
-                      strokeOverlayRef={strokeOverlayRef}
-                    />
-                    )}
-
-                    {/* Top Center - Main Variant Badge/Button (Mobile Stacked) */}
-                    {!readOnly && activeVariant && variants && (
-                      <div
-                        className="absolute top-8 md:top-16 left-1/2 transform -translate-x-1/2 z-[60] select-none"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <div className="flex items-center gap-2">
-                          {/* Main variant badge - only show when multiple variants exist */}
-                          {variants.length > 1 && activeVariant.is_primary && (
-                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-500/90 text-white text-sm font-medium shadow-lg">
-                              <Check className="w-4 h-4" />
-                              <span>Main variant</span>
-                            </div>
-                          )}
-                          {/* Make main button - only show for non-primary variants */}
-                          {!activeVariant.is_primary && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleMakeMainVariant}
-                              disabled={isMakingMainVariant || !canMakeMainVariant}
-                              className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
-                            >
-                              {isMakingMainVariant ? (
-                                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                              ) : (
-                                <Star className="w-4 h-4 mr-1.5" />
-                              )}
-                              Make main
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Top Left - New image button (Mobile Stacked) */}
-                    {!isVideo && !readOnly && (
-                      <div
-                        className="absolute top-4 left-4 z-[70] select-none"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => handlePromoteToGeneration(activeVariant?.id || primaryVariant?.id || '')}
-                          disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId || !(activeVariant?.id || primaryVariant?.id)}
-                          className={cn(
-                            "bg-black/50 hover:bg-black/70 text-white",
-                            promoteSuccess && "bg-green-500/90 hover:bg-green-500/90"
-                          )}
-                          title="Create a standalone image from this variant"
-                        >
-                          {promoteVariantMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                          ) : promoteSuccess ? (
-                            <Check className="w-4 h-4 mr-1.5" />
-                          ) : (
-                            <Plus className="w-4 h-4 mr-1.5" />
-                          )}
-                          {promoteSuccess ? 'Created' : 'New image'}
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Floating Tool Controls - Mobile (portrait, no sidebar) */}
-                    {isSpecialEditMode && (
-                      <FloatingToolControls
-                        variant="mobile"
-                        editMode={editMode}
-                        onSetEditMode={setEditMode}
-                        brushSize={brushSize}
-                        isEraseMode={isEraseMode}
-                        onSetBrushSize={setBrushSize}
-                        onSetIsEraseMode={setIsEraseMode}
-                        annotationMode={editMode === 'annotate' ? annotationMode : null}
-                        onSetAnnotationMode={setAnnotationMode}
-                        repositionTransform={repositionTransform}
-                        onRepositionTranslateXChange={setTranslateX}
-                        onRepositionTranslateYChange={setTranslateY}
-                        onRepositionScaleChange={setScale}
-                        onRepositionRotationChange={setRotation}
-                        onRepositionFlipH={toggleFlipH}
-                        onRepositionFlipV={toggleFlipV}
-                        onRepositionReset={resetTransform}
-                        imageDimensions={effectiveImageDimensions}
-                        brushStrokes={brushStrokes}
-                        onUndo={handleUndo}
-                        onClearMask={handleClearMask}
-                        panelPosition={inpaintPanelPosition}
-                        onSetPanelPosition={setInpaintPanelPosition}
-                      />
-                    )}
-
-                    {/* Mobile Stacked Layout - All button groups (matching desktop) */}
-                    {/* Top Right Controls - Download, Delete & Close */}
-                    <TopRightControls {...buttonGroupProps.topRight} />
-
-                    {/* Bottom Left Controls - Edit & Upscale */}
-                    <BottomLeftControls {...buttonGroupProps.bottomLeft} />
-
-                    {/* Bottom Right Controls - Star & Add to References */}
-                    <BottomRightControls {...buttonGroupProps.bottomRight} />
-
-                    {/* Bottom Workflow Controls (hidden in special edit modes) */}
-                    <WorkflowControlsBar
-                      onAddToShot={onAddToShot}
-                      onDelete={onDelete}
-                      onApplySettings={onApplySettings}
-                      isSpecialEditMode={isSpecialEditMode}
-                      isVideo={isVideo}
-                      mediaId={actualGenerationId}
-                      imageUrl={effectiveMediaUrl}
-                      thumbUrl={media.thumbUrl}
-                      allShots={allShots}
-                      selectedShotId={selectedShotId}
-                      onShotChange={onShotChange}
-                      onCreateShot={onCreateShot}
-                      isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
-                      isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
-                      showTickForImageId={showTickForImageId}
-                      showTickForSecondaryImageId={showTickForSecondaryImageId}
-                      onAddToShotWithoutPosition={onAddToShotWithoutPosition}
-                      onShowTick={onShowTick}
-                      onShowSecondaryTick={onShowSecondaryTick}
-                      onOptimisticPositioned={onOptimisticPositioned}
-                      onOptimisticUnpositioned={onOptimisticUnpositioned}
-                      contentRef={contentRef}
-                      handleApplySettings={handleApplySettings}
-                      onNavigateToShot={handleNavigateToShotFromSelector}
-                      onClose={onClose}
-                      onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
-                      activeVariantId={activeVariant?.id || primaryVariant?.id}
-                      currentTimelineFrame={media.timeline_frame}
-                    />
-
-                    {/* Navigation Arrows */}
-                    <NavigationArrows
-                      showNavigation={showNavigation}
-                      readOnly={readOnly}
-                      onPrevious={handleSlotNavPrev}
-                      onNext={handleSlotNavNext}
-                      hasPrevious={hasPrevious}
-                      hasNext={hasNext}
-                      variant="mobile"
-                    />
-                </div>
-
-                {/* Task Details / Inpaint / Magic Edit Panel - Bottom (50% height) */}
-                <div 
-                  data-task-details-panel
-                  className={cn(
-                    "bg-background border-t border-border overflow-y-auto relative z-[60]"
-                    // Removed flex centering to prevent top clipping with long content
-                  )}
-                  style={{ height: '50%' }}
-                >
-                  <ControlsPanel
-                    variant="mobile"
-                    isInVideoEditMode={isInVideoEditMode}
-                    isSpecialEditMode={isSpecialEditMode}
-                    // VideoEditPanel props
-                    videoEditSubMode={videoEditSubMode}
-                    onEnterTrimMode={handleEnterVideoTrimMode}
-                    onEnterReplaceMode={handleEnterVideoReplaceMode}
-                    onEnterRegenerateMode={handleEnterVideoRegenerateMode}
-                    onExitVideoEditMode={handleExitVideoEditMode}
-                    trimState={trimState}
-                    onStartTrimChange={setStartTrim}
-                    onEndTrimChange={setEndTrim}
-                    onResetTrim={resetTrim}
-                    trimmedDuration={trimmedDuration}
-                    hasTrimChanges={hasTrimChanges}
-                    onSaveTrim={saveTrimmedVideo}
-                    isSavingTrim={isSavingTrim}
-                    trimSaveProgress={trimSaveProgress}
-                    trimSaveError={trimSaveError}
-                    trimSaveSuccess={trimSaveSuccess}
-                    videoUrl={effectiveVideoUrl}
-                    trimCurrentTime={trimCurrentTime}
-                    trimVideoRef={trimVideoRef}
-                    videoEditing={videoEditing}
-                    projectId={selectedProjectId}
-                    regenerateForm={regenerateForm}
-                    // EditModePanel props
-                    sourceGenerationData={sourceGenerationData}
-                    onOpenExternalGeneration={onOpenExternalGeneration}
-                    allShots={allShots}
-                    isCurrentMediaPositioned={isAlreadyPositionedInSelectedShot}
-                    onReplaceInShot={handleReplaceInShot}
-                    sourcePrimaryVariant={sourcePrimaryVariant}
-                    onMakeMainVariant={handleMakeMainVariant}
-                    canMakeMainVariant={canMakeMainVariant}
-                    editMode={editMode}
-                    setEditMode={setEditMode}
-                    setIsInpaintMode={setIsInpaintMode}
-                    inpaintPrompt={inpaintPrompt}
-                    setInpaintPrompt={setInpaintPrompt}
-                    inpaintNumGenerations={inpaintNumGenerations}
-                    setInpaintNumGenerations={setInpaintNumGenerations}
-                    loraMode={loraMode}
-                    setLoraMode={setLoraMode}
-                    customLoraUrl={customLoraUrl}
-                    setCustomLoraUrl={setCustomLoraUrl}
-                    isGeneratingInpaint={isGeneratingInpaint}
-                    inpaintGenerateSuccess={inpaintGenerateSuccess}
-                    isCreatingMagicEditTasks={isCreatingMagicEditTasks}
-                    magicEditTasksCreated={magicEditTasksCreated}
-                    brushStrokes={brushStrokes}
-                    handleExitMagicEditMode={handleExitMagicEditMode}
-                    handleUnifiedGenerate={handleUnifiedGenerate}
-                    handleGenerateAnnotatedEdit={handleGenerateAnnotatedEdit}
-                    handleGenerateReposition={handleGenerateReposition}
-                    isGeneratingReposition={isGeneratingReposition}
-                    repositionGenerateSuccess={repositionGenerateSuccess}
-                    hasTransformChanges={hasTransformChanges}
-                    handleSaveAsVariant={handleSaveAsVariant}
-                    isSavingAsVariant={isSavingAsVariant}
-                    saveAsVariantSuccess={saveAsVariantSuccess}
-                    createAsGeneration={createAsGeneration}
-                    onCreateAsGenerationChange={setCreateAsGeneration}
-                    // Img2Img props
-                    img2imgPrompt={img2imgPrompt}
-                    setImg2imgPrompt={setImg2imgPrompt}
-                    img2imgStrength={img2imgStrength}
-                    setImg2imgStrength={setImg2imgStrength}
-                    enablePromptExpansion={enablePromptExpansion}
-                    setEnablePromptExpansion={setEnablePromptExpansion}
-                    isGeneratingImg2Img={isGeneratingImg2Img}
-                    img2imgGenerateSuccess={img2imgGenerateSuccess}
-                    handleGenerateImg2Img={handleGenerateImg2Img}
-                    img2imgLoraManager={img2imgLoraManager}
-                    availableLoras={availableLoras}
-                    editLoraManager={editLoraManager}
-                    // Advanced settings for two-pass generation
-                    advancedSettings={advancedSettings}
-                    setAdvancedSettings={setAdvancedSettings}
-                    isLocalGeneration={isLocalGeneration}
-                    // Model selection for cloud mode
-                    qwenEditModel={qwenEditModel}
-                    setQwenEditModel={setQwenEditModel}
-                    // InfoPanel props
-                    isVideo={isVideo}
-                    showImageEditTools={showImageEditTools}
-                    readOnly={readOnly}
-                    isInpaintMode={isInpaintMode}
-                    onExitInpaintMode={handleExitInpaintMode}
-                    onEnterInpaintMode={() => {
-                      setIsInpaintMode(true);
-                      setEditMode('inpaint');
-                    }}
-                    onEnterVideoEditMode={handleEnterVideoEditMode}
-                    onClose={onClose}
-                    taskDetailsData={adjustedTaskDetailsData}
-                    generationName={generationName}
-                    onGenerationNameChange={handleGenerationNameChange}
-                    isEditingGenerationName={isEditingGenerationName}
-                    onEditingGenerationNameChange={setIsEditingGenerationName}
-                    derivedItems={derivedItems}
-                    replaceImages={replaceImages}
-                    onReplaceImagesChange={setReplaceImages}
-                    onSwitchToPrimary={primaryVariant ? () => setActiveVariantId(primaryVariant.id) : undefined}
-                    variantsSectionRef={variantsSectionRef}
-                    // Shared props
-                    currentMediaId={media.id}
-                    currentShotId={selectedShotId || shotId}
-                    derivedGenerations={derivedGenerations}
-                    paginatedDerived={paginatedDerived}
-                    derivedPage={derivedPage}
-                    derivedTotalPages={derivedTotalPages}
-                    onSetDerivedPage={setDerivedPage}
-                    variants={variants}
-                    activeVariant={activeVariant}
-                    primaryVariant={primaryVariant}
-                    onVariantSelect={setActiveVariantId}
-                    onMakePrimary={setPrimaryVariant}
-                    isLoadingVariants={isLoadingVariants}
-                    onPromoteToGeneration={handlePromoteToGeneration}
-                    isPromoting={promoteVariantMutation.isPending}
-                    onDeleteVariant={deleteVariant}
-                    onLoadVariantSettings={setVariantParamsToLoad}
-                  />
-                </div>
-              </div>
+              // Mobile layout with stacked panels
+              <MobileStackedLayout {...sidePanelLayoutProps} />
             ) : (
-              // Mobile/Tablet layout using new FlexContainer + MediaWrapper
-              <FlexContainer
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Don't close in edit modes to prevent accidental data loss
-                  if (isInpaintMode) {
-                    return;
-                  }
-                  // Close if clicking directly on the container background (not children)
-                  if (e.target === e.currentTarget) {
-                    onClose();
-                  }
-                }}
-              >
-                {/* Close Button - REMOVED */}
-
-                {/* Media Container with Controls - includes swipe navigation */}
-                <MediaWrapper
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Don't close in edit modes
-                    if (isInpaintMode) return;
-                    // Close if clicking directly on the wrapper background (not the video/image)
-                    if (e.target === e.currentTarget) {
-                      onClose();
-                    }
-                  }}
-                  className={cn(
-                    isMobile && isInpaintMode && "pointer-events-auto",
-                    "touch-pan-y" // Allow vertical scrolling, capture horizontal
-                  )}
-                  {...swipeNavigation.swipeHandlers}
-                  style={{
-                    transform: swipeNavigation.isSwiping ? `translateX(${swipeNavigation.swipeOffset}px)` : undefined,
-                    transition: swipeNavigation.isSwiping ? 'none' : 'transform 0.2s ease-out',
-                  }}
-                >
-                  {/* Based On display removed from overlay - now shows in sidebar above task details */}
-                  
-                  {/* Media Display - The wrapper now handles centering */}
-                {isVideo ? (
-                  isVideoEditModeActive ? (
-                    <VideoEditModeDisplay
-                      videoRef={videoEditing.videoRef}
-                      videoUrl={effectiveVideoUrl}
-                      posterUrl={activeVariant?.thumbnail_url || media.thumbUrl}
-                      videoDuration={trimState.videoDuration}
-                      onLoadedMetadata={setVideoDuration}
-                      selections={videoEditing.selections}
-                      activeSelectionId={videoEditing.activeSelectionId}
-                      onSelectionChange={videoEditing.handleUpdateSelection}
-                      onSelectionClick={videoEditing.setActiveSelectionId}
-                      onRemoveSelection={videoEditing.handleRemoveSelection}
-                      onAddSelection={videoEditing.handleAddSelection}
-                    />
-                  ) : isVideoTrimModeActive ? (
-                    <VideoTrimModeDisplay
-                      videoRef={trimVideoRef}
-                      videoUrl={effectiveVideoUrl}
-                      posterUrl={activeVariant?.thumbnail_url || media.thumbUrl}
-                      trimState={trimState}
-                      onLoadedMetadata={setVideoDuration}
-                      onTimeUpdate={setTrimCurrentTime}
-                    />
-                  ) : (
-                    // Normal video display with StyledVideoPlayer
-                    <StyledVideoPlayer
-                      src={effectiveVideoUrl}
-                      poster={activeVariant?.thumbnail_url || media.thumbUrl}
-                      loop
-                      muted
-                      autoPlay
-                      playsInline
-                      preload="auto"
-                      className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
-                      onLoadedMetadata={(e) => {
-                        const video = e.currentTarget;
-                        if (Number.isFinite(video.duration) && video.duration > 0) {
-                          setVideoDuration(video.duration);
-                        }
-                      }}
-                    />
-                  )
-                ) : (
-                  <MediaDisplayWithCanvas
-                    effectiveImageUrl={effectiveMediaUrl}
-                    thumbUrl={activeVariant?.thumbnail_url || media.thumbUrl}
-                    isVideo={false}
-                    isFlippedHorizontally={isFlippedHorizontally}
-                    isSaving={isSaving}
-                    isInpaintMode={isInpaintMode}
-                    editMode={editMode}
-                    repositionTransformStyle={editMode === 'reposition' ? getTransformStyle() : undefined}
-                    repositionDragHandlers={editMode === 'reposition' ? repositionDragHandlers : undefined}
-                    isRepositionDragging={isRepositionDragging}
-                    imageContainerRef={imageContainerRef}
-                    canvasRef={canvasRef}
-                    maskCanvasRef={maskCanvasRef}
-                    onImageLoad={setImageDimensions}
-                    onContainerClick={onClose}
-                    variant="regular-centered"
-                    containerClassName="w-full h-full"
-                    debugContext="Regular Centered"
-                    // Konva-based stroke overlay props
-                    imageDimensions={effectiveImageDimensions}
-                    brushStrokes={brushStrokes}
-                    currentStroke={currentStroke}
-                    isDrawing={isDrawing}
-                    isEraseMode={isEraseMode}
-                    brushSize={brushSize}
-                    annotationMode={editMode === 'annotate' ? annotationMode : null}
-                    selectedShapeId={selectedShapeId}
-                    onStrokePointerDown={handleKonvaPointerDown}
-                    onStrokePointerMove={handleKonvaPointerMove}
-                    onStrokePointerUp={handleKonvaPointerUp}
-                    onShapeClick={handleShapeClick}
-                    strokeOverlayRef={strokeOverlayRef}
-                  />
-                )}
-
-                  {/* Top Center - Main Variant Badge/Button */}
-                  {!readOnly && activeVariant && variants && (
-                    <div
-                      className="absolute top-8 md:top-16 left-1/2 transform -translate-x-1/2 z-[60] select-none"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center gap-2">
-                        {/* Main variant badge - only show when multiple variants exist */}
-                        {variants.length > 1 && activeVariant.is_primary && (
-                          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-green-500/90 text-white text-sm font-medium shadow-lg">
-                            <Check className="w-4 h-4" />
-                            <span>Main variant</span>
-                          </div>
-                        )}
-                        {/* Make main button - only show for non-primary variants */}
-                        {!activeVariant.is_primary && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={handleMakeMainVariant}
-                            disabled={isMakingMainVariant || !canMakeMainVariant}
-                            className="bg-orange-500/90 hover:bg-orange-600 text-white border-none shadow-lg"
-                          >
-                            {isMakingMainVariant ? (
-                              <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                            ) : (
-                              <Star className="w-4 h-4 mr-1.5" />
-                            )}
-                            Make main
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Top Left - New image button */}
-                  {!isVideo && !readOnly && (
-                    <div
-                      className="absolute top-4 left-4 z-[70] select-none"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handlePromoteToGeneration(activeVariant?.id || primaryVariant?.id || '')}
-                        disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId || !(activeVariant?.id || primaryVariant?.id)}
-                        className={cn(
-                          "bg-black/50 hover:bg-black/70 text-white",
-                          promoteSuccess && "bg-green-500/90 hover:bg-green-500/90"
-                        )}
-                        title="Create a standalone image from this variant"
-                      >
-                        {promoteVariantMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                        ) : promoteSuccess ? (
-                          <Check className="w-4 h-4 mr-1.5" />
-                        ) : (
-                          <Plus className="w-4 h-4 mr-1.5" />
-                        )}
-                        {promoteSuccess ? 'Created' : 'New image'}
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Bottom Left Controls - Mode Entry Buttons */}
-                  {!readOnly && (
-                    <div
-                      className="absolute bottom-4 left-4 z-[70] select-none"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {/* Compact Edit Controls - for special edit mode */}
-                      {isSpecialEditMode && editMode !== 'text' && (
-                        <div className="mb-2 bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 w-40 border border-border shadow-xl">
-                          {/* Brush Size Slider - Only in Inpaint mode */}
-                          {editMode === 'inpaint' && (
-                            <div className="space-y-0.5">
-                              <div className="flex items-center justify-between">
-                                <label className="text-xs font-medium text-foreground">Size:</label>
-                                <span className="text-xs text-muted-foreground">{brushSize}px</span>
-                              </div>
-                              <input
-                                type="range"
-                                min={5}
-                                max={100}
-                                value={brushSize}
-                                onChange={(e) => setBrushSize(parseInt(e.target.value))}
-                                className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
-                              />
-                            </div>
-                          )}
-                          
-                          {/* Paint/Erase or Circle/Arrow Toggle */}
-                          {editMode === 'inpaint' && (
-                            // Inpaint mode: Paint/Erase
-                            <Button
-                              variant={isEraseMode ? "default" : "secondary"}
-                              size="sm"
-                              onClick={() => setIsEraseMode(!isEraseMode)}
-                              className={cn(
-                                "w-full text-xs h-7",
-                                isEraseMode && "bg-purple-600 hover:bg-purple-700"
-                              )}
-                            >
-                              <Eraser className="h-3 w-3 mr-1" />
-                              {isEraseMode ? 'Erase' : 'Paint'}
-                            </Button>
-                          )}
-                          
-                          {editMode === 'annotate' && (
-                            // Annotate mode: Rectangle tool (always active)
-                            <div className="flex gap-1">
-                              <Button
-                                variant="default"
-                                size="sm"
-                                className="flex-1 text-xs h-7"
-                                disabled
-                              >
-                                <Square className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          )}
-                          
-                          {/* Undo | Clear */}
-                          <div className="flex items-center gap-1">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={handleUndo}
-                                  disabled={brushStrokes.length === 0}
-                                  className="flex-1 text-xs h-7"
-                                >
-                                  <Undo2 className="h-3 w-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="z-[100001]">Undo</TooltipContent>
-                            </Tooltip>
-                            
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={handleClearMask}
-                                  disabled={brushStrokes.length === 0}
-                                  className="flex-1 text-xs h-7"
-                                >
-                                  <X className="h-3 w-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="z-[100001]">Clear all</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Regular Mobile Layout - All button groups (matching desktop) */}
-                  {/* Top Right Controls - Download, Delete & Close */}
-                  <TopRightControls {...buttonGroupProps.topRight} />
-
-                  {/* Bottom Left Controls - Edit & Upscale */}
-                  <BottomLeftControls {...buttonGroupProps.bottomLeft} />
-
-                  {/* Bottom Right Controls - Star & Add to References */}
-                  <BottomRightControls {...buttonGroupProps.bottomRight} />
-
-                  {/* Bottom Workflow Controls (hidden in special edit modes) */}
-                  <WorkflowControlsBar
-                    onAddToShot={onAddToShot}
-                    onDelete={onDelete}
-                    onApplySettings={onApplySettings}
-                    isSpecialEditMode={isSpecialEditMode}
-                    isVideo={isVideo}
-                    mediaId={actualGenerationId}
-                    imageUrl={effectiveMediaUrl}
-                    thumbUrl={media.thumbUrl}
-                    allShots={allShots}
-                    selectedShotId={selectedShotId}
-                    onShotChange={onShotChange}
-                    onCreateShot={onCreateShot}
-                    isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
-                    isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
-                    showTickForImageId={showTickForImageId}
-                    showTickForSecondaryImageId={showTickForSecondaryImageId}
-                    onAddToShotWithoutPosition={onAddToShotWithoutPosition}
-                    onShowTick={onShowTick}
-                    onShowSecondaryTick={onShowSecondaryTick}
-                    onOptimisticPositioned={onOptimisticPositioned}
-                    onOptimisticUnpositioned={onOptimisticUnpositioned}
-                    contentRef={contentRef}
-                    handleApplySettings={handleApplySettings}
-                    onNavigateToShot={handleNavigateToShotFromSelector}
-                    onClose={onClose}
-                    onAddVariantAsNewGeneration={handleAddVariantAsNewGenerationToShot}
-                    activeVariantId={activeVariant?.id || primaryVariant?.id}
-                    currentTimelineFrame={media.timeline_frame}
-                  />
-
-                  {/* Navigation Arrows */}
-                  <NavigationArrows
-                    showNavigation={showNavigation}
-                    readOnly={readOnly}
-                    onPrevious={handleSlotNavPrev}
-                    onNext={handleSlotNavNext}
-                    hasPrevious={hasPrevious}
-                    hasNext={hasNext}
-                    variant="mobile"
-                  />
-                </MediaWrapper>
-
-                {/* Workflow Controls - Below Media (hidden in special edit modes) */}
-                {!readOnly && !isSpecialEditMode && (
-                  <div className="w-full" onClick={(e) => e.stopPropagation()}>
-                    <WorkflowControls
-                      mediaId={actualGenerationId}
-                      imageUrl={effectiveMediaUrl}
-                      thumbUrl={media.thumbUrl}
-                      isVideo={isVideo}
-                      isInpaintMode={isInpaintMode}
-                      allShots={allShots}
-                      selectedShotId={selectedShotId}
-                      onShotChange={onShotChange}
-                      onCreateShot={onCreateShot}
-                      contentRef={contentRef}
-                      isAlreadyPositionedInSelectedShot={isAlreadyPositionedInSelectedShot}
-                      isAlreadyAssociatedWithoutPosition={isAlreadyAssociatedWithoutPosition}
-                      showTickForImageId={showTickForImageId}
-                      showTickForSecondaryImageId={showTickForSecondaryImageId}
-                      onAddToShot={onAddToShot}
-                      onAddToShotWithoutPosition={onAddToShotWithoutPosition}
-                      onShowTick={onShowTick}
-                      onApplySettings={onApplySettings}
-                      handleApplySettings={handleApplySettings}
-                      onDelete={onDelete}
-                      handleDelete={handleDelete}
-                      isDeleting={isDeleting}
-                      onNavigateToShot={handleNavigateToShotFromSelector}
-                      onClose={onClose}
-                    />
-              </div>
-                )}
-              </FlexContainer>
+              // Centered layout (no side panel)
+              <CenteredLayout {...centeredLayoutProps} />
             )}
           </DialogPrimitive.Content>
-        
+
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
     </TooltipProvider>
   );
 };
 
+
 export default MediaLightbox;
 
 // Export types for re-export
-export type { MediaLightboxProps, ShotOption }; 
+export type { MediaLightboxProps, ShotOption };

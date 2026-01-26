@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { Button } from '@/shared/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { Plus, Check, Loader2 } from 'lucide-react';
 
 interface NewImageOverlayButtonProps {
@@ -43,27 +44,33 @@ export const NewImageOverlayButton: React.FC<NewImageOverlayButtonProps> = ({
       className="absolute top-4 left-4 z-[70] select-none"
       onClick={(e) => e.stopPropagation()}
     >
-      <Button
-        variant="secondary"
-        size="sm"
-        onClick={() => variantId && onPromote(variantId)}
-        disabled={isDisabled}
-        className={`border-none shadow-lg text-white ${
-          promoteSuccess
-            ? 'bg-green-500/90 hover:bg-green-500/90'
-            : 'bg-blue-500/90 hover:bg-blue-600'
-        }`}
-        title="Create a standalone image from this variant"
-      >
-        {isPromoting ? (
-          <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-        ) : promoteSuccess ? (
-          <Check className="w-4 h-4 mr-1.5" />
-        ) : (
-          <Plus className="w-4 h-4 mr-1.5" />
-        )}
-        {promoteSuccess ? 'Created' : 'New image'}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => variantId && onPromote(variantId)}
+            disabled={isDisabled}
+            className={`text-white ${
+              promoteSuccess
+                ? 'bg-green-500/90 hover:bg-green-500/90'
+                : 'bg-black/50 hover:bg-black/70'
+            }`}
+          >
+            {isPromoting ? (
+              <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+            ) : promoteSuccess ? (
+              <Check className="w-4 h-4 mr-1.5" />
+            ) : (
+              <Plus className="w-4 h-4 mr-1.5" />
+            )}
+            {promoteSuccess ? 'Created' : 'New image'}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent className="z-[100001]">
+          Create a standalone image from this variant
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 };

@@ -186,8 +186,8 @@ export const ShotSelector: React.FC<ShotSelectorProps> = ({
             )}
           >
             <span className="truncate">
-              {selectedShotName 
-                ? (selectedShotName.length > 10 ? `${selectedShotName.substring(0, 10)}...` : selectedShotName)
+              {selectedShotName
+                ? (selectedShotName.length > 10 ? `${selectedShotName.substring(0, 10)}…` : selectedShotName)
                 : (value ? "Loading..." : placeholder)}
             </span>
             <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />

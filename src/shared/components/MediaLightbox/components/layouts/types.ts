@@ -1,32 +1,45 @@
 /**
  * Shared types for MediaLightbox layout components
+ *
+ * These types define the props needed by each layout component.
+ * Rather than trying to abstract everything, we import the actual prop types
+ * from the components that need them.
  */
 
 import React from 'react';
-import { GenerationRow, Shot } from '@/types/shots';
+import { GenerationRow } from '@/types/shots';
 import type { Variant } from '@/shared/hooks/useVariants';
 import type { BrushStroke, AnnotationMode } from '../../hooks/useInpainting';
-import type { EditMode, QwenEditModel } from '../../hooks/useGenerationEditSettings';
-import type { LoraModel } from '@/shared/components/LoraSelectorModal';
-import type { SegmentSlotModeProps } from '../../types';
+import type { EditMode } from '../../hooks/useGenerationEditSettings';
+import type { ControlsPanelProps } from '../ControlsPanel';
+import type { ImageTransform } from '../../hooks/useRepositionMode';
 
 /**
- * Media-related props
+ * Core props needed by all layouts
  */
-export interface MediaProps {
+export interface LayoutCoreProps {
+  onClose: () => void;
+  readOnly: boolean;
+  selectedProjectId: string | null;
+  isMobile: boolean;
+}
+
+/**
+ * Media display props
+ */
+export interface LayoutMediaProps {
   media: GenerationRow;
   isVideo: boolean;
   effectiveMediaUrl: string;
   effectiveVideoUrl: string;
-  thumbUrl?: string;
   imageDimensions: { width: number; height: number } | null;
   setImageDimensions: (dims: { width: number; height: number }) => void;
 }
 
 /**
- * Variant-related props
+ * Variant management props
  */
-export interface VariantProps {
+export interface LayoutVariantProps {
   variants: Variant[] | undefined;
   activeVariant: Variant | undefined;
   primaryVariant: Variant | undefined;
@@ -34,8 +47,6 @@ export interface VariantProps {
   setActiveVariantId: (id: string) => void;
   setPrimaryVariant: (id: string) => Promise<void>;
   deleteVariant: (id: string) => Promise<void>;
-  refetchVariants: () => void;
-  isViewingNonPrimaryVariant: boolean;
   // Promotion
   promoteSuccess: boolean;
   isPromoting: boolean;
@@ -53,14 +64,11 @@ export interface VariantProps {
 /**
  * Video edit mode props
  */
-export interface VideoEditProps {
+export interface LayoutVideoEditProps {
   isVideoTrimModeActive: boolean;
   isVideoEditModeActive: boolean;
   videoEditSubMode: 'trim' | 'replace' | 'regenerate' | null;
-  setVideoEditSubMode: (mode: 'trim' | 'replace' | 'regenerate' | null) => void;
   trimVideoRef: React.RefObject<HTMLVideoElement>;
-  trimCurrentTime: number;
-  setTrimCurrentTime: (time: number) => void;
   trimState: {
     videoDuration: number;
     startTime: number;
@@ -69,8 +77,7 @@ export interface VideoEditProps {
     setEndTime: (time: number) => void;
   };
   setVideoDuration: (duration: number) => void;
-  createAsGeneration: boolean;
-  setCreateAsGeneration: (value: boolean) => void;
+  setTrimCurrentTime: (time: number) => void;
   // Video editing hook (for regenerate mode)
   videoEditing: {
     videoRef: React.RefObject<HTMLVideoElement>;
@@ -80,19 +87,17 @@ export interface VideoEditProps {
     setActiveSelectionId: (id: string | null) => void;
     handleRemoveSelection: (id: string) => void;
     handleAddSelection: () => void;
-    // ... other video editing methods
   } | null;
 }
 
 /**
  * Edit mode (inpaint/annotate/reposition) props
  */
-export interface EditModeProps {
+export interface LayoutEditModeProps {
   isInpaintMode: boolean;
   isAnnotateMode: boolean;
   isSpecialEditMode: boolean;
   editMode: EditMode | null;
-  setEditMode: (mode: EditMode | null) => void;
   // Inpainting/annotation
   brushStrokes: BrushStroke[];
   currentStroke: BrushStroke | null;
@@ -134,7 +139,7 @@ export interface EditModeProps {
 /**
  * Navigation props
  */
-export interface NavigationProps {
+export interface LayoutNavigationProps {
   showNavigation: boolean;
   hasNext: boolean;
   hasPrevious: boolean;
@@ -155,7 +160,7 @@ export interface NavigationProps {
 /**
  * Button group props (from useButtonGroupProps)
  */
-export interface ButtonGroupProps {
+export interface LayoutButtonGroupProps {
   topLeft: any;
   topRight: any;
   bottomLeft: any;
@@ -163,120 +168,127 @@ export interface ButtonGroupProps {
 }
 
 /**
- * Workflow/shot-related props
+ * Workflow controls bar props
  */
-export interface WorkflowProps {
-  allShots: Shot[];
-  selectedShotId: string | null;
-  shotId?: string;
-  onShotChange: (shotId: string | null) => void;
-  onCreateShot: () => Promise<string | null>;
-  onAddToShot?: (generationId: string, shotId: string) => void;
-  onAddToShotWithoutPosition?: (generationId: string, shotId: string) => void;
-  onApplySettings?: (generationId: string) => void;
-  handleApplySettings: () => void;
-  onDelete?: (generationId: string) => void;
-  handleDelete: () => void;
-  isDeleting: boolean;
-  onNavigateToShot?: (shotId: string) => void;
-  handleNavigateToShotFromSelector: (shotId: string) => void;
-  handleAddVariantAsNewGenerationToShot: (
-    shotId: string,
-    variantId: string,
-    currentTimelineFrame?: number
-  ) => Promise<boolean>;
-  // Position/tick state
+export interface LayoutWorkflowBarProps {
+  onAddToShot?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onDelete?: (id: string) => void;
+  onApplySettings?: (metadata: any) => void;
+  allShots: Array<{ id: string; name: string }>;
+  selectedShotId: string | undefined;
+  onShotChange?: (shotId: string) => void;
+  onCreateShot?: (shotName: string, files: File[]) => Promise<{ shotId?: string; shotName?: string } | void>;
   isAlreadyPositionedInSelectedShot: boolean;
   isAlreadyAssociatedWithoutPosition: boolean;
-  showTickForImageId: string | null;
-  showTickForSecondaryImageId: string | null;
-  onShowTick?: (imageId: string | null) => void;
-  onShowSecondaryTick?: (imageId: string | null) => void;
-  onOptimisticPositioned?: () => void;
-  onOptimisticUnpositioned?: () => void;
+  showTickForImageId?: string | null;
+  showTickForSecondaryImageId?: string | null;
+  onAddToShotWithoutPosition?: (targetShotId: string, generationId: string, imageUrl?: string, thumbUrl?: string) => Promise<boolean>;
+  onShowTick?: (imageId: string) => void;
+  onOptimisticPositioned?: (imageId: string, shotId: string) => void;
+  onShowSecondaryTick?: (imageId: string) => void;
+  onOptimisticUnpositioned?: (imageId: string, shotId: string) => void;
   contentRef: React.RefObject<HTMLDivElement>;
+  handleApplySettings: () => void;
+  handleNavigateToShotFromSelector?: (shot: any) => void;
+  handleAddVariantAsNewGenerationToShot?: (shotId: string, variantId: string, currentTimelineFrame?: number) => Promise<boolean>;
 }
 
 /**
- * Panel/UI state props
+ * Floating tool controls props (for edit modes)
  */
-export interface PanelProps {
-  showTaskDetails: boolean;
-  setShowTaskDetails: (show: boolean) => void;
+export interface LayoutFloatingToolProps {
+  editMode: EditMode | null;
+  setEditMode: (mode: EditMode | null) => void;
+  brushSize: number;
+  isEraseMode: boolean;
+  setBrushSize: (size: number) => void;
+  setIsEraseMode: (value: boolean) => void;
+  annotationMode: AnnotationMode | null;
+  setAnnotationMode: (mode: AnnotationMode | null) => void;
+  repositionTransform: ImageTransform;
+  setTranslateX: (x: number) => void;
+  setTranslateY: (y: number) => void;
+  setScale: (scale: number) => void;
+  setRotation: (rotation: number) => void;
+  toggleFlipH: () => void;
+  toggleFlipV: () => void;
+  resetTransform: () => void;
+  effectiveImageDimensions: { width: number; height: number } | null;
+  brushStrokes: BrushStroke[];
+  handleUndo: () => void;
+  handleClearMask: () => void;
+  inpaintPanelPosition: 'left' | 'right';
+  setInpaintPanelPosition: (position: 'left' | 'right') => void;
+}
+
+/**
+ * Panel-related props (task pane state)
+ */
+export interface LayoutPanelProps {
   effectiveTasksPaneOpen: boolean;
   effectiveTasksPaneWidth: number;
-  isTasksPaneLocked: boolean;
-  setIsTasksPaneLocked: (locked: boolean) => void;
-  cancellableTaskCount: number;
 }
 
 /**
- * Edit panel props (for EditModePanel)
+ * Props for layouts that use ControlsPanel (Desktop and Mobile stacked)
+ * Includes all props needed for ControlsPanel plus layout-specific props
  */
-export interface EditPanelProps {
-  editModeLoRAs: LoraModel[];
-  setEditModeLoRAs: (loras: LoraModel[]) => void;
-  prompt: string;
-  setPrompt: (prompt: string) => void;
-  negativePrompt: string;
-  setNegativePrompt: (prompt: string) => void;
-  numGenerations: number;
-  setNumGenerations: (num: number) => void;
-  loraMode: string;
-  setLoraMode: (mode: string) => void;
-  qwenEditModel: QwenEditModel;
-  setQwenEditModel: (model: QwenEditModel) => void;
-  handleInpaint: () => void;
-  isInpainting: boolean;
-  handleEnterMagicEditMode: () => void;
-  handleExitMagicEditMode: () => void;
-  isMagicEditModeActive: boolean;
-  // Source generation
-  sourceGeneration: any;
-  isLoadingSourceGeneration: boolean;
-}
-
-/**
- * Segment slot mode props
- */
-export interface SegmentModeProps {
-  isSegmentSlotMode: boolean;
-  hasSegmentVideo: boolean;
-  isFormOnlyMode: boolean;
-  segmentSlotMode?: SegmentSlotModeProps;
-}
-
-/**
- * Core props needed by all layouts
- */
-export interface LightboxLayoutCoreProps {
-  // Core
-  onClose: () => void;
-  readOnly: boolean;
-  selectedProjectId: string | null;
+export interface SidePanelLayoutProps extends
+  LayoutCoreProps,
+  LayoutMediaProps,
+  LayoutVariantProps,
+  LayoutVideoEditProps,
+  LayoutEditModeProps,
+  LayoutNavigationProps,
+  LayoutPanelProps {
+  // Actual generation ID (may differ from media.id for variants)
   actualGenerationId: string;
-  isMobile: boolean;
-  isPortraitMode?: boolean;
-  isTabletOrLarger?: boolean;
 
-  // Task details
-  taskDetailsData: any;
-  adjustedTaskDetailsData: any;
+  // Effective image dimensions (resolved from media or variants)
+  effectiveImageDimensions: { width: number; height: number } | null;
+
+  // Button groups
+  buttonGroupProps: LayoutButtonGroupProps;
+
+  // Workflow controls bar
+  workflowBarProps: LayoutWorkflowBarProps;
+
+  // Floating tool controls (for edit modes in tablet/desktop)
+  floatingToolProps: LayoutFloatingToolProps;
+
+  // Controls panel props - the full set for ControlsPanel component
+  controlsPanelProps: Omit<ControlsPanelProps, 'variant'>;
 }
 
 /**
- * Complete layout props - combines all prop groups
+ * Props for the centered layout (no side panel)
+ * Uses WorkflowControls below media instead of ControlsPanel
  */
-export interface LightboxLayoutProps extends
-  LightboxLayoutCoreProps,
-  MediaProps,
-  VariantProps,
-  VideoEditProps,
-  EditModeProps,
-  NavigationProps,
-  PanelProps,
-  SegmentModeProps {
-  buttonGroupProps: ButtonGroupProps;
-  workflowProps: WorkflowProps;
-  editPanelProps: EditPanelProps;
+export interface CenteredLayoutProps extends
+  LayoutCoreProps,
+  LayoutMediaProps,
+  LayoutVariantProps,
+  LayoutVideoEditProps,
+  LayoutEditModeProps,
+  LayoutNavigationProps {
+  // Actual generation ID
+  actualGenerationId: string;
+
+  // Effective image dimensions
+  effectiveImageDimensions: { width: number; height: number } | null;
+
+  // Button groups
+  buttonGroupProps: LayoutButtonGroupProps;
+
+  // Workflow controls bar (floating)
+  workflowBarProps: LayoutWorkflowBarProps;
+
+  // Workflow controls (below media) - different from workflowBarProps
+  workflowControlsProps: {
+    isDeleting?: string | null;
+    handleDelete: () => void;
+  } & LayoutWorkflowBarProps;
 }
+
+// Re-export ControlsPanelProps for convenience
+export type { ControlsPanelProps } from '../ControlsPanel';
