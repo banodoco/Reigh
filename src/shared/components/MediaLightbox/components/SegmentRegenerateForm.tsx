@@ -205,7 +205,8 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
 
     // Get effective settings
     const effectiveSettings = getSettingsForTaskCreation();
-    const promptToEnhance = effectiveSettings.prompt?.trim() || '';
+    // Prioritize existing enhanced prompt if available, otherwise use base prompt
+    const promptToEnhance = enhancedPrompt?.trim() || effectiveSettings.prompt?.trim() || '';
 
     // If enhance is enabled, use background submission pattern
     if (effectiveEnhanceEnabled && promptToEnhance) {

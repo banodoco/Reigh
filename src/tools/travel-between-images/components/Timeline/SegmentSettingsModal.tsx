@@ -255,7 +255,8 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
 
     // Get effective settings
     const effectiveSettings = getSettingsForTaskCreation();
-    const promptToEnhance = effectiveSettings.prompt?.trim() || '';
+    // Prioritize existing enhanced prompt if available, otherwise use base prompt
+    const promptToEnhance = enhancedPrompt?.trim() || effectiveSettings.prompt?.trim() || '';
 
     // If enhance is enabled, use background submission pattern
     if (effectiveEnhanceEnabled && promptToEnhance) {
@@ -300,7 +301,13 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
           const enhancedPromptResult = enhanceResult?.enhanced_prompt?.trim() || promptToEnhance;
           console.log('[SegmentSettingsModal] ✅ Enhanced prompt:', enhancedPromptResult.substring(0, 80) + '...');
 
-          // 2. Store enhanced prompt in metadata
+          // 2. Apply before/after text to the enhanced prompt
+          const beforeText = effectiveSettings.textBeforePrompts?.trim() || '';
+          const afterText = effectiveSettings.textAfterPrompts?.trim() || '';
+          const finalPrompt = [beforeText, enhancedPromptResult, afterText].filter(Boolean).join(' ');
+          console.log('[SegmentSettingsModal] 📝 Final prompt with before/after:', finalPrompt.substring(0, 100) + '...');
+
+          // 3. Store enhanced prompt in metadata
           if (pairShotGenerationId && enhancedPromptResult !== promptToEnhance) {
             const { data: current } = await supabase
               .from('shot_generations')
@@ -323,9 +330,9 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
             queryClient.invalidateQueries({ queryKey: ['pair-metadata', pairShotGenerationId] });
           }
 
-          // 3. Build task params with enhanced prompt
+          // 4. Build task params with final prompt (enhanced + before/after)
           const taskParams = buildTaskParams(
-            { ...effectiveSettings, prompt: enhancedPromptResult },
+            { ...effectiveSettings, prompt: finalPrompt },
             {
               projectId,
               shotId,
@@ -339,7 +346,7 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
             }
           );
 
-          // 4. Create task
+          // 5. Create task
           const result = await createIndividualTravelSegmentTask(taskParams);
 
           if (!result.task_id) {
@@ -378,8 +385,14 @@ const SegmentSettingsModal: React.FC<SegmentSettingsModalProps> = ({
       // Notify parent for optimistic UI
       onGenerateStarted?.(pairShotGenerationId);
 
-      // Build task params using effective settings (merged with shot defaults)
-      const taskParams = buildTaskParams(effectiveSettings, {
+      // Apply before/after text to the prompt
+      const beforeText = effectiveSettings.textBeforePrompts?.trim() || '';
+      const afterText = effectiveSettings.textAfterPrompts?.trim() || '';
+      const basePrompt = effectiveSettings.prompt?.trim() || '';
+      const finalPrompt = [beforeText, basePrompt, afterText].filter(Boolean).join(' ');
+
+      // Build task params using effective settings with final prompt
+      const taskParams = buildTaskParams({ ...effectiveSettings, prompt: finalPrompt }, {
         projectId,
         shotId,
         generationId,
