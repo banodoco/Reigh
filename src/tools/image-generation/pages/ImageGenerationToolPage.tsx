@@ -4,7 +4,7 @@ import ImageGenerationForm, { PromptEntry } from "../components/ImageGenerationF
 import { ImageGenerationFormHandles } from "../components/ImageGenerationForm/types";
 import { createBatchImageGenerationTasks, BatchImageGenerationTaskParams } from "@/shared/lib/tasks/imageGeneration";
 import { ImageGallery, GeneratedImageWithMetadata, DisplayableMetadata, MetadataLora } from "@/shared/components/ImageGallery";
-import { useContainerWidth } from "@/shared/components/ImageGallery/hooks";
+import { useContainerDimensions } from "@/shared/components/ImageGallery/hooks";
 import { getLayoutForAspectRatio } from "@/shared/components/ImageGallery/utils";
 import SettingsModal from "@/shared/components/SettingsModal";
 import { toast } from "sonner";
@@ -166,8 +166,9 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   // Always use hooks - no environment-based disabling
   const { apiKeys, getApiKey } = useApiKeys();
   const imageGenerationFormRef = useRef<ImageGenerationFormHandles>(null);
-  // Measure gallery container width for calculating correct items per page
-  const [galleryRef, containerWidth] = useContainerWidth();
+  // Measure gallery container dimensions for calculating correct items per page
+  // Height offset accounts for pagination controls at bottom (~80px)
+  const [galleryRef, containerDimensions] = useContainerDimensions(80);
   const formContainerRef = useRef<HTMLDivElement>(null);
   const collapsibleContainerRef = useRef<HTMLDivElement>(null);
   const [searchParams] = useSearchParams();
@@ -259,19 +260,26 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
   }, [formAssociatedShotId, pagePrefs]);
 
-  // Calculate items per page based on actual container width for correct row count
-  // This ensures we show the right number of rows (9 desktop, 5 mobile) regardless of columns
+  // Calculate items per page based on container dimensions
+  // Columns are calculated from width, rows from available height (viewport-aware)
   const galleryLayout = useMemo(() => {
-    return getLayoutForAspectRatio(projectAspectRatio, isMobile, containerWidth);
-  }, [projectAspectRatio, isMobile, containerWidth]);
+    return getLayoutForAspectRatio(
+      projectAspectRatio,
+      isMobile,
+      containerDimensions.width,
+      containerDimensions.height
+    );
+  }, [projectAspectRatio, isMobile, containerDimensions.width, containerDimensions.height]);
 
   // Lock in skeleton layout to prevent jitter during loading
-  // Calculate once based on window width and never change
+  // Calculate once based on window dimensions and never change
   const stableSkeletonLayout = useRef<{ columns: number; itemsPerPage: number } | null>(null);
   if (stableSkeletonLayout.current === null) {
-    // Use window width estimate for stable initial value
+    // Use window dimensions estimate for stable initial value
+    // Height offset of 80 matches useContainerDimensions offset for header + controls
     const estimatedWidth = typeof window !== 'undefined' ? Math.floor(window.innerWidth * 0.9) : 800;
-    const stableLayout = getLayoutForAspectRatio(projectAspectRatio, isMobile, estimatedWidth);
+    const estimatedHeight = typeof window !== 'undefined' ? window.innerHeight - 80 : 600;
+    const stableLayout = getLayoutForAspectRatio(projectAspectRatio, isMobile, estimatedWidth, estimatedHeight);
     stableSkeletonLayout.current = {
       columns: stableLayout.columns,
       itemsPerPage: stableLayout.itemsPerPage

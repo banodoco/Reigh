@@ -1,10 +1,20 @@
 /**
  * Default rows per page for different screen sizes
- * Used with dynamic columns to compute items per page
+ * Used as fallback when container height is not available
  */
 export const DEFAULT_ROWS_PER_PAGE = {
   MOBILE: 5,
   DESKTOP: 6,
+} as const;
+
+/**
+ * Row calculation constraints
+ */
+export const ROW_LIMITS = {
+  /** Minimum rows to show (prevents gallery from being too small) */
+  MIN_ROWS: 2,
+  /** Maximum rows to show (prevents too many items per page) */
+  MAX_ROWS: 12,
 } as const;
 
 /**
@@ -44,14 +54,14 @@ export const DEFAULT_ITEMS_PER_PAGE = {
 
 /**
  * Maximum items per page that server pagination should request.
- * This ensures we always have enough items for any column count.
+ * This ensures we always have enough items for any column/row combination.
  * ImageGallery will slice to the actual needed amount (columns × rows).
  *
- * Calculated as MAX_COLUMNS × DESKTOP_ROWS = 24 × 6 = 144
+ * Calculated as MAX_COLUMNS × MAX_ROWS = 24 × 12 = 288
  */
 export const SERVER_ITEMS_PER_PAGE = {
-  MOBILE: TARGET_IMAGE_WIDTH.MAX_COLUMNS * DEFAULT_ROWS_PER_PAGE.MOBILE,  // 24 × 5 = 120
-  DESKTOP: TARGET_IMAGE_WIDTH.MAX_COLUMNS * DEFAULT_ROWS_PER_PAGE.DESKTOP, // 24 × 9 = 216
+  MOBILE: TARGET_IMAGE_WIDTH.MAX_COLUMNS * ROW_LIMITS.MAX_ROWS,  // 24 × 12 = 288
+  DESKTOP: TARGET_IMAGE_WIDTH.MAX_COLUMNS * ROW_LIMITS.MAX_ROWS, // 24 × 12 = 288
 } as const;
 
 /**
@@ -141,6 +151,51 @@ export function calculateDynamicColumns(
 }
 
 /**
+ * Calculate optimal rows based on container dimensions and image aspect ratio.
+ *
+ * Uses the same logic as columns: given container height, how many rows fit?
+ * Row height is derived from column width (which comes from container width / columns)
+ * and the image aspect ratio.
+ *
+ * @param containerWidth - The width of the gallery container in pixels
+ * @param containerHeight - The available height for the gallery in pixels
+ * @param columns - Number of columns (already calculated)
+ * @param aspectRatio - width/height ratio of images (e.g., 1.78 for 16:9)
+ * @returns Number of rows that fit, clamped to MIN/MAX range
+ */
+export function calculateDynamicRows(
+  containerWidth: number,
+  containerHeight: number,
+  columns: number,
+  aspectRatio: number
+): number {
+  if (!containerWidth || containerWidth <= 0 || !containerHeight || containerHeight <= 0) {
+    return DEFAULT_ROWS_PER_PAGE.DESKTOP;
+  }
+
+  // Calculate actual image width based on container and columns
+  // containerWidth = columns * imageWidth + (columns - 1) * gap
+  // imageWidth = (containerWidth - (columns - 1) * gap) / columns
+  const totalGapWidth = (columns - 1) * TARGET_IMAGE_WIDTH.GAP;
+  const imageWidth = (containerWidth - totalGapWidth) / columns;
+
+  // Calculate image height from width and aspect ratio
+  // aspectRatio = width / height, so height = width / aspectRatio
+  const imageHeight = imageWidth / aspectRatio;
+
+  // Calculate how many rows fit in available height
+  // containerHeight = rows * imageHeight + (rows - 1) * gap
+  // Solve for rows: rows = (containerHeight + gap) / (imageHeight + gap)
+  const effectiveHeight = imageHeight + TARGET_IMAGE_WIDTH.GAP;
+  const rows = Math.floor((containerHeight + TARGET_IMAGE_WIDTH.GAP) / effectiveHeight);
+
+  return Math.max(
+    ROW_LIMITS.MIN_ROWS,
+    Math.min(ROW_LIMITS.MAX_ROWS, rows)
+  );
+}
+
+/**
  * Calculate optimal columns per row based on aspect ratio.
  *
  * Wider images (16:9) → fewer columns (so each image isn't too wide)
@@ -173,20 +228,23 @@ export function getItemsPerPageForColumns(columns: number, isMobile: boolean): n
 }
 
 /**
- * Get both columns and items per page based on aspect ratio and container width.
+ * Get both columns and items per page based on aspect ratio and container dimensions.
  * Convenience function that combines the above utilities.
  *
  * @param aspectRatioStr - Aspect ratio string (e.g., "16:9", "9:16")
  * @param isMobile - Whether on mobile device
- * @param containerWidth - Optional container width in pixels for dynamic calculation
- * @returns { columns, itemsPerPage, skeletonColumns }
+ * @param containerWidth - Optional container width in pixels for dynamic column calculation
+ * @param containerHeight - Optional container height in pixels for dynamic row calculation
+ * @returns { columns, rows, itemsPerPage, skeletonColumns }
  */
 export function getLayoutForAspectRatio(
   aspectRatioStr: string | undefined | null,
   isMobile: boolean,
-  containerWidth?: number
+  containerWidth?: number,
+  containerHeight?: number
 ): {
   columns: number;
+  rows: number;
   itemsPerPage: number;
   skeletonColumns: typeof SKELETON_COLUMNS[keyof typeof SKELETON_COLUMNS];
   gridColumnClasses: string;
@@ -201,11 +259,17 @@ export function getLayoutForAspectRatio(
   // Clamp to valid range for our predefined grid classes (3-12)
   const clampedColumns = Math.max(3, Math.min(12, rawColumns)) as keyof typeof GRID_COLUMN_CLASSES;
 
-  const itemsPerPage = getItemsPerPageForColumns(rawColumns, isMobile);
+  // Use dynamic row calculation only on desktop when both width and height are known
+  // Mobile always uses fixed rows for consistent scrolling behavior
+  const rows = (!isMobile && containerWidth && containerWidth > 0 && containerHeight && containerHeight > 0)
+    ? calculateDynamicRows(containerWidth, containerHeight, rawColumns, ratio)
+    : (isMobile ? DEFAULT_ROWS_PER_PAGE.MOBILE : DEFAULT_ROWS_PER_PAGE.DESKTOP);
+
+  const itemsPerPage = rawColumns * rows;
   const skeletonColumns = SKELETON_COLUMNS[clampedColumns] || SKELETON_COLUMNS[5];
   const gridColumnClasses = GRID_COLUMN_CLASSES[clampedColumns];
 
-  return { columns: rawColumns, itemsPerPage, skeletonColumns, gridColumnClasses };
+  return { columns: rawColumns, rows, itemsPerPage, skeletonColumns, gridColumnClasses };
 }
 
 /**

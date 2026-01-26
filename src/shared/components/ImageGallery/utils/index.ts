@@ -2,6 +2,7 @@ export { deriveInputImages, formatMetadataForDisplay } from './imageGallery-util
 export {
   DEFAULT_ITEMS_PER_PAGE,
   DEFAULT_ROWS_PER_PAGE,
+  ROW_LIMITS,
   SERVER_ITEMS_PER_PAGE,
   GRID_COLUMN_CLASSES,
   SKELETON_COLUMNS,
@@ -16,4 +17,5 @@ export {
   getLayoutForAspectRatio,
   getTargetImageWidth,
   calculateDynamicColumns,
+  calculateDynamicRows,
 } from './imageGallery-constants';
