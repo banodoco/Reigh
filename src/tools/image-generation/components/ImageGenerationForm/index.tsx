@@ -372,6 +372,18 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     if (!projectImageSettings) return;
     if (!referencePointers || referencePointers.length === 0) return;
 
+    // Count how many non-legacy pointers we have
+    const nonLegacyPointers = referencePointers.filter(p => {
+      const isLegacy = !p.resourceId && (p as any).styleReferenceImage;
+      return !isLegacy && !!p.resourceId;
+    });
+
+    // CRITICAL: Don't run cleanup until ALL non-legacy pointers are hydrated
+    // Otherwise we'd delete references that are still being fetched
+    if (hydratedReferences.length < nonLegacyPointers.length) {
+      return;
+    }
+
     const hydratedPointerIds = new Set(hydratedReferences.map(r => r.id));
     const invalidPointers = referencePointers.filter(p => {
       const isLegacy = !p.resourceId && (p as any).styleReferenceImage;
@@ -440,6 +452,13 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       return selectedReferenceId;
     }
 
+    // If we have a selection but it's not hydrated yet, DON'T show a fallback
+    // Wait until either: the selected ref hydrates, or all refs are hydrated (meaning selection is truly invalid)
+    if (selectedReferenceId && hydratedReferences.length < referenceCount) {
+      // Selected ref might still be loading - don't show fallback yet
+      return null;
+    }
+
     // Need a fallback - check if we already cached one for this shot
     if (fallbackCache.current?.shotId === effectiveShotId) {
       // Verify the cached fallback still exists in hydrated refs
@@ -464,7 +483,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     }
 
     return fallbackId;
-  }, [hydratedReferences, selectedReferenceId, effectiveShotId]);
+  }, [hydratedReferences, selectedReferenceId, effectiveShotId, referenceCount]);
   
   // Derive the full reference object
   const currentSelectedReference = hydratedReferences.find(ref => ref.id === displayedReferenceId) || null;
@@ -1948,8 +1967,6 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       const currentData2 = extractSettingsFromCache<ProjectImageSettings>(
         queryClient.getQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined])
       ) || {};
-
-      console.log('[RefBrowser] 💾 Persisting to database...');
       await updateProjectImageSettings('project', {
         references: currentData2?.references || [],
         selectedReferenceIdByShot: currentData2?.selectedReferenceIdByShot || {}

@@ -229,6 +229,23 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
       setCurrentPage(totalPages - 1);
     }
   }, [references.length, currentPage, totalPages]);
+
+  // Jump to the page containing the selected reference on initial load
+  const hasJumpedToSelectedRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    // Only jump once per selection (track by selection ID)
+    if (hasJumpedToSelectedRef.current === selectedReferenceId) return;
+    if (!selectedReferenceId || sortedRefs.length === 0) return;
+
+    const selectedIndex = sortedRefs.findIndex(ref => ref.id === selectedReferenceId);
+    if (selectedIndex === -1) return; // Selection not found in refs yet - keep waiting
+
+    const targetPage = Math.floor(selectedIndex / REFS_PER_PAGE);
+    if (targetPage !== currentPage) {
+      setCurrentPage(targetPage);
+    }
+    hasJumpedToSelectedRef.current = selectedReferenceId;
+  }, [selectedReferenceId, sortedRefs, currentPage]);
   
   const handleImageLoad = React.useCallback((refId: string) => {
     setLoadedImages(prev => new Set(prev).add(refId));
@@ -580,7 +597,7 @@ const ReferenceSelector: React.FC<ReferenceSelectorProps> = ({
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-2">
+        <div className="flex items-center justify-center gap-2">
           <Button
             type="button"
             variant="ghost"

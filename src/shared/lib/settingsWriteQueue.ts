@@ -146,9 +146,10 @@ export function enqueueSettingsWrite(
     
     if (existing) {
       // Merge with existing pending write
+      const beforeMerge = existing.write.patch;
       existing.write.patch = mergePatch(existing.write.patch, write.patch);
       existing.resolvers.push({ resolve, reject });
-      
+
       console.log('[SettingsWriteQueue] ♻️ Merged with pending write:', {
         scope: write.scope,
         entityId: write.entityId?.substring(0, 8),
@@ -170,9 +171,9 @@ export function enqueueSettingsWrite(
         timerId: null,
         enqueuedAt: Date.now(),
       };
-      
+
       pendingByTarget.set(key, pending);
-      
+
       if (mode === 'immediate') {
         scheduleFlush(key, pending);
       } else {

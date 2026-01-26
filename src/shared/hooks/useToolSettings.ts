@@ -707,6 +707,7 @@ export function useToolSettings<T>(
           const hasWrapper = oldData && 'settings' in oldData && 'hasShotSettings' in oldData;
           const oldSettings = hasWrapper ? (oldData?.settings ?? {}) : (oldData ?? {});
           const mergedSettings = deepMerge({}, oldSettings, fullMergedSettings);
+
           return {
             settings: mergedSettings,
             hasShotSettings: hasWrapper ? (oldData?.hasShotSettings ?? false) : false
