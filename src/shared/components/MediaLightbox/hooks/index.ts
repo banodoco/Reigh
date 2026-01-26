@@ -88,3 +88,4 @@ export { useVideoEditMode } from './useVideoEditMode';
 export type { VideoEditSubMode } from './useVideoEditMode';
 export { useSegmentSlotMode } from './useSegmentSlotMode';
 export { useVariantManagement } from './useVariantManagement';
+export { useLightboxLayoutProps } from './useLightboxLayoutProps';

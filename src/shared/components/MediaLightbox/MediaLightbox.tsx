@@ -71,6 +71,7 @@ import {
   useVideoEditMode,
   useSegmentSlotMode,
   useVariantManagement,
+  useLightboxLayoutProps,
 } from './hooks';
 
 // Import all extracted components
@@ -100,7 +101,13 @@ import {
   SegmentRegenerateForm,
   SegmentSlotFormView,
 } from './components';
-import { FlexContainer, MediaWrapper } from './components/layouts';
+import {
+  FlexContainer,
+  MediaWrapper,
+  DesktopSidePanelLayout,
+  MobileStackedLayout,
+  CenteredLayout,
+} from './components/layouts';
 
 // Import utils
 import { downloadMedia } from './utils';
@@ -1621,10 +1628,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
   // Fetch the variant's source task when it differs from taskDetailsData
   // Skip fetch if variant already has orchestrator_details (e.g., clip_join variants)
+  // NOTE: Uses ['tasks', 'single', taskId] query key to share cache with usePrefetchTaskData
   const { data: variantSourceTask, isLoading: isLoadingVariantTask } = useQuery({
-    queryKey: ['variant-source-task', variantSourceTaskId],
+    queryKey: ['tasks', 'single', variantSourceTaskId],
     queryFn: async () => {
       if (!variantSourceTaskId) return null;
+      console.log('[VariantTaskDetails] Fetching task:', variantSourceTaskId.substring(0, 8));
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
@@ -1638,7 +1647,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     },
     // Don't fetch if: no task ID, already have matching taskDetailsData, or variant has orchestrator_details
     enabled: !!variantSourceTaskId && variantSourceTaskId !== taskDetailsData?.taskId && !variantHasOrchestratorDetails,
-    staleTime: 60000, // Cache for 1 minute
+    staleTime: Infinity, // Task data is immutable - cache forever (matches prefetch)
   });
 
   // For variants, show the variant's source task params instead of the original task

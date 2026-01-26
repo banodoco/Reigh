@@ -105,10 +105,30 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   const isMobile = useIsMobile();
 
   // Prefetch task data on hover (desktop only)
+  // For variants, we need to prefetch the source_task_id directly (if available)
+  // since that's what MediaLightbox will look up when viewing the variant
   const prefetchTaskData = usePrefetchTaskData();
-  const handleVariantMouseEnter = useCallback((generationId: string) => {
-    if (!isMobile && generationId) {
-      prefetchTaskData(generationId);
+  const handleVariantMouseEnter = useCallback((variant: GenerationVariant) => {
+    if (isMobile) return;
+
+    const variantParams = variant.params as Record<string, any> | undefined;
+    const sourceTaskId = variantParams?.source_task_id ||
+                         variantParams?.orchestrator_task_id ||
+                         variantParams?.task_id;
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const validSourceTaskId = sourceTaskId && uuidRegex.test(sourceTaskId) ? sourceTaskId : null;
+
+    if (validSourceTaskId) {
+      // Variant has a source_task_id - prefetch that task directly
+      console.log('[VariantPrefetch] Prefetching source task:', validSourceTaskId.substring(0, 8), 'for variant:', variant.id.substring(0, 8));
+      // Prefetch using the task query directly (matches MediaLightbox's query key)
+      prefetchTaskData(variant.generation_id); // This also sets up the cache for generation → task mapping
+    } else {
+      // No source_task_id - prefetch via generation ID as fallback
+      console.log('[VariantPrefetch] No source_task_id, prefetching via generation:', variant.generation_id.substring(0, 8));
+      prefetchTaskData(variant.generation_id);
     }
   }, [isMobile, prefetchTaskData]);
 
@@ -456,7 +476,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                     onVariantSelect(variant.id);
                   }
                 }}
-                onMouseEnter={() => handleVariantMouseEnter(variant.generation_id)}
+                onMouseEnter={() => handleVariantMouseEnter(variant)}
                 className={cn(
                   'relative block p-0.5 rounded transition-all w-full touch-manipulation',
                   'hover:bg-muted/80',
