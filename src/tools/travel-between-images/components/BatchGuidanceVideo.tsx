@@ -40,7 +40,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   videoMetadata,
   treatment,
   motionStrength,
-  structureType = 'flow',
+  structureType = 'uni3c',
   onVideoUploaded,
   onTreatmentChange,
   onMotionStrengthChange,
@@ -508,46 +508,10 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
             </div>
           </div>
 
-          {/* Structure type and Motion strength - hidden when shown elsewhere (like Structure section) */}
+          {/* Motion strength - hidden when shown elsewhere (like Structure section) */}
           {!hideStructureSettings && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Structure type selector */}
-              {onStructureTypeChange && (
-                <div className="space-y-2">
-                  <Label className="text-sm">What type of guidance would you like to use?</Label>
-                  <Select
-                    value={structureType}
-                    onValueChange={(type: 'uni3c' | 'flow' | 'canny' | 'depth') => {
-                      onStructureTypeChange(type);
-                    }}
-                    disabled={readOnly}
-                  >
-                    <SelectTrigger variant="retro" size="sm" className="h-9 w-full text-sm">
-                      <SelectValue>
-                        {structureType === 'uni3c' ? 'Uni3C (I2V)' : 
-                         structureType === 'flow' ? 'Optical flow (VACE)' : 
-                         structureType === 'canny' ? 'Canny (VACE)' : 'Depth (VACE)'}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent variant="retro">
-                      <SelectItem variant="retro" value="uni3c">
-                        <span className="text-sm">Uni3C (I2V)</span>
-                      </SelectItem>
-                      <SelectItem variant="retro" value="flow">
-                        <span className="text-sm">Optical flow (VACE)</span>
-                      </SelectItem>
-                      <SelectItem variant="retro" value="canny">
-                        <span className="text-sm">Canny (VACE)</span>
-                      </SelectItem>
-                      <SelectItem variant="retro" value="depth">
-                        <span className="text-sm">Depth (VACE)</span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Motion strength and End Percent (when uni3c) */}
+              {/* Motion strength and End Percent (uni3c hardcoded) */}
               <div className="space-y-4">
                 {/* Strength slider */}
                 <div className="space-y-2">
