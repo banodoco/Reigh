@@ -69,6 +69,16 @@ export interface UseSegmentSettingsOptions {
     treatment: 'adjust' | 'clip';
     uni3cEndPercent: number;
   } | null;
+  /**
+   * Callback to update structure video defaults when "Save as Shot Defaults" is clicked.
+   * Structure videos are stored separately from tool settings, so the parent must provide this.
+   * Returns a Promise so we can await it before showing success.
+   */
+  onUpdateStructureVideoDefaults?: (updates: {
+    motionStrength?: number;
+    treatment?: 'adjust' | 'clip';
+    uni3cEndPercent?: number;
+  }) => Promise<void>;
 }
 
 /** Tracks which fields have pair-level overrides vs using shot defaults */
@@ -137,6 +147,7 @@ export function useSegmentSettings({
   shotId,
   defaults,
   structureVideoDefaults,
+  onUpdateStructureVideoDefaults,
 }: UseSegmentSettingsOptions): UseSegmentSettingsReturn {
   // Unique instance ID for debugging
   const instanceIdRef = useRef<number | null>(null);
@@ -278,7 +289,9 @@ export function useSegmentSettings({
       amountOfMotion: pairOverrides.amountOfMotion,
       phaseConfig: pairOverrides.phaseConfig,
       selectedPhasePresetId: pairOverrides.selectedPhasePresetId,
-      loras: pairOverrides.loras ?? [],
+      // Keep loras as undefined when no override, so effectiveLoras can fall back to shot defaults
+      // When user edits other fields, loras stays undefined and shot defaults are preserved
+      loras: pairOverrides.loras,
 
       // Frame count: always from timeline (source of truth)
       numFrames: defaults.numFrames ?? 25,
@@ -439,25 +452,30 @@ export function useSegmentSettings({
   }, [isDirty]);
 
   // Save settings to database
-  const saveSettings = useCallback(async (): Promise<boolean> => {
+  // Optional settingsOverride parameter allows passing settings directly (e.g., for resetSettings)
+  // This avoids React closure issues where the captured `settings` might be stale
+  const saveSettings = useCallback(async (settingsOverride?: SegmentSettings): Promise<boolean> => {
+    // Use override if provided, otherwise use current settings from state
+    const settingsToSave = settingsOverride ?? settings;
+
     if (!pairShotGenerationId) {
       console.warn('[useSegmentSettings] ⚠️ Cannot save - no pairShotGenerationId (lightbox may be opened from non-travel context)');
       return false;
     }
 
     console.log(`[useSegmentSettings:${instanceId}] 💾 Saving settings to pair:`, pairShotGenerationId.substring(0, 8), {
-      prompt: settings.prompt?.substring(0, 30) + '...',
-      negPrompt: settings.negativePrompt?.substring(0, 30) + '...',
-      motionMode: settings.motionMode,
-      amountOfMotion: settings.amountOfMotion,
-      hasPhaseConfig: !!settings.phaseConfig,
-      phaseConfigFlowShift: settings.phaseConfig?.flow_shift,
-      loraCount: settings.loras?.length ?? 0,
-      willSavePhaseConfig: settings.motionMode !== 'basic',
-      numFrames: settings.numFrames,
-      randomSeed: settings.randomSeed,
-      seed: settings.seed,
-      selectedPhasePresetId: settings.selectedPhasePresetId,
+      prompt: settingsToSave.prompt?.substring(0, 30) + '...',
+      negPrompt: settingsToSave.negativePrompt?.substring(0, 30) + '...',
+      motionMode: settingsToSave.motionMode,
+      amountOfMotion: settingsToSave.amountOfMotion,
+      hasPhaseConfig: !!settingsToSave.phaseConfig,
+      phaseConfigFlowShift: settingsToSave.phaseConfig?.flow_shift,
+      loraCount: settingsToSave.loras?.length ?? 0,
+      willSavePhaseConfig: settingsToSave.motionMode !== 'basic',
+      numFrames: settingsToSave.numFrames,
+      randomSeed: settingsToSave.randomSeed,
+      seed: settingsToSave.seed,
+      selectedPhasePresetId: settingsToSave.selectedPhasePresetId,
     });
 
     try {
@@ -475,25 +493,25 @@ export function useSegmentSettings({
 
       const currentMetadata = (current?.metadata as Record<string, any>) || {};
 
-      // Build update from current settings
+      // Build update from settings to save
       // Note: numFrames is NOT saved - timeline positions are the source of truth
       const newMetadata = buildMetadataUpdate(currentMetadata, {
-        prompt: settings.prompt,
-        negativePrompt: settings.negativePrompt,
-        textBeforePrompts: settings.textBeforePrompts,
-        textAfterPrompts: settings.textAfterPrompts,
-        motionMode: settings.motionMode,
-        amountOfMotion: settings.amountOfMotion, // Store in 0-100 scale (UI scale) - new format
-        phaseConfig: settings.motionMode === 'basic' ? null : settings.phaseConfig,
-        loras: settings.loras,
+        prompt: settingsToSave.prompt,
+        negativePrompt: settingsToSave.negativePrompt,
+        textBeforePrompts: settingsToSave.textBeforePrompts,
+        textAfterPrompts: settingsToSave.textAfterPrompts,
+        motionMode: settingsToSave.motionMode,
+        amountOfMotion: settingsToSave.amountOfMotion, // Store in 0-100 scale (UI scale) - new format
+        phaseConfig: settingsToSave.motionMode === 'basic' ? null : settingsToSave.phaseConfig,
+        loras: settingsToSave.loras,
         // numFrames intentionally omitted - timeline positions are source of truth
-        randomSeed: settings.randomSeed,
-        seed: settings.seed,
-        selectedPhasePresetId: settings.selectedPhasePresetId,
+        randomSeed: settingsToSave.randomSeed,
+        seed: settingsToSave.seed,
+        selectedPhasePresetId: settingsToSave.selectedPhasePresetId,
         // Structure video overrides (only saved if set)
-        structureMotionStrength: settings.structureMotionStrength,
-        structureTreatment: settings.structureTreatment,
-        structureUni3cEndPercent: settings.structureUni3cEndPercent,
+        structureMotionStrength: settingsToSave.structureMotionStrength,
+        structureTreatment: settingsToSave.structureTreatment,
+        structureUni3cEndPercent: settingsToSave.structureUni3cEndPercent,
       });
 
       // Log the new format (segmentOverrides) since buildMetadataUpdate writes there and deletes old pair_* fields
@@ -545,14 +563,16 @@ export function useSegmentSettings({
       console.log(`[useSegmentSettings:${instanceId}] ✅ Settings saved`, {
         pairShotGenerationId: pairShotGenerationId?.substring(0, 8),
         shotId: shotId?.substring(0, 8),
-        savedPrompt: settings.prompt?.substring(0, 50),
-        savedNegativePrompt: settings.negativePrompt?.substring(0, 50),
+        savedPrompt: settingsToSave.prompt?.substring(0, 50),
+        savedNegativePrompt: settingsToSave.negativePrompt?.substring(0, 50),
       });
 
-      // Invalidate the cache so the next read gets fresh data
-      console.log(`[SegmentSaveDebug] 🔄 Invalidating pair-metadata cache for:`, pairShotGenerationId.substring(0, 8));
-      await queryClient.invalidateQueries({ queryKey: ['pair-metadata', pairShotGenerationId] });
-      console.log(`[SegmentSaveDebug] ✅ pair-metadata cache invalidated`);
+      // Refetch the cache so mergedSettings uses fresh data immediately
+      // Using refetchQueries (not invalidateQueries) ensures the data is actually fetched before continuing
+      // This is critical for resetSettings which clears localSettings and relies on fresh mergedSettings
+      console.log(`[SegmentSaveDebug] 🔄 Refetching pair-metadata cache for:`, pairShotGenerationId.substring(0, 8));
+      await queryClient.refetchQueries({ queryKey: ['pair-metadata', pairShotGenerationId] });
+      console.log(`[SegmentSaveDebug] ✅ pair-metadata cache refetched`);
 
       // Refetch (not just invalidate) shot generations so timeline/pairDataByIndex updates immediately
       // Using refetchQueries ensures the query is actively refetched and events are reliably emitted
@@ -585,9 +605,15 @@ export function useSegmentSettings({
     const effectiveAmountOfMotion = settings.amountOfMotion ?? shotDefaultsValue.amountOfMotion ?? 50;
     const effectivePhaseConfig = settings.phaseConfig ?? shotDefaultsValue.phaseConfig;
     const effectiveSelectedPhasePresetId = settings.selectedPhasePresetId ?? shotDefaultsValue.selectedPhasePresetId ?? null;
-    // Use segment loras if there's an override (even empty array), otherwise use shot defaults
-    // This respects the user's explicit choice to have no loras on this segment
-    const effectiveLoras = hasOverride?.loras ? settings.loras : (shotDefaultsValue.loras ?? []);
+    // Use segment loras if explicitly set (even empty array), otherwise use shot defaults
+    // Consistent with effectiveLoras in SegmentSettingsForm
+    const effectiveLoras = settings.loras !== undefined ? settings.loras : (shotDefaultsValue.loras ?? []);
+    // Text before/after prompts
+    const effectiveTextBeforePrompts = settings.textBeforePrompts ?? shotDefaultsValue.textBeforePrompts ?? '';
+    const effectiveTextAfterPrompts = settings.textAfterPrompts ?? shotDefaultsValue.textAfterPrompts ?? '';
+    // Seed settings
+    const effectiveRandomSeed = settings.randomSeed ?? true;
+    const effectiveSeed = settings.seed;
 
     console.log(`[useSegmentSettings:${instanceId}] 💾 Saving as shot defaults:`, shotId.substring(0, 8), {
       // Raw settings (segment overrides only)
@@ -603,12 +629,16 @@ export function useSegmentSettings({
       effectiveAmountOfMotion,
       hasPhaseConfig: !!effectivePhaseConfig,
       effectiveLoraCount: effectiveLoras?.length ?? 0,
+      effectiveTextBeforePrompts: effectiveTextBeforePrompts?.substring(0, 30) || '(empty)',
+      effectiveTextAfterPrompts: effectiveTextAfterPrompts?.substring(0, 30) || '(empty)',
+      effectiveRandomSeed,
+      effectiveSeed: effectiveSeed ?? '(random)',
     });
 
     try {
       // Build the patch for shot-level settings using EFFECTIVE values
       // (what the user sees in the form, merging segment overrides with shot defaults)
-      const patch = {
+      const shotPatch = {
         prompt: effectivePrompt,
         negativePrompt: effectiveNegativePrompt,
         motionMode: effectiveMotionMode,
@@ -616,20 +646,12 @@ export function useSegmentSettings({
         phaseConfig: effectivePhaseConfig,
         selectedPhasePresetId: effectiveSelectedPhasePresetId,
         loras: effectiveLoras,
+        textBeforePrompts: effectiveTextBeforePrompts,
+        textAfterPrompts: effectiveTextAfterPrompts,
+        randomSeed: effectiveRandomSeed,
+        seed: effectiveSeed,
         // Note: numFrames intentionally not included - timeline positions are source of truth
-        randomSeed: settings.randomSeed ?? true,
-        seed: settings.seed,
-      };
-
-      // Use unified field names for shot settings
-      const shotPatch = {
-        prompt: patch.prompt,
-        negativePrompt: patch.negativePrompt,
-        motionMode: patch.motionMode,
-        amountOfMotion: patch.amountOfMotion,
-        phaseConfig: patch.phaseConfig,
-        selectedPhasePresetId: patch.selectedPhasePresetId,
-        loras: patch.loras,
+        // Note: structure video settings are stored per-video in structure_videos table, not here
       };
 
       console.log(`[SetAsShotDefaults] 📤 Sending patch to updateToolSettingsSupabase:`, {
@@ -642,6 +664,10 @@ export function useSegmentSettings({
           hasPhaseConfig: !!shotPatch.phaseConfig,
           loraCount: shotPatch.loras?.length ?? 0,
           loraNames: shotPatch.loras?.map((l: any) => l.name) ?? [],
+          textBeforePrompts: shotPatch.textBeforePrompts?.substring(0, 30) || '(empty)',
+          textAfterPrompts: shotPatch.textAfterPrompts?.substring(0, 30) || '(empty)',
+          randomSeed: shotPatch.randomSeed,
+          seed: shotPatch.seed ?? '(random)',
         },
       });
 
@@ -671,12 +697,58 @@ export function useSegmentSettings({
       await queryClient.refetchQueries({ queryKey: ['toolSettings', 'travel-between-images'] });
       console.log(`[SetAsShotDefaults] ✅ Query caches refetched`);
 
+      // Update structure video defaults if callback provided and segment has overrides
+      if (onUpdateStructureVideoDefaults) {
+        const hasStructureOverrides =
+          settings.structureMotionStrength !== undefined ||
+          settings.structureTreatment !== undefined ||
+          settings.structureUni3cEndPercent !== undefined;
+
+        if (hasStructureOverrides) {
+          // Calculate effective values (segment override → shot default)
+          const effectiveStructureMotionStrength = settings.structureMotionStrength ?? structureVideoDefaults?.motionStrength;
+          const effectiveStructureTreatment = settings.structureTreatment ?? structureVideoDefaults?.treatment;
+          const effectiveStructureUni3cEndPercent = settings.structureUni3cEndPercent ?? structureVideoDefaults?.uni3cEndPercent;
+
+          console.log(`[SetAsShotDefaults] 🎬 Updating structure video defaults:`, {
+            motionStrength: effectiveStructureMotionStrength,
+            treatment: effectiveStructureTreatment,
+            uni3cEndPercent: effectiveStructureUni3cEndPercent,
+          });
+
+          // Await the structure video update so UI refreshes before we return
+          await onUpdateStructureVideoDefaults({
+            motionStrength: effectiveStructureMotionStrength,
+            treatment: effectiveStructureTreatment,
+            uni3cEndPercent: effectiveStructureUni3cEndPercent,
+          });
+
+          // Clear segment's structure video overrides from local state AND DB
+          // so form shows "Default" badges (values are now the shot defaults)
+          // Convention: null = clear the override, undefined = don't touch
+          const clearedStructureSettings: SegmentSettings = {
+            ...settings,
+            structureMotionStrength: null as any,  // null = clear override
+            structureTreatment: null as any,
+            structureUni3cEndPercent: null as any,
+          };
+          await saveSettings(clearedStructureSettings);
+          // For local state, set to undefined so form falls back to shot defaults
+          setLocalSettings({
+            ...settings,
+            structureMotionStrength: undefined,
+            structureTreatment: undefined,
+            structureUni3cEndPercent: undefined,
+          });
+        }
+      }
+
       return true;
     } catch (error) {
       console.error('[useSegmentSettings] Exception saving shot defaults:', error);
       return false;
     }
-  }, [shotId, settings, shotDefaultsValue, instanceId, queryClient]);
+  }, [shotId, settings, shotDefaultsValue, instanceId, queryClient, onUpdateStructureVideoDefaults, structureVideoDefaults]);
 
   // Get effective settings for task creation (merges segment overrides with shot defaults)
   // This is what should be passed to buildTaskParams() when generating
@@ -882,26 +954,24 @@ export function useSegmentSettings({
       shotId: shotId?.substring(0, 8) || null,
     });
 
-    // Set cleared values temporarily so saveSettings can persist them to DB
-    setLocalSettings(clearedSettings);
-    setIsDirty(true);
-
-    // Clear enhanced prompt (fire and forget)
-    clearEnhancedPrompt();
-
-    // Save immediately (don't wait for auto-save debounce)
-    // This persists the "clear" operation to DB
+    // Save immediately by passing cleared settings directly
+    // This avoids React closure issues - we don't rely on setLocalSettings being applied
     if (pairShotGenerationId) {
       // Cancel any pending auto-save
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
         saveTimeoutRef.current = null;
       }
-      await saveSettings();
+
+      // Pass clearedSettings directly to avoid stale closure
+      await saveSettings(clearedSettings);
+
+      // Clear enhanced prompt AFTER saveSettings completes to avoid race condition
+      // Both functions do read-modify-write on metadata, so they must be sequential
+      await clearEnhancedPrompt();
     }
 
-    // NOW clear local state so form falls back to mergedSettings (which shows shot defaults)
-    // This must happen AFTER save, otherwise saveSettings would save the wrong values
+    // Clear local state so form falls back to mergedSettings (which shows shot defaults)
     setLocalSettings(null);
     setIsDirty(false);
   }, [instanceId, shotId, settings.numFrames, clearEnhancedPrompt, pairShotGenerationId, saveSettings]);

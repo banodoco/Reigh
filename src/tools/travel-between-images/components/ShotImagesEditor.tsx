@@ -1147,29 +1147,56 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     // Only handle video segments
     if (!currentSegment?.hasVideo || !currentSegment.videoUrl) return;
 
-    const activeVideo = activeVideoSlot === 'A' ? previewVideoRef.current : previewVideoRefB.current;
-    if (!activeVideo) return;
+    // Function to set up and play the video
+    const setupAndPlayVideo = () => {
+      const activeVideo = activeVideoSlot === 'A' ? previewVideoRef.current : previewVideoRefB.current;
+      if (!activeVideo) {
+        console.log('[SeamlessCut] Video element not available yet');
+        return false; // Signal that we need to retry
+      }
 
-    // Check if video already has the correct src (preloaded case)
-    const currentSrc = activeVideo.src;
-    const targetSrc = currentSegment.videoUrl;
+      // Check if video already has the correct src (preloaded case)
+      const currentSrc = activeVideo.src;
+      const targetSrc = currentSegment.videoUrl;
 
-    // Compare URLs (handle relative vs absolute)
-    const srcMatches = currentSrc && (currentSrc === targetSrc || currentSrc.endsWith(new URL(targetSrc, window.location.href).pathname));
+      // Compare URLs (handle relative vs absolute)
+      const srcMatches = currentSrc && (currentSrc === targetSrc || currentSrc.endsWith(new URL(targetSrc, window.location.href).pathname));
 
-    if (srcMatches) {
-      // Already has correct src (from preload) - just play
-      console.log('[SeamlessCut] Video already preloaded, playing:', { slot: activeVideoSlot, index: safeIndex });
+      if (srcMatches) {
+        // Already has correct src (from preload) - just play
+        console.log('[SeamlessCut] Video already preloaded, playing:', { slot: activeVideoSlot, index: safeIndex });
+        activeVideo.play().catch(() => {});
+        return true;
+      }
+
+      // Need to load the video (initial load or manual navigation)
+      console.log('[SeamlessCut] Loading active video:', { slot: activeVideoSlot, index: safeIndex });
+      setIsPreviewVideoLoading(true);
+      activeVideo.src = currentSegment.videoUrl;
+      activeVideo.load();
       activeVideo.play().catch(() => {});
-      return;
-    }
+      return true;
+    };
 
-    // Need to load the video (initial load or manual navigation)
-    console.log('[SeamlessCut] Loading active video:', { slot: activeVideoSlot, index: safeIndex });
-    setIsPreviewVideoLoading(true);
-    activeVideo.src = currentSegment.videoUrl;
-    activeVideo.load();
-    activeVideo.play().catch(() => {});
+    // Try immediately
+    if (setupAndPlayVideo()) return;
+
+    // If video element not available (Dialog portal not mounted yet), retry after a frame
+    // This handles the race condition where the effect runs before the Dialog content mounts
+    let retryCount = 0;
+    const maxRetries = 10;
+    const retryInterval = setInterval(() => {
+      retryCount++;
+      console.log('[SeamlessCut] Retrying video setup, attempt:', retryCount);
+      if (setupAndPlayVideo() || retryCount >= maxRetries) {
+        clearInterval(retryInterval);
+        if (retryCount >= maxRetries) {
+          console.warn('[SeamlessCut] Max retries reached, video element never became available');
+        }
+      }
+    }, 50);
+
+    return () => clearInterval(retryInterval);
   }, [isPreviewTogetherOpen, currentPreviewIndex, previewableSegments, activeVideoSlot]);
 
   // Helper to calculate global time across all segments
@@ -2789,6 +2816,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                               setPreviewCurrentTime(0);
                               setIsPreviewVideoLoading(false);
                               syncAudioToVideo();
+                              // Retry play now that video is ready - initial play() in effect may have failed
+                              video.play().catch(() => {});
                             }
                           }}
                           onEnded={() => {
@@ -2861,6 +2890,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                               setPreviewCurrentTime(0);
                               setIsPreviewVideoLoading(false);
                               syncAudioToVideo();
+                              // Retry play now that video is ready - initial play() in effect may have failed
+                              video.play().catch(() => {});
                             }
                           }}
                           onEnded={() => {

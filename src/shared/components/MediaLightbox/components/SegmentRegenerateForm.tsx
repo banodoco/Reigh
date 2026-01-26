@@ -66,6 +66,12 @@ export interface SegmentRegenerateFormProps {
     videoTotalFrames: number;
     videoFps: number;
   };
+  /** Callback to update structure video defaults when "Set as Shot Defaults" is clicked */
+  onUpdateStructureVideoDefaults?: (updates: {
+    motionStrength?: number;
+    treatment?: 'adjust' | 'clip';
+    uni3cEndPercent?: number;
+  }) => Promise<void>;
 }
 
 export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
@@ -89,6 +95,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   structureVideoDefaults,
   structureVideoUrl,
   structureVideoFrameRange,
+  onUpdateStructureVideoDefaults,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -122,6 +129,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
     structureVideoType,
     structureVideoUrl,
     structureVideoFrameRange,
+    onUpdateStructureVideoDefaults,
   });
 
   // Extract enhanced prompt from form props

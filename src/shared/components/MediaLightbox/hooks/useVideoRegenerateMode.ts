@@ -10,11 +10,12 @@
  * - Computing all props for SegmentRegenerateForm
  */
 
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
 import { extractSegmentImages } from '@/tools/travel-between-images/components/VideoGallery/utils/gallery-utils';
+import { updateToolSettingsSupabase } from '@/shared/hooks/useToolSettings';
 import type { SegmentRegenerateFormProps } from '../components/SegmentRegenerateForm';
 import type { SegmentSlotModeData } from '../types';
 
@@ -85,6 +86,8 @@ export function useVideoRegenerateMode({
   onSegmentFrameCountChange,
   currentFrameCount,
 }: UseVideoRegenerateModeProps): UseVideoRegenerateModeReturn {
+  const queryClient = useQueryClient();
+
   // Fetch shot's aspect ratio AND structure videos for regeneration
   const { data: shotDataForRegen, isLoading: isLoadingShotData } = useQuery({
     queryKey: ['shot-regen-data', shotId],
@@ -114,6 +117,63 @@ export function useVideoRegenerateMode({
     enabled: !!shotId && isVideo,
     staleTime: 60000,
   });
+
+  // Callback to update structure video defaults when "Set as Shot Defaults" is clicked
+  const handleUpdateStructureVideoDefaults = useCallback(async (updates: {
+    motionStrength?: number;
+    treatment?: 'adjust' | 'clip';
+    uni3cEndPercent?: number;
+  }): Promise<void> => {
+    if (!shotId) return;
+
+    const shotStructureVideos = shotDataForRegen?.structure_videos as Array<Record<string, unknown>> | null;
+    if (!shotStructureVideos || shotStructureVideos.length === 0) {
+      console.warn('[useVideoRegenerateMode] No structure videos to update');
+      return;
+    }
+
+    // Update the first structure video (or all if needed)
+    const updatedVideos = shotStructureVideos.map((video, index) => {
+      // Only update the first video for now (most common case)
+      if (index === 0) {
+        return {
+          ...video,
+          ...(updates.motionStrength !== undefined && { motion_strength: updates.motionStrength }),
+          ...(updates.treatment !== undefined && { treatment: updates.treatment }),
+          ...(updates.uni3cEndPercent !== undefined && { uni3c_end_percent: updates.uni3cEndPercent }),
+        };
+      }
+      return video;
+    });
+
+    console.log('[useVideoRegenerateMode] 🎬 Updating structure video defaults:', {
+      shotId: shotId.substring(0, 8),
+      updates,
+      updatedVideosCount: updatedVideos.length,
+    });
+
+    // Update structure video settings and await completion
+    await updateToolSettingsSupabase({
+      scope: 'shot',
+      id: shotId,
+      toolId: 'travel-structure-video',
+      patch: {
+        structure_videos: updatedVideos,
+        // Also update legacy single-video fields for backwards compat
+        structure_video_motion_strength: updates.motionStrength ?? shotStructureVideos[0]?.motion_strength,
+        structure_video_treatment: updates.treatment ?? shotStructureVideos[0]?.treatment,
+        uni3c_end_percent: updates.uni3cEndPercent ?? shotStructureVideos[0]?.uni3c_end_percent,
+      },
+    }, undefined, 'immediate');
+
+    // Refetch to update UI - await so caller knows when complete
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['shot-regen-data', shotId] }),
+      queryClient.refetchQueries({ queryKey: ['toolSettings', 'travel-structure-video'] }),
+    ]);
+
+    console.log('[useVideoRegenerateMode] ✅ Structure video defaults updated and caches refreshed');
+  }, [shotId, shotDataForRegen?.structure_videos, queryClient]);
 
   // Compute effective resolution for regeneration
   const effectiveRegenerateResolution = useMemo(() => {
@@ -318,6 +378,7 @@ export function useVideoRegenerateMode({
       structureVideoType,
       structureVideoDefaults,
       structureVideoUrl,
+      onUpdateStructureVideoDefaults: handleUpdateStructureVideoDefaults,
     };
   }, [
     canRegenerate,
@@ -336,6 +397,7 @@ export function useVideoRegenerateMode({
     onSegmentFrameCountChange,
     currentFrameCount,
     shotId,
+    handleUpdateStructureVideoDefaults,
   ]);
 
   return {

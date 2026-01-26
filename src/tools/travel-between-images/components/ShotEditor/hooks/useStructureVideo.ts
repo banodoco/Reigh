@@ -218,10 +218,10 @@ export function useStructureVideo({
         structureVideoSettings ?? null,
         timelineEndFrame
       );
-      
+
       setStructureVideosState(migratedVideos);
       setHasInitialized(shotId);
-      
+
       console.log('[useStructureVideo] ✅ Loaded structure videos:', {
         shotId: shotId.substring(0, 8),
         count: migratedVideos.length,
@@ -233,6 +233,41 @@ export function useStructureVideo({
       });
     }
   }, [structureVideoSettings, isStructureVideoSettingsLoading, shotId, hasInitialized, timelineEndFrame]);
+
+  // Sync local state when settings change externally (e.g., from "Set as Shot Defaults" in lightbox)
+  // This runs AFTER initialization, when the underlying query data changes
+  const prevSettingsRef = useRef<StructureVideoSettings | null>(null);
+  useEffect(() => {
+    // Only sync after initial load, when settings actually change
+    if (!hasInitialized || isStructureVideoSettingsLoading) return;
+
+    // Compare with previous settings to detect external changes
+    const prevSettings = prevSettingsRef.current;
+    const currentSettings = structureVideoSettings ?? null;
+
+    // Skip if settings haven't changed (same reference or both null)
+    if (prevSettings === currentSettings) return;
+
+    // Check if structure_videos array content changed
+    const prevVideos = prevSettings?.structure_videos;
+    const currentVideos = currentSettings?.structure_videos;
+
+    // Only sync if the actual video data changed (not just a re-render)
+    const videosChanged = JSON.stringify(prevVideos) !== JSON.stringify(currentVideos);
+
+    if (videosChanged && currentVideos !== undefined) {
+      console.log('[useStructureVideo] 🔄 External settings change detected, syncing:', {
+        shotId: shotId?.substring(0, 8),
+        prevCount: prevVideos?.length ?? 0,
+        newCount: currentVideos?.length ?? 0,
+      });
+
+      const migratedVideos = migrateToArrayFormat(currentSettings, timelineEndFrame);
+      setStructureVideosState(migratedVideos);
+    }
+
+    prevSettingsRef.current = currentSettings;
+  }, [structureVideoSettings, isStructureVideoSettingsLoading, hasInitialized, shotId, timelineEndFrame]);
 
   // Refs for stable callbacks
   const updateSettingsRef = useRef(updateStructureVideoSettings);

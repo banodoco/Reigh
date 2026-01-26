@@ -111,6 +111,8 @@ export interface SegmentSettingsFormProps {
     loras: import('@/shared/types/segmentSettings').LoraConfig[];
     selectedPhasePresetId: string | null;
   };
+  /** Whether user has made local edits (used for immediate UI updates before DB save) */
+  isDirty?: boolean;
 
   // Structure video context (for per-segment overrides)
   /** Structure video type for this segment (null = no structure video) */
@@ -278,6 +280,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   onSaveAsShotDefaults,
   hasOverride,
   shotDefaults,
+  isDirty,
   structureVideoType,
   structureVideoDefaults,
   structureVideoUrl,
@@ -308,17 +311,21 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
     return generationMode === 'vace' ? BUILTIN_VACE_PRESET : BUILTIN_I2V_PRESET;
   }, [generationMode]);
 
-  // Compute effective loras: use segment override if it exists, otherwise shot defaults
-  // hasOverride.loras tells us if user has set a segment-level override (could be empty array)
-  // This distinguishes "no override, use defaults" from "override to empty list"
+  // Compute effective loras: use segment override if explicitly set, otherwise shot defaults
+  // settings.loras values:
+  // - undefined: no override set (use shot defaults)
+  // - []: user explicitly cleared all loras (show empty)
+  // - [...]: user has specific loras (show them)
+  // This handles both local edits and DB overrides correctly
   const effectiveLoras = useMemo(() => {
-    // If segment has a lora override (even if empty), use it
-    if (hasOverride?.loras) {
-      return settings.loras ?? [];
+    // If loras have been explicitly set (locally or from DB), use that value
+    // This catches both "user added loras" and "user removed all loras"
+    if (settings.loras !== undefined) {
+      return settings.loras;
     }
-    // No segment override - fall back to shot defaults
+    // No explicit loras set - fall back to shot defaults
     return shotDefaults?.loras ?? [];
-  }, [settings.loras, shotDefaults?.loras, hasOverride?.loras]);
+  }, [settings.loras, shotDefaults?.loras]);
 
   // ==========================================================================
   // HANDLERS
@@ -694,7 +701,9 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               // Check if using defaults for motion settings
               const isUsingMotionModeDefault = settings.motionMode === undefined && !!shotDefaults?.motionMode;
               const isUsingPhaseConfigDefault = settings.phaseConfig === undefined && !!shotDefaults?.phaseConfig;
-              const isUsingLorasDefault = !hasOverride?.loras && (shotDefaults?.loras?.length ?? 0) > 0;
+              // For loras: show "Default" badge only if settings.loras is undefined AND shot has default loras
+              // settings.loras !== undefined means user has explicitly set loras (even if empty)
+              const isUsingLorasDefault = settings.loras === undefined && (shotDefaults?.loras?.length ?? 0) > 0;
               const isUsingMotionDefaults = isUsingMotionModeDefault || isUsingPhaseConfigDefault;
 
               return (

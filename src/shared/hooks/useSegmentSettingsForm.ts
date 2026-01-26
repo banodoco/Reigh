@@ -49,6 +49,16 @@ export interface UseSegmentSettingsFormOptions extends UseSegmentSettingsOptions
     videoTotalFrames: number;
     videoFps: number;
   };
+  /**
+   * Callback to update structure video defaults when "Save as Shot Defaults" is clicked.
+   * Structure videos are stored separately from tool settings, so the parent must provide this.
+   * Returns a Promise so we can await it before showing success.
+   */
+  onUpdateStructureVideoDefaults?: (updates: {
+    motionStrength?: number;
+    treatment?: 'adjust' | 'clip';
+    uni3cEndPercent?: number;
+  }) => Promise<void>;
 }
 
 export interface UseSegmentSettingsFormReturn {
@@ -104,6 +114,7 @@ export function useSegmentSettingsForm(
     shotId,
     defaults,
     structureVideoDefaults,
+    onUpdateStructureVideoDefaults,
     // Form display options
     segmentIndex,
     startImageUrl,
@@ -139,6 +150,7 @@ export function useSegmentSettingsForm(
     shotId,
     defaults,
     structureVideoDefaults,
+    onUpdateStructureVideoDefaults,
   });
 
   // Build form props that can be spread onto SegmentSettingsForm
@@ -150,6 +162,7 @@ export function useSegmentSettingsForm(
     // Override indicators
     hasOverride,
     shotDefaults,
+    isDirty,
 
     // Actions
     onRestoreDefaults: resetSettings,
@@ -181,6 +194,7 @@ export function useSegmentSettingsForm(
     updateSettings,
     hasOverride,
     shotDefaults,
+    isDirty,
     resetSettings,
     saveAsShotDefaults,
     enhancedPrompt,
