@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { GenerationRow } from '@/types/shots';
-import { useVariants, Variant } from '@/shared/hooks/useVariants';
+import { useVariants, GenerationVariant } from '@/shared/hooks/useVariants';
 import { useMarkVariantViewed } from '@/shared/hooks/useMarkVariantViewed';
 import { usePromoteVariantToGeneration } from '@/shared/hooks/usePromoteVariantToGeneration';
 import { useAddImageToShot } from '@/shared/hooks/useShots';
@@ -25,11 +25,11 @@ interface UseVariantManagementProps {
 
 interface UseVariantManagementReturn {
   /** All variants for this generation */
-  variants: Variant[] | undefined;
+  variants: GenerationVariant[] | undefined;
   /** The primary variant */
-  primaryVariant: Variant | undefined;
+  primaryVariant: GenerationVariant | undefined;
   /** The currently active/selected variant */
-  activeVariant: Variant | undefined;
+  activeVariant: GenerationVariant | undefined;
   /** Whether variants are loading */
   isLoadingVariants: boolean;
   /** Set the active variant ID */
