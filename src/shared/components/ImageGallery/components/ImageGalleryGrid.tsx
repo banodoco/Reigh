@@ -7,7 +7,6 @@ import { ImageGalleryItem } from "@/shared/components/ImageGalleryItem";
 import { getImageLoadingStrategy } from '@/shared/lib/imageLoadingPriority';
 import { GeneratedImageWithMetadata } from '../index';
 import { parseRatio } from '@/shared/lib/aspectRatios';
-import { SKELETON_COLUMNS } from '../utils/imageGallery-constants';
 
 export interface ImageGalleryGridProps {
   // Data props
@@ -217,16 +216,14 @@ const ImageGalleryGridInner: React.FC<ImageGalleryGridProps> = ({
 
   // Show full skeleton gallery when loading new data
   if (isLoading) {
-    // Use SKELETON_COLUMNS to match the actual grid layout for this columnsPerRow value
-    const skeletonColumns = SKELETON_COLUMNS[columnsPerRow as keyof typeof SKELETON_COLUMNS] || SKELETON_COLUMNS[5];
     // Match the gap classes used in the actual grid
     const skeletonGapClasses = reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4';
-    
+
     return (
       <div className={reducedSpacing ? "" : "min-h-[400px]"}>
         <SkeletonGallery
           count={itemsPerPage}
-          columns={skeletonColumns}
+          fixedColumns={columnsPerRow}
           gapClasses={skeletonGapClasses}
           whiteText={whiteText}
           showControls={false}
@@ -312,7 +309,11 @@ const ImageGalleryGridInner: React.FC<ImageGalleryGridProps> = ({
           >
             {(showImageIndices) => (
               <div>
-                <div className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${(reducedSpacing || hideBottomPagination) ? 'mb-0' : 'mb-12'} ${gridColumnClasses}`} data-tour="gallery-grid">
+                <div
+                  className={`grid ${reducedSpacing ? 'gap-2 sm:gap-4' : 'gap-4'} ${(reducedSpacing || hideBottomPagination) ? 'mb-0' : 'mb-12'}`}
+                  style={{ gridTemplateColumns: `repeat(${columnsPerRow}, minmax(0, 1fr))` }}
+                  data-tour="gallery-grid"
+                >
                   {paginatedImages.map((image, index) => {
                     const shouldShow = showImageIndices.has(index);
                     

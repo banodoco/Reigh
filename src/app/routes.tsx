@@ -21,7 +21,6 @@ const EditImagesPage = lazy(() => import('@/tools/edit-images/pages/EditImagesPa
 const TrainingDataHelperPage = lazy(() => import('@/tools/training-data-helper/pages/TrainingDataHelperPage'));
 import NotFoundPage from '@/pages/NotFoundPage';
 import ShotsPage from "@/pages/ShotsPage";
-import GenerationsPage from "@/pages/GenerationsPage"; // Import the new GenerationsPage
 import Layout from './Layout'; // Import the new Layout component
 import { AppEnv } from '@/types/env';
 import { ReighLoading } from '@/shared/components/ReighLoading';
@@ -136,10 +135,6 @@ const router = createBrowserRouter([
       {
         path: '/shots',
         element: <ShotsPage />,
-      },
-      {
-        path: '/generations',
-        element: <GenerationsPage />,
       },
       {
         path: '/art',

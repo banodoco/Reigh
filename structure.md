@@ -57,7 +57,7 @@
 | Path | Purpose | Key Files |
 |------|---------|-----------|
 | `/src/app` | App bootstrap & routing | `main.tsx` → `App.tsx` → `routes.tsx` → `Layout.tsx` |
-| `/src/pages` | Top-level pages | `HomePage`, `ToolSelectorPage`, `GenerationsPage`, `ShotsPage` |
+| `/src/pages` | Top-level pages | `HomePage`, `ToolSelectorPage`, `ShotsPage` |
 | `/src/tools` | Feature modules | Each tool: `pages/`, `components/`, `hooks/`, `settings.ts` |
 | `/src/shared` | Shared code | `components/ui/` (shadcn), `hooks/`, `contexts/`, `lib/` |
 | `/supabase/functions` | Edge Functions | Task processing, payments, AI integration |

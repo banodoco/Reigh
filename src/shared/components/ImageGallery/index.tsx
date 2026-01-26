@@ -204,7 +204,9 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
   // Use aspect-ratio-aware defaults, but allow explicit override via props
   const effectiveColumnsPerRow = columnsPerRow !== 5 ? columnsPerRow : aspectRatioLayout.columns;
   const defaultItemsPerPage = aspectRatioLayout.itemsPerPage;
-  const actualItemsPerPage = itemsPerPage ?? defaultItemsPerPage;
+  // Ensure itemsPerPage is a multiple of columns to guarantee full rows
+  const rawItemsPerPage = itemsPerPage ?? defaultItemsPerPage;
+  const actualItemsPerPage = Math.floor(rawItemsPerPage / effectiveColumnsPerRow) * effectiveColumnsPerRow || effectiveColumnsPerRow;
 
   // Memoize simplified shot options to prevent re-computation on every render
   const simplifiedShotOptions = React.useMemo(() =>

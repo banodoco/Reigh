@@ -4,6 +4,7 @@ import ImageGenerationForm, { PromptEntry } from "../components/ImageGenerationF
 import { ImageGenerationFormHandles } from "../components/ImageGenerationForm/types";
 import { createBatchImageGenerationTasks, BatchImageGenerationTaskParams } from "@/shared/lib/tasks/imageGeneration";
 import { ImageGallery, GeneratedImageWithMetadata, DisplayableMetadata, MetadataLora } from "@/shared/components/ImageGallery";
+import { useContainerWidth } from "@/shared/components/ImageGallery/hooks";
 import { getLayoutForAspectRatio } from "@/shared/components/ImageGallery/utils";
 import SettingsModal from "@/shared/components/SettingsModal";
 import { toast } from "sonner";
@@ -165,7 +166,8 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
   // Always use hooks - no environment-based disabling
   const { apiKeys, getApiKey } = useApiKeys();
   const imageGenerationFormRef = useRef<ImageGenerationFormHandles>(null);
-  const galleryRef = useRef<HTMLDivElement>(null);
+  // Measure gallery container width for calculating correct items per page
+  const [galleryRef, containerWidth] = useContainerWidth();
   const formContainerRef = useRef<HTMLDivElement>(null);
   const collapsibleContainerRef = useRef<HTMLDivElement>(null);
   const [searchParams] = useSearchParams();
@@ -257,12 +259,26 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
     }
   }, [formAssociatedShotId, pagePrefs]);
 
-  // Use aspect-ratio-aware page sizes to ensure full rows
-  // Columns and items per page are computed based on project aspect ratio
-  const aspectRatioLayout = useMemo(() => {
-    return getLayoutForAspectRatio(projectAspectRatio, isMobile);
-  }, [projectAspectRatio, isMobile]);
-  const itemsPerPage = aspectRatioLayout.itemsPerPage;
+  // Calculate items per page based on actual container width for correct row count
+  // This ensures we show the right number of rows (9 desktop, 5 mobile) regardless of columns
+  const galleryLayout = useMemo(() => {
+    return getLayoutForAspectRatio(projectAspectRatio, isMobile, containerWidth);
+  }, [projectAspectRatio, isMobile, containerWidth]);
+
+  // Lock in skeleton layout to prevent jitter during loading
+  // Calculate once based on window width and never change
+  const stableSkeletonLayout = useRef<{ columns: number; itemsPerPage: number } | null>(null);
+  if (stableSkeletonLayout.current === null) {
+    // Use window width estimate for stable initial value
+    const estimatedWidth = typeof window !== 'undefined' ? Math.floor(window.innerWidth * 0.9) : 800;
+    const stableLayout = getLayoutForAspectRatio(projectAspectRatio, isMobile, estimatedWidth);
+    stableSkeletonLayout.current = {
+      columns: stableLayout.columns,
+      itemsPerPage: stableLayout.itemsPerPage
+    };
+  }
+
+  const itemsPerPage = galleryLayout.itemsPerPage;
   
   // Use stable object for filters to prevent recreating on every render
   const generationsFilters = useStableObject(() => ({
@@ -1079,10 +1095,9 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
             {/* Show SkeletonGallery on initial load or when filter changes take too long */}
             {(!effectiveProjectId || (isLoadingGenerations && imagesToShow.length === 0)) ? (
               <SkeletonGallery
-                count={itemsPerPage}
-                columns={aspectRatioLayout.skeletonColumns}
+                count={stableSkeletonLayout.current.itemsPerPage}
+                fixedColumns={stableSkeletonLayout.current.columns}
                 showControls={true}
-                projectAspectRatio={projectAspectRatio}
               />
             ) : (
               <div className={isLoadingGenerations && isFilterChange ? 'opacity-60 pointer-events-none transition-opacity duration-200' : ''}>

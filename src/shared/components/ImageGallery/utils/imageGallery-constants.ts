@@ -4,7 +4,7 @@
  */
 export const DEFAULT_ROWS_PER_PAGE = {
   MOBILE: 5,
-  DESKTOP: 9,
+  DESKTOP: 6,
 } as const;
 
 /**
@@ -23,11 +23,11 @@ export const DEFAULT_ROWS_PER_PAGE = {
  */
 export const TARGET_IMAGE_WIDTH = {
   /** Base target width in pixels - TWEAK THIS to adjust gallery density */
-  BASE: 150,
+  BASE: 100,
   /** Minimum columns to show (prevents images from getting too large) */
   MIN_COLUMNS: 2,
   /** Maximum columns to show (prevents images from getting too small) */
-  MAX_COLUMNS: 12,
+  MAX_COLUMNS: 24,
   /** Gap between images in pixels (must match Tailwind gap class) */
   GAP: 8,
 } as const;
@@ -40,6 +40,18 @@ export const TARGET_IMAGE_WIDTH = {
 export const DEFAULT_ITEMS_PER_PAGE = {
   MOBILE: 20,
   DESKTOP: 45,
+} as const;
+
+/**
+ * Maximum items per page that server pagination should request.
+ * This ensures we always have enough items for any column count.
+ * ImageGallery will slice to the actual needed amount (columns × rows).
+ *
+ * Calculated as MAX_COLUMNS × DESKTOP_ROWS = 24 × 6 = 144
+ */
+export const SERVER_ITEMS_PER_PAGE = {
+  MOBILE: TARGET_IMAGE_WIDTH.MAX_COLUMNS * DEFAULT_ROWS_PER_PAGE.MOBILE,  // 24 × 5 = 120
+  DESKTOP: TARGET_IMAGE_WIDTH.MAX_COLUMNS * DEFAULT_ROWS_PER_PAGE.DESKTOP, // 24 × 9 = 216
 } as const;
 
 /**
@@ -90,21 +102,14 @@ export function parseAspectRatio(aspectRatioStr: string | undefined | null): num
 }
 
 /**
- * Calculate the target image width adjusted for aspect ratio.
+ * Calculate the target image width.
  *
- * Tall images (9:16) are naturally narrower, so we reduce the target width
- * to fit more of them. Wide images (16:9) get the full target width.
- *
- * The adjustment uses sqrt for smoother scaling:
- *   adjustedWidth = BASE * sqrt(aspectRatio)
- *
- * Examples (with BASE = 200):
- *   16:9 (1.78) → 200 * sqrt(1.78) ≈ 267px target
- *   1:1  (1.00) → 200 * sqrt(1.00) = 200px target
- *   9:16 (0.56) → 200 * sqrt(0.56) ≈ 150px target
+ * Uses a consistent target width regardless of aspect ratio.
+ * The actual displayed width depends on the grid column count,
+ * which is calculated from container width / target width.
  */
-export function getTargetImageWidth(aspectRatio: number): number {
-  return TARGET_IMAGE_WIDTH.BASE * Math.sqrt(aspectRatio);
+export function getTargetImageWidth(_aspectRatio: number): number {
+  return TARGET_IMAGE_WIDTH.BASE;
 }
 
 /**

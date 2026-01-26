@@ -131,13 +131,18 @@ export const useImageGalleryPagination = ({
   const totalPages = Math.max(1, Math.ceil(totalFilteredItems / itemsPerPage));
   
   const rangeStart = totalFilteredItems === 0 ? 0 : (isServerPagination ? offset : page * itemsPerPage) + 1;
-  const rangeEnd = rangeStart + (isServerPagination ? filteredImages.length : Math.min(itemsPerPage, filteredImages.length - page * itemsPerPage)) - 1;
+  // For server pagination, show the actual displayed count (capped at itemsPerPage for full rows)
+  const displayedCount = isServerPagination
+    ? Math.min(itemsPerPage, filteredImages.length)
+    : Math.min(itemsPerPage, filteredImages.length - page * itemsPerPage);
+  const rangeEnd = rangeStart + displayedCount - 1;
   
   // Get paginated images
   const paginatedImages = React.useMemo(() => {
     if (isServerPagination) {
-      // In server pagination mode, don't slice - the server already sent us the right page
-      return filteredImages;
+      // In server pagination mode, slice to itemsPerPage to ensure full rows
+      // The server may return more items than we need (for flexibility with dynamic columns)
+      return filteredImages.slice(0, itemsPerPage);
     }
     return filteredImages.slice(page * itemsPerPage, (page + 1) * itemsPerPage);
   }, [filteredImages, page, isServerPagination, itemsPerPage]);

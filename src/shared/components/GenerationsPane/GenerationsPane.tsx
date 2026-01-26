@@ -13,6 +13,7 @@ import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Sparkles
 import { ImageGenerationModal } from '@/shared/components/ImageGenerationModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ImageGallery } from '@/shared/components/ImageGallery';
+import { useContainerWidth } from '@/shared/components/ImageGallery/hooks';
 import { getLayoutForAspectRatio } from '@/shared/components/ImageGallery/utils';
 import { usePanes } from '@/shared/contexts/PanesContext';
 import PaneControlTab from '../PaneControlTab';
@@ -61,26 +62,43 @@ const GenerationsPaneComponent: React.FC = () => {
     tasksPaneWidth,
   } = usePanes();
   
-  // Check if we're on the generations page or image generation tool page
-  const isOnGenerationsPage = location.pathname === '/generations';
+  // Check if we're on the image generation tool page
   const isOnImageGenerationPage = location.pathname === '/tools/image-generation';
-  
+
   // Get current project's aspect ratio
   const { selectedProjectId, projects } = useProject();
   const currentProject = projects.find(p => p.id === selectedProjectId);
   const projectAspectRatio = currentProject?.aspectRatio;
-  const shouldEnableDataLoading = isOnGenerationsPage || isGenerationsPaneOpen;
+  const shouldEnableDataLoading = isGenerationsPaneOpen;
 
   const isMobile = useIsMobile();
 
-  // Compute aspect-ratio-aware layout for the pane
-  // Uses fewer rows than full-page galleries since this is a sliding pane
+  // Measure gallery container width for calculating correct items per page
+  const [galleryContainerRef, containerWidth] = useContainerWidth();
+
+  // Calculate items per page based on actual container width
+  // Pane uses fewer rows (PANE_ROWS=3) than full galleries (9 rows)
   const paneLayout = useMemo(() => {
-    const layout = getLayoutForAspectRatio(projectAspectRatio, isMobile);
-    // Override itemsPerPage to use fewer rows for the pane
-    const paneItemsPerPage = layout.columns * PANE_ROWS;
-    return { ...layout, itemsPerPage: paneItemsPerPage };
-  }, [projectAspectRatio, isMobile]);
+    const layout = getLayoutForAspectRatio(projectAspectRatio, isMobile, containerWidth);
+    // Override rows for the pane (3 rows instead of 9)
+    return {
+      ...layout,
+      itemsPerPage: layout.columns * PANE_ROWS
+    };
+  }, [projectAspectRatio, isMobile, containerWidth]);
+
+  // Lock in skeleton layout to prevent jitter during loading
+  // Calculate once based on window width and never change
+  const stableSkeletonLayout = useRef<{ columns: number; itemsPerPage: number } | null>(null);
+  if (stableSkeletonLayout.current === null) {
+    // Use window width estimate for stable initial value
+    const estimatedWidth = typeof window !== 'undefined' ? Math.floor(window.innerWidth * 0.9) : 800;
+    const stableLayout = getLayoutForAspectRatio(projectAspectRatio, isMobile, estimatedWidth);
+    stableSkeletonLayout.current = {
+      columns: stableLayout.columns,
+      itemsPerPage: stableLayout.columns * PANE_ROWS
+    };
+  }
 
   const GENERATIONS_PER_PAGE = paneLayout.itemsPerPage;
   const { currentShotId } = useCurrentShot();
@@ -395,10 +413,10 @@ const GenerationsPaneComponent: React.FC = () => {
 
   // Close the pane when navigating to generations page or image generation tool page
   useEffect(() => {
-    if ((isOnGenerationsPage || isOnImageGenerationPage) && (isOpen || isLocked)) {
+    if ((isOnImageGenerationPage) && (isOpen || isLocked)) {
       setIsGenerationsPaneLocked(false);
     }
-  }, [isOnGenerationsPage, isOnImageGenerationPage, isOpen, isLocked, setIsGenerationsPaneLocked]);
+  }, [isOnImageGenerationPage, isOpen, isLocked, setIsGenerationsPaneLocked]);
 
   return (
     <>
@@ -421,7 +439,7 @@ const GenerationsPaneComponent: React.FC = () => {
         />
       )}
       {/* Hide the control tab when on the generations page or image generation tool page */}
-      {!isOnGenerationsPage && !isOnImageGenerationPage && (
+      {!isOnImageGenerationPage && (
         <PaneControlTab
           side="bottom"
           isLocked={isLocked}
@@ -706,7 +724,7 @@ const GenerationsPaneComponent: React.FC = () => {
                         value={page.toString()} 
                         onValueChange={(value) => handleServerPageChange(parseInt(value))}
                       >
-                        <SelectTrigger variant="retro-dark" colorScheme="zinc" size="sm" className="h-6 w-9 text-xs px-1" hideIcon>
+                        <SelectTrigger variant="retro-dark" colorScheme="zinc" size="sm" className="h-6 w-9 text-xs px-1 !justify-center [&>span]:!text-center" hideIcon>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent variant="zinc">
@@ -735,18 +753,18 @@ const GenerationsPaneComponent: React.FC = () => {
             </div>
         </div>
         <div
+          ref={galleryContainerRef}
           className="flex-grow px-1 sm:px-3 overflow-y-auto overscroll-contain flex flex-col"
           style={{ WebkitOverflowScrolling: 'touch' }}
           data-tour="gallery-section"
         >
             {isLoading && (
                 <SkeletonGallery
-                    count={expectedItemCount ?? GENERATIONS_PER_PAGE}
-                    columns={paneLayout.skeletonColumns}
+                    count={expectedItemCount ?? stableSkeletonLayout.current.itemsPerPage}
+                    fixedColumns={stableSkeletonLayout.current.columns}
                     gapClasses="gap-2 sm:gap-4"
                     whiteText={true}
                     showControls={false}
-                    projectAspectRatio={projectAspectRatio}
                     className="space-y-0 pb-4 pt-2"
                 />
             )}
@@ -796,14 +814,13 @@ const GenerationsPaneComponent: React.FC = () => {
                     offset={(page - 1) * GENERATIONS_PER_PAGE}
                     totalCount={totalCount}
                     whiteText
-                    columnsPerRow={paneLayout.columns}
                     itemsPerPage={GENERATIONS_PER_PAGE}
                     initialMediaTypeFilter={mediaTypeFilter}
                     onMediaTypeFilterChange={setMediaTypeFilter}
                     initialStarredFilter={starredOnly}
                     onStarredFilterChange={setStarredOnly}
                     reducedSpacing={true}
-                    className="space-y-0"
+                    className="space-y-0 pb-8"
                     hidePagination={true}
                     hideTopFilters={true}
                     showShare={false}

@@ -327,7 +327,7 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
       });
 
       setTimeout(() => {
-        navigate('/generations');
+        navigate('/tools/image-generation');
       }, 1500);
 
     } catch (error) {

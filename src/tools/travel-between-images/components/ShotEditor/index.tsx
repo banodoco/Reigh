@@ -674,6 +674,34 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   
   // Device detection (extracted to shared hook)
   const { isTablet, isPhone, orientation, mobileColumns } = useDeviceDetection();
+
+  // Adjust columns based on aspect ratio - portrait images are narrower so we can fit more
+  const aspectAdjustedColumns = useMemo(() => {
+    if (!effectiveAspectRatio) return mobileColumns;
+
+    const [w, h] = effectiveAspectRatio.split(':').map(Number);
+    if (!w || !h) return mobileColumns;
+
+    const ratio = w / h;
+
+    // Portrait (ratio < 1): images are narrow, fit more columns
+    // Landscape (ratio > 1): images are wide, fit fewer columns
+    // Square (ratio = 1): use base columns
+
+    if (ratio < 0.7) {
+      // Very portrait (e.g., 9:16 = 0.56) - add 2 columns
+      return Math.min(mobileColumns + 2, 8) as 2 | 3 | 4 | 6;
+    } else if (ratio < 1) {
+      // Slightly portrait (e.g., 3:4 = 0.75) - add 1 column
+      return Math.min(mobileColumns + 1, 7) as 2 | 3 | 4 | 6;
+    } else if (ratio > 1.5) {
+      // Very landscape (e.g., 16:9 = 1.78) - reduce by 1 column (min 2)
+      return Math.max(mobileColumns - 1, 2) as 2 | 3 | 4 | 6;
+    }
+
+    // Square or slightly landscape - use base columns
+    return mobileColumns;
+  }, [mobileColumns, effectiveAspectRatio]);
   const { 
     setIsGenerationsPaneLocked,
     isShotsPaneLocked,
@@ -2359,11 +2387,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onImageDelete={generationActions.handleDeleteImageFromShot}
             onBatchImageDelete={generationActions.handleBatchDeleteImages}
             onImageDuplicate={generationActions.handleDuplicateImage}
-            columns={mobileColumns as 2 | 3 | 4 | 6}
+            columns={aspectAdjustedColumns as 2 | 3 | 4 | 6}
             skeleton={
-              <ImageManagerSkeleton 
+              <ImageManagerSkeleton
                 isMobile={isMobile}
-                {...({ columns: mobileColumns } as any)}
+                {...({ columns: aspectAdjustedColumns } as any)}
                 shotImages={contextImages}
                 projectAspectRatio={effectiveAspectRatio}
               />

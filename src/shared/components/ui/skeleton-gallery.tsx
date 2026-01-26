@@ -5,7 +5,7 @@ import { parseRatio } from '@/shared/lib/aspectRatios';
 interface SkeletonGalleryProps {
   /** Number of skeleton items to show */
   count?: number;
-  /** Number of columns for the grid */
+  /** Number of columns for the grid (responsive breakpoints) */
   columns?: {
     base?: number;
     sm?: number;
@@ -14,6 +14,8 @@ interface SkeletonGalleryProps {
     xl?: number;
     '2xl'?: number;
   };
+  /** Fixed column count - overrides responsive columns when provided */
+  fixedColumns?: number;
   /** Custom gap classes (e.g. "gap-2 sm:gap-3 md:gap-4") - defaults to "gap-4" */
   gapClasses?: string;
   /** Whether to use white text/styling (for dark panes) */
@@ -30,9 +32,10 @@ interface SkeletonGalleryProps {
  * A reusable skeleton loading component for gallery layouts.
  * Provides consistent skeleton styling across different tools and pages.
  */
-export function SkeletonGallery({ 
-  count = 20, 
+export function SkeletonGallery({
+  count = 20,
   columns = { base: 2, sm: 3, md: 4, lg: 5, xl: 6 },
+  fixedColumns,
   gapClasses = 'gap-4',
   whiteText = false,
   className,
@@ -151,10 +154,13 @@ export function SkeletonGallery({
       )}
       
       {/* Gallery grid skeleton */}
-      <div className={gridCols}>
+      <div
+        className={fixedColumns ? cn('grid', gapClasses) : gridCols}
+        style={fixedColumns ? { gridTemplateColumns: `repeat(${fixedColumns}, minmax(0, 1fr))` } : undefined}
+      >
         {Array.from({ length: count }).map((_, idx) => (
-          <div 
-            key={idx} 
+          <div
+            key={idx}
             className={cn(
               'animate-pulse rounded-lg relative',
               skeletonBg
