@@ -2,74 +2,95 @@ import { useMemo } from 'react';
 import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
 import { useGetTask } from '@/shared/hooks/useTasks';
 import { deriveInputImages } from '@/shared/utils/taskParamsUtils';
+import { Task } from '@/types/tasks';
 
 interface UseTaskDetailsProps {
   generationId: string | null;
+  /** Optional callback for applying task settings */
+  onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
+  /** Optional callback when closing task details */
+  onClose?: () => void;
+}
+
+interface TaskDetailsData {
+  task: Task | undefined;
+  isLoading: boolean;
+  error: Error | null;
+  inputImages: string[];
+  taskId: string | null;
+  onApplySettingsFromTask?: (taskId: string, replaceImages: boolean, inputImages: string[]) => void;
+  onClose?: () => void;
 }
 
 interface UseTaskDetailsReturn {
-  taskDetailsData: {
-    task: any;
-    isLoading: boolean;
-    error: any;
-    inputImages: string[];
-    taskId: string | null;
-    onApplySettingsFromTask?: undefined;
-    onClose?: undefined;
-  } | null;
+  taskDetailsData: TaskDetailsData | null;
+  /** The task mapping (generationId → taskId) */
+  taskMapping: { taskId: string | null } | undefined;
+  /** The raw task data */
+  task: Task | undefined;
+  /** Loading state for just the task data (not mapping) */
+  isLoadingTask: boolean;
+  /** Error from task fetch */
+  taskError: Error | null;
 }
 
 /**
- * Hook to fetch and manage task details for a generation
- * Used to display task information in the MediaLightbox sidebar
+ * Hook to fetch and manage task details for a generation.
+ * Combines two queries: generation→taskId mapping and taskId→task data.
+ * Both queries use aggressive caching (staleTime: Infinity) for performance.
  */
 export function useTaskDetails({
-  generationId
+  generationId,
+  onApplySettingsFromTask,
+  onClose,
 }: UseTaskDetailsProps): UseTaskDetailsReturn {
-  // Fetch task mapping from unified cache
-  const { data: taskMapping } = useTaskFromUnifiedCache(generationId || '');
-  
-  // Fetch actual task data
-  const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(
+  // Fetch task mapping from unified cache (generation ID → task ID)
+  const { data: taskMapping, isLoading: isLoadingMapping } = useTaskFromUnifiedCache(generationId || '');
+
+  // Fetch actual task data (only runs when we have a taskId)
+  const { data: task, isLoading: isLoadingTaskData, error: taskError } = useGetTask(
     (taskMapping?.taskId as string) || ''
   );
-  
+
+  // Combined loading state:
+  // - If mapping is loading, we're loading
+  // - If mapping returned null taskId, we know there's no task - not loading
+  // - If mapping has a taskId and task data is loading, we're loading
+  const hasNoTask = taskMapping !== undefined && taskMapping.taskId === null;
+  const isLoading = hasNoTask ? false : (isLoadingMapping || isLoadingTaskData);
+
   // Derive input images from task params using shared utility
   const inputImages = useMemo(() => {
     if (!task?.params) return [];
     const params = typeof task.params === 'string' ? JSON.parse(task.params) : task.params;
     return deriveInputImages(params);
   }, [task]);
-  
-  console.log('[BasedOnNav] 🔍 useTaskDetails:', {
-    generationId: generationId?.substring(0, 8),
-    hasTaskMapping: !!taskMapping,
-    taskId: taskMapping?.taskId,
-    hasTask: !!task,
-    isLoadingTask,
-    hasError: !!taskError,
-    inputImagesCount: inputImages.length,
-    taskKeys: task ? Object.keys(task) : []
-  });
-  
-  // Return null if no generation ID (lightbox closed)
+
+  // Return null taskDetailsData if no generation ID (lightbox closed)
   if (!generationId) {
-    return { taskDetailsData: null };
+    return {
+      taskDetailsData: null,
+      taskMapping: undefined,
+      task: undefined,
+      isLoadingTask: false,
+      taskError: null,
+    };
   }
-  
-  // Return task details data
+
   return {
     taskDetailsData: {
       task,
-      isLoading: isLoadingTask,
+      isLoading,
       error: taskError,
       inputImages,
       taskId: taskMapping?.taskId || null,
-      // These handlers are undefined for ShotImageManager
-      // They're only used in ImageGallery
-      onApplySettingsFromTask: undefined,
-      onClose: undefined
-    }
+      onApplySettingsFromTask,
+      onClose,
+    },
+    taskMapping,
+    task,
+    isLoadingTask: isLoadingTaskData,
+    taskError,
   };
 }
 

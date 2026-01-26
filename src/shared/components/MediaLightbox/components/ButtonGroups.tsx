@@ -7,7 +7,6 @@ import {
   CheckCircle,
   Loader2,
   ImagePlus,
-  Pencil,
   ArrowUpCircle,
   Trash2,
   Film,
@@ -36,39 +35,9 @@ interface TopLeftControlsProps extends BaseButtonGroupProps {
   handleEnterMagicEditMode?: () => void;
 }
 
-export const TopLeftControls: React.FC<TopLeftControlsProps> = ({
-  isVideo,
-  readOnly,
-  isSpecialEditMode,
-  selectedProjectId,
-  isCloudMode,
-  handleEnterMagicEditMode,
-}) => {
-  // Show Edit button when: not video, not readOnly, not in special edit mode, has project, is cloud mode
-  const showEditButton = !isVideo && !readOnly && !isSpecialEditMode && selectedProjectId && isCloudMode && handleEnterMagicEditMode;
-  
-  if (!showEditButton) {
-    return null;
-  }
-
-  return (
-    <div className="absolute top-4 left-4 flex items-center space-x-2 z-10">
-      {/* Edit Button */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleEnterMagicEditMode}
-            className="bg-black/50 hover:bg-black/70 text-white"
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent className="z-[100001]">Edit image</TooltipContent>
-      </Tooltip>
-    </div>
-  );
+export const TopLeftControls: React.FC<TopLeftControlsProps> = () => {
+  // Edit button removed - no longer shown in top left
+  return null;
 };
 
 // ============================================================================

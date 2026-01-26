@@ -157,22 +157,37 @@ const VideoTravelToolPage: React.FC = () => {
   }, []);
 
   const videoLayoutConfig = useMemo(() => {
-    // Use the same layout calculation as ImageGallery, but with ~50% columns and max 3 rows
+    // Use the same layout calculation as ImageGallery
     const layout = getLayoutForAspectRatio(projectAspectRatio, isMobile, windowWidth * 0.95);
-    const videoColumns = Math.max(3, Math.floor(layout.columns / 3)); // ~33% of image columns, min 3 (GRID_COLUMN_CLASSES minimum)
-    const videoRows = Math.min(3, layout.rows); // Max 3 rows
-    const result = videoColumns * videoRows;
-    console.log('[VideoTravelToolPage] Dynamic video layout calculation:', {
+
+    // For videos: use ~33% of image columns, minimum 2
+    const videoColumns = Math.max(2, Math.floor(layout.columns / 3));
+
+    // For videos: use 3 rows
+    const videoRows = 3;
+
+    const itemsPerPage = videoColumns * videoRows;
+
+    console.log('[VideoLayoutFix] VideoTravelToolPage calculation:', {
+      // Inputs
       projectAspectRatio,
       isMobile,
       windowWidth,
-      imageColumns: layout.columns,
+      containerWidthEstimate: windowWidth * 0.95,
+      // Image layout (what ImageGallery would use)
+      imageLayoutColumns: layout.columns,
+      imageLayoutRows: layout.rows,
+      imageLayoutItemsPerPage: layout.itemsPerPage,
+      imageLayoutGridClasses: layout.gridColumnClasses,
+      // Video layout (what we're calculating)
       videoColumns,
-      imageRows: layout.rows,
       videoRows,
-      itemsPerPage: result,
+      videoItemsPerPage: itemsPerPage,
+      // This columnsPerRow will be passed to ImageGallery
+      passingColumnsPerRow: videoColumns,
     });
-    return { columns: videoColumns, itemsPerPage: result };
+
+    return { columns: videoColumns, itemsPerPage };
   }, [projectAspectRatio, isMobile, windowWidth]);
 
   const itemsPerPage = videoLayoutConfig.itemsPerPage;

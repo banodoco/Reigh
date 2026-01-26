@@ -25,6 +25,7 @@ import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 import { useVideoScrubbing } from '@/shared/hooks/useVideoScrubbing';
 import { SegmentSlot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
 import { getDisplayUrl, cn } from '@/shared/lib/utils';
+import { usePrefetchTaskData } from '@/shared/hooks/useUnifiedGenerations';
 
 interface ShotImageManagerDesktopProps extends ShotImageManagerProps {
   selection: any;
@@ -118,11 +119,42 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
   // Fetch task details for current lightbox image
   // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
   // For ShotImageManager, id is shot_generations.id but generation_id is the actual generation ID
-  const currentLightboxImage = lightbox.lightboxIndex !== null 
-    ? lightbox.currentImages[lightbox.lightboxIndex] 
+  const currentLightboxImage = lightbox.lightboxIndex !== null
+    ? lightbox.currentImages[lightbox.lightboxIndex]
     : null;
   const currentLightboxImageId = (currentLightboxImage as any)?.generation_id || currentLightboxImage?.id || null;
   const { taskDetailsData } = useTaskDetails({ generationId: currentLightboxImageId });
+
+  // Prefetch task data for adjacent items when lightbox is open
+  const prefetchTaskData = usePrefetchTaskData();
+
+  useEffect(() => {
+    if (lightbox.lightboxIndex === null) return;
+
+    // Prefetch previous item
+    if (lightbox.lightboxIndex > 0) {
+      const prevItem = lightbox.currentImages[lightbox.lightboxIndex - 1];
+      const prevGenerationId = (prevItem as any)?.generation_id || prevItem?.id;
+      if (prevGenerationId) {
+        prefetchTaskData(prevGenerationId);
+      }
+    }
+
+    // Prefetch next item
+    if (lightbox.lightboxIndex < lightbox.currentImages.length - 1) {
+      const nextItem = lightbox.currentImages[lightbox.lightboxIndex + 1];
+      const nextGenerationId = (nextItem as any)?.generation_id || nextItem?.id;
+      if (nextGenerationId) {
+        prefetchTaskData(nextGenerationId);
+      }
+    }
+
+    // Prefetch current item too
+    if (currentLightboxImageId) {
+      prefetchTaskData(currentLightboxImageId);
+    }
+  }, [lightbox.lightboxIndex, lightbox.currentImages, currentLightboxImageId, prefetchTaskData]);
+
   const gridColsClass = GRID_COLS_CLASSES[props.columns || 4] || 'grid-cols-4';
   const isMobile = useIsMobile();
   

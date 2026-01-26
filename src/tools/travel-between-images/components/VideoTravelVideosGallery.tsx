@@ -126,6 +126,15 @@ export const VideoTravelVideosGallery: React.FC<VideoTravelVideosGalleryProps> =
   // Use actual count if available, otherwise default to 12
   const skeletonCount = (vd?.total) || 12;
   
+  // For videos, use fewer columns than images (hardcoded for now to verify it works)
+  const effectiveColumnsPerRow = columnsPerRow ?? 3;
+
+  console.log('[VideoLayoutFix] VideoTravelVideosGallery:', {
+    columnsPerRow_received: columnsPerRow,
+    effectiveColumnsPerRow,
+    itemsPerPage,
+  });
+
   console.log('[VideoSkeletonDebug] === RENDER DECISION ===', {
     selectedProjectId,
     videosLoading,
@@ -152,7 +161,7 @@ export const VideoTravelVideosGallery: React.FC<VideoTravelVideosGalleryProps> =
         <div className="pb-2">
           <SkeletonGallery
             count={skeletonCount}
-            columns={SKELETON_COLUMNS[columnsPerRow as keyof typeof SKELETON_COLUMNS] || SKELETON_COLUMNS[3]}
+            columns={SKELETON_COLUMNS[effectiveColumnsPerRow as keyof typeof SKELETON_COLUMNS] || SKELETON_COLUMNS[5]}
             showControls={true}
             projectAspectRatio={projectAspectRatio}
           />
@@ -195,7 +204,7 @@ export const VideoTravelVideosGallery: React.FC<VideoTravelVideosGalleryProps> =
           initialStarredFilter={videoStarredOnly}
           onStarredFilterChange={(val) => { setVideoStarredOnly(val); setVideoPage(1); }}
           projectAspectRatio={projectAspectRatio}
-          columnsPerRow={columnsPerRow}
+          columnsPerRow={effectiveColumnsPerRow}
           showShare={false}
           onDelete={deletion?.onDelete}
           isDeleting={deletion?.isDeleting}

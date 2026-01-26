@@ -69,6 +69,7 @@ export const SERVER_ITEMS_PER_PAGE = {
  * Extended to support up to 12 columns for dynamic width-based calculation
  */
 export const GRID_COLUMN_CLASSES = {
+  2: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-2',
   3: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-3',
   4: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-4',
   5: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5',
@@ -86,6 +87,7 @@ export const GRID_COLUMN_CLASSES = {
  * These must stay in sync with GRID_COLUMN_CLASSES to prevent layout shift during loading.
  */
 export const SKELETON_COLUMNS = {
+  2: { base: 1, sm: 2, md: 2, lg: 2, xl: 2, '2xl': 2 },
   3: { base: 1, md: 2, lg: 3, xl: 3, '2xl': 3 },
   4: { base: 2, sm: 3, md: 4, lg: 4, xl: 4, '2xl': 4 },
   5: { base: 2, sm: 3, md: 4, lg: 5, xl: 5, '2xl': 5 },

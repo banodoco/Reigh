@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast as sonnerToast } from 'sonner';
 import { GenerationRow } from '@/types/shots';
 import { Task } from '@/types/tasks';
 import { deriveInputImages } from '../utils/task-utils';
+import { usePrefetchTaskData } from '@/shared/hooks/useUnifiedGenerations';
 
 interface LightboxData {
   type: 'image' | 'video';
@@ -138,6 +139,26 @@ export function useTasksLightbox({
       sonnerToast.error('Failed to load generation');
     }
   }, [selectedProjectId]);
+
+  // Prefetch task data for adjacent videos when navigating
+  const prefetchTaskData = usePrefetchTaskData();
+
+  useEffect(() => {
+    if (lightboxData?.type !== 'video' || !Array.isArray(lightboxData.media)) return;
+
+    const currentIndex = lightboxData.videoIndex ?? 0;
+    const mediaArray = lightboxData.media as GenerationRow[];
+
+    // Prefetch previous item
+    if (currentIndex > 0 && mediaArray[currentIndex - 1]?.id) {
+      prefetchTaskData(mediaArray[currentIndex - 1].id);
+    }
+
+    // Prefetch next item
+    if (currentIndex < mediaArray.length - 1 && mediaArray[currentIndex + 1]?.id) {
+      prefetchTaskData(mediaArray[currentIndex + 1].id);
+    }
+  }, [lightboxData, prefetchTaskData]);
 
   // Video navigation handlers
   const handleVideoNext = useCallback(() => {

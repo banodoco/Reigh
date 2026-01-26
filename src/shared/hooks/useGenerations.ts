@@ -490,14 +490,26 @@ async function createGeneration(params: {
   projectId: string;
   prompt: string;
   thumbnailUrl?: string;
+  /** Resolution in "WIDTHxHEIGHT" format (e.g., "1920x1080") */
+  resolution?: string;
+  /** Standard aspect ratio (e.g., "16:9") */
+  aspectRatio?: string;
 }): Promise<any> {
-  const generationParams = {
+  const generationParams: Record<string, any> = {
     prompt: params.prompt,
     source: 'external_upload',
     original_filename: params.fileName,
     file_type: params.fileType,
     file_size: params.fileSize,
   };
+
+  // Add dimension params if provided
+  if (params.resolution) {
+    generationParams.resolution = params.resolution;
+  }
+  if (params.aspectRatio) {
+    generationParams.aspect_ratio = params.aspectRatio;
+  }
 
   const { data, error } = await supabase
     .from('generations')

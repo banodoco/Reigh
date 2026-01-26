@@ -5,8 +5,7 @@ import { useProject } from '@/shared/contexts/ProjectContext';
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useShotNavigation } from '@/shared/hooks/useShotNavigation';
 import { useToggleGenerationStar } from '@/shared/hooks/useGenerations';
-import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
-import { useGetTask } from '@/shared/hooks/useTasks';
+import { useTaskDetails } from '@/shared/components/ShotImageManager/hooks/useTaskDetails';
 import { useBackgroundThumbnailGenerator } from '@/shared/hooks/useBackgroundThumbnailGenerator';
 import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
@@ -33,7 +32,6 @@ import {
 
 // Import utils
 import {
-  deriveInputImages,
   DEFAULT_ITEMS_PER_PAGE,
   GRID_COLUMN_CLASSES,
   getLayoutForAspectRatio,
@@ -202,8 +200,20 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
   }, [projectAspectRatio, isMobile, containerWidth]);
 
   // Use aspect-ratio-aware defaults, but allow explicit override via props
+  // NOTE: columnsPerRow=5 is the "magic" default that means "use dynamic calculation"
+  // Any other value (including undefined!) will be used directly - BE CAREFUL
   const effectiveColumnsPerRow = columnsPerRow !== 5 ? columnsPerRow : aspectRatioLayout.columns;
   const defaultItemsPerPage = aspectRatioLayout.itemsPerPage;
+
+  // Debug log for video layout issues
+  console.log('[VideoLayoutFix] ImageGallery computing layout:', {
+    columnsPerRow_prop: columnsPerRow,
+    columnsPerRow_is5: columnsPerRow === 5,
+    aspectRatioLayout_columns: aspectRatioLayout.columns,
+    effectiveColumnsPerRow,
+    willUseGridClass: GRID_COLUMN_CLASSES[effectiveColumnsPerRow as keyof typeof GRID_COLUMN_CLASSES] ? 'YES' : 'NO - FALLBACK',
+    containerWidth,
+  });
   // Ensure itemsPerPage is a multiple of columns to guarantee full rows
   const rawItemsPerPage = itemsPerPage ?? defaultItemsPerPage;
   const actualItemsPerPage = Math.floor(rawItemsPerPage / effectiveColumnsPerRow) * effectiveColumnsPerRow || effectiveColumnsPerRow;
@@ -315,17 +325,23 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
     onOpenLightbox: actionsHook.handleOpenLightbox,
   });
 
-  // Task details functionality
+  // Task details functionality using shared hook
   // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
   // For ShotImageManager images, id is shot_generations.id but generation_id is the actual generation ID
-  const lightboxImageId = (stateHook.state.activeLightboxMedia as any)?.generation_id 
-    || stateHook.state.activeLightboxMedia?.id 
+  const lightboxImageId = (stateHook.state.activeLightboxMedia as any)?.generation_id
+    || stateHook.state.activeLightboxMedia?.id
     || null;
-  const { data: lightboxTaskMapping } = useTaskFromUnifiedCache(lightboxImageId || '');
-  const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask((lightboxTaskMapping?.taskId as string) || '');
-  
-  // Derive input images from multiple possible locations within task params
-  const inputImages: string[] = useMemo(() => deriveInputImages(task), [task]);
+  const {
+    taskDetailsData,
+    taskMapping: lightboxTaskMapping,
+    task,
+    taskError,
+  } = useTaskDetails({
+    generationId: lightboxImageId,
+    onApplySettingsFromTask: onApplySettings,
+    onClose: actionsHook.handleCloseLightbox,
+  });
+  const inputImages = taskDetailsData?.inputImages || [];
 
   // Background thumbnail generation for videos without thumbnails
   useBackgroundThumbnailGenerator({
@@ -882,7 +898,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
         selectedImageForDetails={stateHook.state.selectedImageForDetails}
         setSelectedImageForDetails={stateHook.setSelectedImageForDetails}
         task={task}
-        isLoadingTask={isLoadingTask}
+        isLoadingTask={taskDetailsData?.isLoading ?? false}
         taskError={taskError}
         inputImages={inputImages}
         lightboxTaskMapping={lightboxTaskMapping}

@@ -295,7 +295,7 @@ export const ShotSelectorControls: React.FC<ShotSelectorControlsProps> = ({
                 className={`h-8 px-3 text-white ${
                   addedVariantAsNewSuccess
                     ? 'bg-green-600/80 hover:bg-green-600'
-                    : 'bg-blue-600/80 hover:bg-blue-600'
+                    : 'bg-black/50 hover:bg-black/70'
                 }`}
               >
                 {isAddingVariantAsNew ? (

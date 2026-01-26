@@ -26,8 +26,7 @@ import MediaLightbox from '@/shared/components/MediaLightbox';
 import { GenerationRow } from '@/types/shots';
 import { formatDistanceToNow } from 'date-fns';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import { useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
-import { useGetTask } from '@/shared/hooks/useTasks';
+import { useTaskDetails } from '@/shared/components/ShotImageManager/hooks/useTaskDetails';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
@@ -128,10 +127,16 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
     } as GenerationRow;
   }, [selectedParent]);
   
-  // Get task data for lightbox task details
-  const { data: taskMapping } = useTaskFromUnifiedCache(selectedParentId || '');
-  const taskId = typeof taskMapping?.taskId === 'string' ? taskMapping.taskId : '';
-  const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(taskId);
+  // Get task data for lightbox task details using shared hook
+  const {
+    taskDetailsData,
+    taskMapping,
+    task,
+    taskError,
+  } = useTaskDetails({
+    generationId: selectedParentId,
+    onApplySettingsFromTask,
+  });
 
   // Check for active join_clips_orchestrator tasks for this shot
   // Include parentGenerations IDs in query key so we can match by parent_generation_id
@@ -503,10 +508,10 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
           showVideoTrimEditor={true}
           taskDetailsData={{
             task,
-            isLoading: isLoadingTask,
+            isLoading: taskDetailsData?.isLoading ?? false,
             error: taskError,
             inputImages,
-            taskId: taskId || null,
+            taskId: taskMapping?.taskId || null,
             onApplySettingsFromTask: onApplySettingsFromTask,
             onClose: handleLightboxClose,
           }}

@@ -1770,13 +1770,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       };
     }
 
-    // If variants are still loading, return taskDetailsData but mark as loading
-    // This prevents showing wrong task type that then switches after variants load
+    // If variants are still loading AND we don't have task data yet, show loading
+    // But if we already have task data cached, show it immediately rather than blocking on variants
+    // This provides better UX when task data is prefetched/cached
     // ALSO check if we're waiting for initialVariantId to be applied (clicked a specific variant)
     const waitingForInitialVariant = initialVariantId &&
       (!activeVariant || activeVariant.id !== initialVariantId);
 
-    if ((isLoadingVariants && !activeVariant) || waitingForInitialVariant) {
+    // Only override to loading if:
+    // 1. Waiting for a specific variant (user clicked a variant)
+    // 2. Variants loading AND no active variant AND task details still loading
+    //    (If task details finished - either has task or knows there's none - don't block on variants)
+    const shouldShowLoading = waitingForInitialVariant ||
+      (isLoadingVariants && !activeVariant && taskDetailsData?.isLoading);
+
+    if (shouldShowLoading) {
       return taskDetailsData ? { ...taskDetailsData, isLoading: true } : taskDetailsData;
     }
 
@@ -3495,13 +3503,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     );
                   })()}
 
-                    {/* Top Left Controls Container - stacked vertically */}
-                    <div
-                      className="absolute top-4 left-4 z-[70] flex flex-col gap-2 items-start select-none"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {/* Main Variant Badge/Button and New Image button */}
-                      {!readOnly && activeVariant && variants && (
+                    {/* Top Center - Main Variant Badge/Button */}
+                    {!readOnly && activeVariant && variants && (
+                      <div
+                        className="absolute top-8 md:top-16 left-1/2 transform -translate-x-1/2 z-[60] select-none"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <div className="flex items-center gap-2">
                           {/* Main variant badge - only show when multiple variants exist */}
                           {variants.length > 1 && activeVariant.is_primary && (
@@ -3527,46 +3534,38 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               Make main
                             </Button>
                           )}
-                          {/* New image button - always show for images */}
-                          {!isVideo && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => handlePromoteToGeneration(activeVariant.id)}
-                              disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
-                              className={cn(
-                                "border-none shadow-lg text-white",
-                                promoteSuccess
-                                  ? "bg-green-500/90 hover:bg-green-500/90"
-                                  : "bg-blue-500/90 hover:bg-blue-600"
-                              )}
-                              title="Create a standalone image from this variant"
-                            >
-                              {promoteVariantMutation.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                              ) : promoteSuccess ? (
-                                <Check className="w-4 h-4 mr-1.5" />
-                              ) : (
-                                <Plus className="w-4 h-4 mr-1.5" />
-                              )}
-                              {promoteSuccess ? 'Created' : 'New image'}
-                            </Button>
-                          )}
                         </div>
-                      )}
-                      {/* Edit button - below main variant when both show */}
-                      {!buttonGroupProps.topLeft.isVideo && !buttonGroupProps.topLeft.readOnly && !buttonGroupProps.topLeft.isSpecialEditMode && buttonGroupProps.topLeft.selectedProjectId && buttonGroupProps.topLeft.isCloudMode && buttonGroupProps.topLeft.handleEnterMagicEditMode && (
+                      </div>
+                    )}
+
+                    {/* Top Left - New image button */}
+                    {!isVideo && !readOnly && (
+                      <div
+                        className="absolute top-4 left-4 z-[70] select-none"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={buttonGroupProps.topLeft.handleEnterMagicEditMode}
-                          className="bg-black/50 hover:bg-black/70 text-white"
-                          title="Edit image"
+                          onClick={() => handlePromoteToGeneration(activeVariant?.id || primaryVariant?.id || '')}
+                          disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId || !(activeVariant?.id || primaryVariant?.id)}
+                          className={cn(
+                            "bg-black/50 hover:bg-black/70 text-white",
+                            promoteSuccess && "bg-green-500/90 hover:bg-green-500/90"
+                          )}
+                          title="Create a standalone image from this variant"
                         >
-                          <Pencil className="h-4 w-4" />
+                          {promoteVariantMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                          ) : promoteSuccess ? (
+                            <Check className="w-4 h-4 mr-1.5" />
+                          ) : (
+                            <Plus className="w-4 h-4 mr-1.5" />
+                          )}
+                          {promoteSuccess ? 'Created' : 'New image'}
                         </Button>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {/* Floating Tool Controls - Tablet (landscape with sidebar) */}
                     {isSpecialEditMode && shouldShowSidePanel && (
@@ -3876,10 +3875,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     />
                     )}
 
-                    {/* Top Left - Main Variant Badge/Button (Mobile Stacked) */}
+                    {/* Top Center - Main Variant Badge/Button (Mobile Stacked) */}
                     {!readOnly && activeVariant && variants && (
                       <div
-                        className="absolute top-4 left-4 z-[70] select-none"
+                        className="absolute top-8 md:top-16 left-1/2 transform -translate-x-1/2 z-[60] select-none"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center gap-2">
@@ -3907,32 +3906,36 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                               Make main
                             </Button>
                           )}
-                          {/* New image button - always show for images */}
-                          {!isVideo && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() => handlePromoteToGeneration(activeVariant.id)}
-                              disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
-                              className={cn(
-                                "border-none shadow-lg text-white",
-                                promoteSuccess
-                                  ? "bg-green-500/90 hover:bg-green-500/90"
-                                  : "bg-blue-500/90 hover:bg-blue-600"
-                              )}
-                              title="Create a standalone image from this variant"
-                            >
-                              {promoteVariantMutation.isPending ? (
-                                <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                              ) : promoteSuccess ? (
-                                <Check className="w-4 h-4 mr-1.5" />
-                              ) : (
-                                <Plus className="w-4 h-4 mr-1.5" />
-                              )}
-                              {promoteSuccess ? 'Created' : 'New image'}
-                            </Button>
-                          )}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Top Left - New image button (Mobile Stacked) */}
+                    {!isVideo && !readOnly && (
+                      <div
+                        className="absolute top-4 left-4 z-[70] select-none"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handlePromoteToGeneration(activeVariant?.id || primaryVariant?.id || '')}
+                          disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId || !(activeVariant?.id || primaryVariant?.id)}
+                          className={cn(
+                            "bg-black/50 hover:bg-black/70 text-white",
+                            promoteSuccess && "bg-green-500/90 hover:bg-green-500/90"
+                          )}
+                          title="Create a standalone image from this variant"
+                        >
+                          {promoteVariantMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                          ) : promoteSuccess ? (
+                            <Check className="w-4 h-4 mr-1.5" />
+                          ) : (
+                            <Plus className="w-4 h-4 mr-1.5" />
+                          )}
+                          {promoteSuccess ? 'Created' : 'New image'}
+                        </Button>
                       </div>
                     )}
 
@@ -3966,9 +3969,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     )}
 
                     {/* Mobile Stacked Layout - All button groups (matching desktop) */}
-                    {/* Top Left Controls - Edit button */}
-                    <TopLeftControls {...buttonGroupProps.topLeft} />
-
                     {/* Top Right Controls - Download, Delete & Close */}
                     <TopRightControls {...buttonGroupProps.topRight} />
 
@@ -4279,10 +4279,10 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   />
                 )}
 
-                  {/* Top Left - Main Variant Badge/Button */}
+                  {/* Top Center - Main Variant Badge/Button */}
                   {!readOnly && activeVariant && variants && (
                     <div
-                      className="absolute top-4 left-4 z-[70] select-none"
+                      className="absolute top-8 md:top-16 left-1/2 transform -translate-x-1/2 z-[60] select-none"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center gap-2">
@@ -4310,32 +4310,36 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                             Make main
                           </Button>
                         )}
-                        {/* New image button - always show for images */}
-                        {!isVideo && (
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => handlePromoteToGeneration(activeVariant.id)}
-                            disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId}
-                            className={cn(
-                              "border-none shadow-lg text-white",
-                              promoteSuccess
-                                ? "bg-green-500/90 hover:bg-green-500/90"
-                                : "bg-blue-500/90 hover:bg-blue-600"
-                            )}
-                            title="Create a standalone image from this variant"
-                          >
-                            {promoteVariantMutation.isPending ? (
-                              <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
-                            ) : promoteSuccess ? (
-                              <Check className="w-4 h-4 mr-1.5" />
-                            ) : (
-                              <Plus className="w-4 h-4 mr-1.5" />
-                            )}
-                            {promoteSuccess ? 'Created' : 'New image'}
-                          </Button>
-                        )}
                       </div>
+                    </div>
+                  )}
+
+                  {/* Top Left - New image button */}
+                  {!isVideo && !readOnly && (
+                    <div
+                      className="absolute top-4 left-4 z-[70] select-none"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => handlePromoteToGeneration(activeVariant?.id || primaryVariant?.id || '')}
+                        disabled={promoteVariantMutation.isPending || promoteSuccess || !selectedProjectId || !(activeVariant?.id || primaryVariant?.id)}
+                        className={cn(
+                          "bg-black/50 hover:bg-black/70 text-white",
+                          promoteSuccess && "bg-green-500/90 hover:bg-green-500/90"
+                        )}
+                        title="Create a standalone image from this variant"
+                      >
+                        {promoteVariantMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-1.5" />
+                        ) : promoteSuccess ? (
+                          <Check className="w-4 h-4 mr-1.5" />
+                        ) : (
+                          <Plus className="w-4 h-4 mr-1.5" />
+                        )}
+                        {promoteSuccess ? 'Created' : 'New image'}
+                      </Button>
                     </div>
                   )}
 
@@ -4345,26 +4349,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       className="absolute bottom-4 left-4 z-[70] select-none"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div className="flex items-center space-x-2">
-                        {!isSpecialEditMode && (
-                        <>
-                          {/* Unified Edit Button */}
-                          {!isVideo && selectedProjectId && isCloudMode && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleEnterMagicEditMode}
-                              className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-                              title="Edit image"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </>
-                      )}
-                      </div>
-                      
-                      {/* Compact Edit Controls - Above the bottom buttons */}
+                      {/* Compact Edit Controls - for special edit mode */}
                       {isSpecialEditMode && editMode !== 'text' && (
                         <div className="mb-2 bg-background backdrop-blur-md rounded-lg p-2 space-y-1.5 w-40 border border-border shadow-xl">
                           {/* Brush Size Slider - Only in Inpaint mode */}
@@ -4454,9 +4439,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                   )}
 
                   {/* Regular Mobile Layout - All button groups (matching desktop) */}
-                  {/* Top Left Controls - Edit button */}
-                  <TopLeftControls {...buttonGroupProps.topLeft} />
-
                   {/* Top Right Controls - Download, Delete & Close */}
                   <TopRightControls {...buttonGroupProps.topRight} />
 

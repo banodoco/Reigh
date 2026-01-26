@@ -126,7 +126,8 @@ export const useDistinctTaskTypes = (projectId?: string | null) => {
 };
 
 // Helper to convert DB row (snake_case) to Task interface (camelCase)
-const mapDbTaskToTask = (row: any): Task => ({
+// Exported for use in prefetch utilities
+export const mapDbTaskToTask = (row: any): Task => ({
   id: row.id,
   taskType: row.task_type,
   params: row.params,
@@ -243,6 +244,7 @@ export const useUpdateTaskStatus = () => {
 };
 
 // Hook to get a single task by ID
+// Uses IMMUTABLE_PRESET since task data rarely changes after creation
 export const useGetTask = (taskId: string) => {
   return useQuery<Task, Error>({
     queryKey: [TASKS_QUERY_KEY, 'single', taskId],
@@ -260,6 +262,8 @@ export const useGetTask = (taskId: string) => {
       return mapDbTaskToTask(data);
     },
     enabled: !!taskId,
+    // Task data is essentially immutable once created - cache aggressively
+    ...QUERY_PRESETS.immutable,
   });
 };
 

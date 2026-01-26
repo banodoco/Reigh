@@ -31,7 +31,7 @@ import { useQuickShotCreate } from "@/shared/hooks/useQuickShotCreate";
 import { parseRatio } from "@/shared/lib/aspectRatios";
 import { useProgressiveImage } from "@/shared/hooks/useProgressiveImage";
 import { isProgressiveLoadingEnabled } from "@/shared/settings/progressiveLoading";
-import { useTaskFromUnifiedCache } from "@/shared/hooks/useUnifiedGenerations";
+import { useTaskFromUnifiedCache, usePrefetchTaskData } from "@/shared/hooks/useUnifiedGenerations";
 import { useTaskType } from "@/shared/hooks/useTaskType";
 import { useGetTask } from "@/shared/hooks/useTasks";
 import { useShareGeneration } from "@/shared/hooks/useShareGeneration";
@@ -162,6 +162,9 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
     setLocalStarred(image.starred ?? false);
   }, [image.id, image.starred]);
   
+  // Prefetch task data on hover for faster lightbox loading
+  const prefetchTaskData = usePrefetchTaskData();
+
   // Fetch task data for video tasks to show proper details
   // Try to get task ID from metadata first (more efficient), fallback to cache query
   // IMPORTANT: Use generation_id (actual generations.id) when available, falling back to id
@@ -171,8 +174,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   const { data: taskIdMapping } = useTaskFromUnifiedCache(actualGenerationId);
   const taskIdFromCache = typeof taskIdMapping?.taskId === 'string' ? taskIdMapping.taskId : null;
   const taskId: string | null = taskIdFromMetadata || taskIdFromCache;
-  
+
   const { data: taskData } = useGetTask(taskId);
+
+  // Prefetch task data on mouse enter (desktop only)
+  const handleMouseEnter = useCallback(() => {
+    if (!isMobile && actualGenerationId) {
+      prefetchTaskData(actualGenerationId);
+    }
+  }, [isMobile, actualGenerationId, prefetchTaskData]);
   
   // Derive input images for guidance tooltip
   const inputImages = useMemo(() => deriveInputImages(taskData), [taskData]);
@@ -886,6 +896,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
         draggable={!isMobile}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onMouseEnter={handleMouseEnter}
         data-tour={dataTour}
         onClick={enableSingleClick || !isMobile ? (e) => {
           if (onImageClick) {

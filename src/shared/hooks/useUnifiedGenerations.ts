@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { GeneratedImageWithMetadata } from '@/shared/components/ImageGallery';
 import { GenerationRow } from '@/types/shots';
@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSmartPollingConfig } from './useSmartPolling';
 import { useQueryDebugLogging, QueryDebugConfigs } from './useQueryDebugLogging';
 import { transformForUnifiedGenerations, type RawShotGeneration, calculateDerivedCounts } from '@/shared/lib/generationTransformers';
+import { mapDbTaskToTask } from './useTasks';
 
 // Extended interface that includes task data
 export interface GenerationWithTask extends GeneratedImageWithMetadata {
@@ -666,7 +667,7 @@ async function preloadTaskDataInBackground(items: GenerationWithTask[], queryCli
         if (taskId) {
           // Cache the mapping
           queryClient.setQueryData(['tasks', 'taskId', item.id], { taskId });
-          
+
           // Optionally prefetch the full task
           queryClient.prefetchQuery({
             queryKey: ['tasks', 'single', taskId],
@@ -676,9 +677,10 @@ async function preloadTaskDataInBackground(items: GenerationWithTask[], queryCli
                 .select('*')
                 .eq('id', taskId)
                 .single();
-              
+
               if (error) throw error;
-              return taskData;
+              // Transform to match useGetTask format
+              return mapDbTaskToTask(taskData);
             },
             staleTime: 5 * 60 * 1000,
           });
@@ -696,56 +698,115 @@ async function preloadTaskDataInBackground(items: GenerationWithTask[], queryCli
 }
 
 // Hook for getting task data from unified cache
+// Uses immutable caching since generation→task mapping never changes once created
 export function useTaskFromUnifiedCache(generationId: string) {
-  const queryClient = useQueryClient();
-  
-  return useQuery({
+  const result = useQuery({
     queryKey: ['tasks', 'taskId', generationId],
     queryFn: async () => {
-      // First try to get task ID from cache
-      const cachedMapping = queryClient.getQueryData(['tasks', 'taskId', generationId]) as { taskId: string } | undefined;
-      
-      if (cachedMapping?.taskId) {
-        console.log('[gem] useTaskFromUnifiedCache: found in cache', {
-          generationId,
-          taskId: cachedMapping.taskId
-        });
-        return cachedMapping;
-      }
-      
-      // Fallback: fetch task ID
+      // Fetch task ID from generations table
+      // Note: React Query won't call this if data is cached (staleTime: Infinity)
       const { data, error } = await supabase
         .from('generations')
         .select('tasks')
         .eq('id', generationId)
         .maybeSingle();
-      
+
       if (error) {
-        console.error('[TaskDetailsSidebar] useTaskFromUnifiedCache: fetch error', {
-          generationId,
-          error
-        });
         throw error;
       }
-      
-      // If generation doesn't exist, return null taskId
+
+      // Return null taskId if generation doesn't exist or has no tasks
       if (!data) {
-        console.log('[TaskDetailsSidebar] useTaskFromUnifiedCache: generation not found', { generationId });
         return { taskId: null };
       }
-      
+
       const taskId = Array.isArray(data?.tasks) && data.tasks.length > 0 ? data.tasks[0] : null;
-      console.log('[TaskDetailsSidebar] useTaskFromUnifiedCache: fetched from DB', {
-        generationId,
-        tasksArray: data?.tasks,
-        taskId,
-        hasTaskId: !!taskId
-      });
       return { taskId };
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    // Generation→task mapping is immutable - cache aggressively
+    staleTime: Infinity,
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
     enabled: !!generationId,
   });
+
+  return result;
+}
+
+/**
+ * Hook to prefetch task data for a generation on hover.
+ * Returns a function that can be called onMouseEnter to prefetch
+ * both the task ID mapping and the full task data.
+ */
+export function usePrefetchTaskData() {
+  const queryClient = useQueryClient();
+
+  const prefetch = useCallback(async (generationId: string) => {
+    if (!generationId) return;
+
+    // Check if task ID mapping is already cached (including { taskId: null } for no-task generations)
+    let taskId: string | null = null;
+    const cachedMapping = queryClient.getQueryData(['tasks', 'taskId', generationId]) as { taskId: string | null } | undefined;
+
+    if (cachedMapping !== undefined) {
+      // Already cached - use the cached value (could be null if no task)
+      taskId = cachedMapping.taskId;
+    } else {
+      // Not cached - fetch the task ID mapping
+      try {
+        const result = await queryClient.fetchQuery({
+          queryKey: ['tasks', 'taskId', generationId],
+          queryFn: async () => {
+            const { data, error } = await supabase
+              .from('generations')
+              .select('tasks')
+              .eq('id', generationId)
+              .maybeSingle();
+
+            if (error) throw error;
+            if (!data) return { taskId: null };
+
+            const fetchedTaskId = Array.isArray(data?.tasks) && data.tasks.length > 0 ? data.tasks[0] : null;
+            return { taskId: fetchedTaskId };
+          },
+          staleTime: Infinity,
+        });
+        taskId = result?.taskId ?? null;
+      } catch {
+        return;
+      }
+    }
+
+    // Prefetch the full task data if we have a task ID and it's not cached
+    if (taskId) {
+      const cachedTask = queryClient.getQueryData(['tasks', 'single', taskId]);
+      if (!cachedTask) {
+        try {
+          await queryClient.fetchQuery({
+            queryKey: ['tasks', 'single', taskId],
+            queryFn: async () => {
+              const { data, error } = await supabase
+                .from('tasks')
+                .select('*')
+                .eq('id', taskId)
+                .single();
+
+              if (error) throw error;
+              // Transform to match useGetTask format
+              return mapDbTaskToTask(data);
+            },
+            staleTime: Infinity,
+          });
+        } catch {
+          // Silently fail - prefetch is best-effort
+        }
+      }
+    }
+  }, [queryClient]);
+
+  return prefetch;
 }
 
 // Utility to migrate ImageGallery to unified system (optional)

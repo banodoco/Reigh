@@ -7,6 +7,37 @@ import { supabase } from '@/integrations/supabase/client';
 import { generateClientThumbnail, uploadImageWithThumbnail } from './clientThumbnailGenerator';
 import { uploadImageToStorage } from './imageUploader';
 import { Database } from '@/integrations/supabase/types';
+import { findClosestAspectRatio } from './aspectRatios';
+
+/**
+ * Extract image dimensions from a File object
+ * Used when thumbnail generation is skipped or fails
+ */
+async function extractImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+
+    img.onload = () => {
+      resolve({ width: img.width, height: img.height });
+    };
+
+    img.onerror = () => {
+      console.warn('[ImageUploadHelper] Failed to extract image dimensions');
+      resolve(null);
+    };
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (e.target?.result) {
+        img.src = e.target.result as string;
+      } else {
+        resolve(null);
+      }
+    };
+    reader.onerror = () => resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
 
 export interface UploadImageOptions {
   /** File to upload */
@@ -72,6 +103,7 @@ export async function uploadImageWithGeneration(
 
   let imageUrl = '';
   let thumbnailUrl = '';
+  let imageDimensions: { width: number; height: number } | null = null;
 
   // Generate and upload thumbnail (unless skipped)
   if (!skipThumbnail) {
@@ -89,14 +121,21 @@ export async function uploadImageWithGeneration(
         thumbnailMaxSize,
         thumbnailQuality
       );
-      
+
+      // Capture original image dimensions from thumbnail generation
+      imageDimensions = {
+        width: thumbnailResult.originalWidth,
+        height: thumbnailResult.originalHeight
+      };
+
       console.log('[ImageUploadHelper] Thumbnail generated:', {
         width: thumbnailResult.thumbnailWidth,
         height: thumbnailResult.thumbnailHeight,
         size: thumbnailResult.thumbnailBlob.size,
-        originalSize: file.size
+        originalSize: file.size,
+        originalDimensions: imageDimensions
       });
-      
+
       // Upload both main image and thumbnail (with progress tracking)
       const uploadResult = await uploadImageWithThumbnail(
         file,
@@ -104,29 +143,54 @@ export async function uploadImageWithGeneration(
         userId,
         onProgress
       );
-      
+
       imageUrl = uploadResult.imageUrl;
       thumbnailUrl = uploadResult.thumbnailUrl;
-      
+
       console.log('[ImageUploadHelper] Upload complete:', {
         imageUrl: imageUrl.substring(0, 50) + '...',
         thumbnailUrl: thumbnailUrl.substring(0, 50) + '...'
       });
     } catch (thumbnailError) {
       console.warn('[ImageUploadHelper] Thumbnail generation failed, falling back to direct upload:', thumbnailError);
-      
+
+      // Try to extract dimensions even if thumbnail failed
+      imageDimensions = await extractImageDimensions(file);
+
       // Fallback: upload without thumbnail
       imageUrl = await uploadImageToStorage(file, 3, onProgress);
       thumbnailUrl = imageUrl; // Use main image as fallback
     }
   } else {
-    // Skip thumbnail - just upload the main image
+    // Skip thumbnail - extract dimensions separately (only for images, not videos)
+    if (file.type.startsWith('image/')) {
+      imageDimensions = await extractImageDimensions(file);
+    }
+
+    // Just upload the main image
     imageUrl = await uploadImageToStorage(file, 3, onProgress);
     thumbnailUrl = imageUrl;
   }
 
   if (!imageUrl) {
     throw new Error('Failed to upload image to storage');
+  }
+
+  // Build dimension params if we have them
+  const dimensionParams: Record<string, any> = {};
+  if (imageDimensions) {
+    // Store resolution in the same format as task-generated images: "WIDTHxHEIGHT"
+    dimensionParams.resolution = `${imageDimensions.width}x${imageDimensions.height}`;
+
+    // Calculate and store the closest standard aspect ratio
+    const aspectRatioValue = imageDimensions.width / imageDimensions.height;
+    dimensionParams.aspect_ratio = findClosestAspectRatio(aspectRatioValue);
+
+    console.log('[ImageUploadHelper] Storing image dimensions:', {
+      resolution: dimensionParams.resolution,
+      aspect_ratio: dimensionParams.aspect_ratio,
+      calculatedRatio: aspectRatioValue.toFixed(3)
+    });
   }
 
   // Create generation record
@@ -142,6 +206,7 @@ export async function uploadImageWithGeneration(
       original_filename: file.name,
       file_type: file.type,
       file_size: file.size,
+      ...dimensionParams,
       ...metadata
     }
   };

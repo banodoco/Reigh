@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo, useEffect, useCallback } from "react";
 import MediaLightbox from "@/shared/components/MediaLightbox";
 import TaskDetailsModal from '@/tools/travel-between-images/components/TaskDetailsModal';
 import { GenerationRow, Shot } from "@/types/shots";
@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
+import { usePrefetchTaskData } from '@/shared/hooks/useUnifiedGenerations';
 
 export interface ImageGalleryLightboxProps {
   // Lightbox state
@@ -195,6 +196,41 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
     });
     return starred;
   }, [filteredImages, activeLightboxMedia?.id]);
+
+  // Prefetch task data for adjacent items so navigation is instant
+  const prefetchTaskData = usePrefetchTaskData();
+
+  // Prefetch task data for previous and next items when lightbox opens or current item changes
+  useEffect(() => {
+    if (!activeLightboxMedia) return;
+
+    const currentIndex = filteredImages.findIndex(img => img.id === activeLightboxMedia.id);
+    if (currentIndex === -1) return;
+
+    // Prefetch previous item
+    if (currentIndex > 0) {
+      const prevItem = filteredImages[currentIndex - 1];
+      const prevGenerationId = (prevItem as any).generation_id || prevItem.id;
+      if (prevGenerationId) {
+        prefetchTaskData(prevGenerationId);
+      }
+    }
+
+    // Prefetch next item
+    if (currentIndex < filteredImages.length - 1) {
+      const nextItem = filteredImages[currentIndex + 1];
+      const nextGenerationId = (nextItem as any).generation_id || nextItem.id;
+      if (nextGenerationId) {
+        prefetchTaskData(nextGenerationId);
+      }
+    }
+
+    // Prefetch current item too (in case it wasn't prefetched on hover)
+    const currentGenerationId = (activeLightboxMedia as any).generation_id || activeLightboxMedia.id;
+    if (currentGenerationId) {
+      prefetchTaskData(currentGenerationId);
+    }
+  }, [activeLightboxMedia?.id, filteredImages, prefetchTaskData]);
 
   // Get query client for direct cache access
   const queryClient = useQueryClient();

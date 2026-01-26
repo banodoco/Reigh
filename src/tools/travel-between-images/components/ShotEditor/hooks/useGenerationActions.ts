@@ -15,7 +15,7 @@ import {
 import { useDeleteGeneration, useCreateGeneration, useUpdateGenerationLocation } from "@/shared/hooks/useGenerations";
 import { useApiKeys } from '@/shared/hooks/useApiKeys';
 import { cropImageToProjectAspectRatio } from '@/shared/lib/imageCropper';
-import { parseRatio } from '@/shared/lib/aspectRatios';
+import { parseRatio, findClosestAspectRatio } from '@/shared/lib/aspectRatios';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from '@tanstack/react-query';
@@ -223,7 +223,8 @@ export const useGenerationActions = ({
         console.log(`[ThumbnailGenDebug] Starting client-side thumbnail generation for ${file.name}`);
         let thumbnailUrl = '';
         let finalImageUrl = '';
-        
+        let imageDimensions: { width: number; height: number } | null = null;
+
         try {
           // Get current user ID for storage path
           const { data: { session } } = await supabase.auth.getSession();
@@ -235,12 +236,18 @@ export const useGenerationActions = ({
           // Generate thumbnail client-side
           const thumbnailResult = await generateClientThumbnail(fileToUpload, 300, 0.8);
           console.log(`[ThumbnailGenDebug] Generated thumbnail: ${thumbnailResult.thumbnailWidth}x${thumbnailResult.thumbnailHeight} (original: ${thumbnailResult.originalWidth}x${thumbnailResult.originalHeight})`);
-          
+
+          // Capture original image dimensions
+          imageDimensions = {
+            width: thumbnailResult.originalWidth,
+            height: thumbnailResult.originalHeight
+          };
+
           // Upload both main image and thumbnail
           const uploadResult = await uploadImageWithThumbnail(fileToUpload, thumbnailResult.thumbnailBlob, userId);
           finalImageUrl = croppedImageUrl ? getDisplayUrl(uploadResult.imageUrl) : uploadResult.imageUrl;
           thumbnailUrl = uploadResult.thumbnailUrl;
-          
+
           console.log(`[ThumbnailGenDebug] Upload complete - Image: ${finalImageUrl}, Thumbnail: ${thumbnailUrl}`);
         } catch (thumbnailError) {
           console.warn(`[ThumbnailGenDebug] Client-side thumbnail generation failed for ${file.name}:`, thumbnailError);
@@ -248,6 +255,7 @@ export const useGenerationActions = ({
           const imageUrl = await uploadImageToStorage(fileToUpload);
           finalImageUrl = croppedImageUrl ? getDisplayUrl(imageUrl) : imageUrl;
           thumbnailUrl = finalImageUrl; // Use main image as fallback
+          // Note: dimensions remain null in fallback case
         }
 
         const promptForGeneration = `External image: ${file.name || 'untitled'}`;
@@ -258,12 +266,21 @@ export const useGenerationActions = ({
 
         if (currentEnv === 'web') {
           // Directly insert into Supabase instead of hitting the API server
+          // Build dimension params if we have them
+          const dimensionParams: Record<string, string> = {};
+          if (imageDimensions) {
+            dimensionParams.resolution = `${imageDimensions.width}x${imageDimensions.height}`;
+            const aspectRatioValue = imageDimensions.width / imageDimensions.height;
+            dimensionParams.aspect_ratio = findClosestAspectRatio(aspectRatioValue);
+          }
+
           const generationParams = {
             prompt: promptForGeneration,
             source: 'external_upload',
             original_filename: file.name,
             file_type: file.type,
             file_size: file.size,
+            ...dimensionParams,
           };
 
           const { data: inserted, error } = await supabase
@@ -294,6 +311,14 @@ export const useGenerationActions = ({
           newGeneration = inserted;
         } else {
           // Use the new Supabase-based hook for all environments
+          // Build dimension params if we have them
+          const dimensionMutationParams: { resolution?: string; aspectRatio?: string } = {};
+          if (imageDimensions) {
+            dimensionMutationParams.resolution = `${imageDimensions.width}x${imageDimensions.height}`;
+            const aspectRatioValue = imageDimensions.width / imageDimensions.height;
+            dimensionMutationParams.aspectRatio = findClosestAspectRatio(aspectRatioValue);
+          }
+
           newGeneration = await createGenerationMutation.mutateAsync({
             imageUrl: finalImageUrl,
             fileName: file.name,
@@ -301,6 +326,7 @@ export const useGenerationActions = ({
             fileSize: file.size,
             projectId: projectId,
             prompt: promptForGeneration,
+            ...dimensionMutationParams,
           });
         }
 

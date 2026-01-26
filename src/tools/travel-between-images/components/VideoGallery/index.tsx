@@ -12,9 +12,9 @@ import { Button } from '@/shared/components/ui/button';
 import MediaLightbox from '@/shared/components/MediaLightbox';
 import TaskDetailsModal from '../TaskDetailsModal';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
-import { useGetTask } from '@/shared/hooks/useTasks';
 import { useQueryClient } from '@tanstack/react-query';
-import { useUnifiedGenerations, useTaskFromUnifiedCache } from '@/shared/hooks/useUnifiedGenerations';
+import { useUnifiedGenerations, usePrefetchTaskData } from '@/shared/hooks/useUnifiedGenerations';
+import { useTaskDetails } from '@/shared/components/ShotImageManager/hooks/useTaskDetails';
 import { useGenerationTaskPreloader, useEnhancedGenerations } from '@/shared/contexts/GenerationTaskContext';
 import { useVideoCountCache } from '@/shared/hooks/useVideoCountCache';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,7 +42,6 @@ import {
 } from './utils/video-loading-utils';
 import {
   createMobileTapHandler,
-  deriveInputImages,
   createHoverDetailsHandler,
   createTaskDetailsHandler
 } from './utils/gallery-utils';
@@ -527,18 +526,29 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // TASK DATA HOOKS
   // ===============================================================================
 
-  // Hooks for task details (now using unified cache)
+  // Hooks for task details using shared hook
   const lightboxVideoId = lightboxIndex !== null && displaySortedVideoOutputs[lightboxIndex] ? displaySortedVideoOutputs[lightboxIndex].id : null;
-  const { data: lightboxTaskMapping } = useTaskFromUnifiedCache(lightboxVideoId || '');
-  const { data: task, isLoading: isLoadingTask, error: taskError } = useGetTask(lightboxTaskMapping?.taskId || '');
+  const {
+    taskDetailsData: lightboxTaskDetailsData,
+    taskMapping: lightboxTaskMapping,
+    task,
+    taskError,
+  } = useTaskDetails({
+    generationId: lightboxVideoId,
+    onApplySettingsFromTask,
+    onClose: () => setLightboxIndex(null),
+  });
+  const inputImages = lightboxTaskDetailsData?.inputImages || [];
 
-  // Hooks for hover preview (now using unified cache)
-  const { data: hoverTaskMapping } = useTaskFromUnifiedCache(hoveredVideo?.id || '');
-  const { data: hoverTask, isLoading: isLoadingHoverTask } = useGetTask(hoverTaskMapping?.taskId || '');
-
-  // Derive input images from multiple possible locations within task params
-  const inputImages: string[] = useMemo(() => deriveInputImages(task), [task]);
-  const hoverInputImages: string[] = useMemo(() => deriveInputImages(hoverTask), [hoverTask]);
+  // Hooks for hover preview using shared hook
+  const {
+    task: hoverTask,
+    taskDetailsData: hoverTaskDetailsData,
+    taskMapping: hoverTaskMapping,
+  } = useTaskDetails({
+    generationId: hoveredVideo?.id || null,
+  });
+  const hoverInputImages = hoverTaskDetailsData?.inputImages || [];
 
   // ===============================================================================
   // DATA CACHING AND SKELETON LOGIC
@@ -922,6 +932,35 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     }
   }, [lightboxIndex, displaySortedVideoOutputs.length]);
 
+  // Prefetch task data for adjacent items when lightbox is open
+  const prefetchTaskData = usePrefetchTaskData();
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+
+    // Prefetch previous item
+    if (lightboxIndex > 0) {
+      const prevItem = displaySortedVideoOutputs[lightboxIndex - 1];
+      if (prevItem?.id) {
+        prefetchTaskData(prevItem.id);
+      }
+    }
+
+    // Prefetch next item
+    if (lightboxIndex < displaySortedVideoOutputs.length - 1) {
+      const nextItem = displaySortedVideoOutputs[lightboxIndex + 1];
+      if (nextItem?.id) {
+        prefetchTaskData(nextItem.id);
+      }
+    }
+
+    // Prefetch current item too
+    const currentItem = displaySortedVideoOutputs[lightboxIndex];
+    if (currentItem?.id) {
+      prefetchTaskData(currentItem.id);
+    }
+  }, [lightboxIndex, displaySortedVideoOutputs, prefetchTaskData]);
+
   // Log video loading strategy for this page (throttled to avoid spam)
   const hasLoggedStrategyRef = useRef(false);
   useEffect(() => {
@@ -1086,7 +1125,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           onOpenExternalGeneration={externalGens.handleOpenExternalGeneration}
           taskDetailsData={{
             task,
-            isLoading: isLoadingTask,
+            isLoading: lightboxTaskDetailsData?.isLoading ?? false,
             error: taskError,
             inputImages,
             taskId: lightboxTaskMapping?.taskId || null,
@@ -1143,7 +1182,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
         hoveredVideo={hoveredVideo}
         hoverPosition={hoverPosition}
         isInitialHover={isInitialHover}
-        isLoadingHoverTask={isLoadingHoverTask}
+        isLoadingHoverTask={hoverTaskDetailsData?.isLoading ?? false}
         hoverTaskMapping={hoverTaskMapping}
         hoverTask={hoverTask}
         hoverInputImages={hoverInputImages}
