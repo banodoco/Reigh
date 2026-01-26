@@ -2588,34 +2588,8 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                               <SectionHeader title="Structure" theme="green" />
                             </div>
                             <div className="space-y-4">
-                              {/* Structure type selector */}
-                              <div className="space-y-2">
-                                <Label className="text-sm">Type:</Label>
-                                <Select 
-                                  value={structureVideoType || 'uni3c'} 
-                                  onValueChange={(type: 'uni3c' | 'flow' | 'canny' | 'depth') => {
-                                    handleStructureTypeChangeFromMotionControl(type);
-                                  }}
-                                >
-                                  <SelectTrigger className="w-full h-9">
-                                    <SelectValue>
-                                      {structureVideoType === 'uni3c' ? 'Uni3C (I2V)' : 
-                                       structureVideoType === 'flow' ? 'Optical flow (VACE)' : 
-                                       structureVideoType === 'canny' ? 'Canny (VACE)' : 
-                                       structureVideoType === 'depth' ? 'Depth (VACE)' : 'Uni3C (I2V)'}
-                                    </SelectValue>
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="uni3c">Uni3C (I2V)</SelectItem>
-                                    <SelectItem value="flow">Optical flow (VACE)</SelectItem>
-                                    <SelectItem value="canny">Canny (VACE)</SelectItem>
-                                    <SelectItem value="depth">Depth (VACE)</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              
-                              {/* Strength and End side by side for uni3c, just Strength otherwise */}
-                              <div className={structureVideoType === 'uni3c' ? "grid grid-cols-2 gap-4" : ""}>
+                              {/* Strength and End side by side (uni3c hardcoded) */}
+                              <div className="grid grid-cols-2 gap-4">
                                 {/* Strength slider */}
                                 <div className="space-y-2">
                                   <div className="flex items-center justify-between">
