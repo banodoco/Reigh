@@ -7,7 +7,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
-import { ASPECT_RATIO_TO_RESOLUTION } from '@/shared/lib/aspectRatios';
+import { ASPECT_RATIO_TO_RESOLUTION, findClosestAspectRatio, parseRatio } from '@/shared/lib/aspectRatios';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -610,9 +610,46 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleToggleUpscaled,
   } = upscaleHook;
 
+  // Helper to convert resolution string to dimensions
+  const resolutionToDimensions = (resolution: string): { width: number; height: number } | null => {
+    if (!resolution || typeof resolution !== 'string' || !resolution.includes('x')) return null;
+    const [w, h] = resolution.split('x').map(Number);
+    if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
+      return { width: w, height: h };
+    }
+    return null;
+  };
+
+  // Helper to convert aspect ratio string to standard dimensions
+  const aspectRatioToDimensions = (aspectRatio: string): { width: number; height: number } | null => {
+    if (!aspectRatio) return null;
+
+    // Direct lookup in our standard aspect ratios
+    const directResolution = ASPECT_RATIO_TO_RESOLUTION[aspectRatio];
+    if (directResolution) {
+      return resolutionToDimensions(directResolution);
+    }
+
+    // Try to parse and find closest standard aspect ratio
+    const ratio = parseRatio(aspectRatio);
+    if (!isNaN(ratio)) {
+      const closestAspectRatio = findClosestAspectRatio(ratio);
+      const closestResolution = ASPECT_RATIO_TO_RESOLUTION[closestAspectRatio];
+      if (closestResolution) {
+        return resolutionToDimensions(closestResolution);
+      }
+    }
+
+    return null;
+  };
+
   // Helper to extract dimensions from media object (checks multiple sources)
+  // Priority: exact dimensions > resolution string > aspect_ratio > null
   const extractDimensionsFromMedia = React.useCallback((mediaObj: typeof media): { width: number; height: number } | null => {
     if (!mediaObj) return null;
+
+    const params = (mediaObj as any)?.params;
+    const metadata = mediaObj?.metadata as any;
 
     // 1. Check top-level width/height first (from generations table)
     if ((mediaObj as any)?.width && (mediaObj as any)?.height) {
@@ -620,26 +657,32 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     }
 
     // 2. Check metadata.width/height
-    const metadata = mediaObj?.metadata as any;
     if (metadata?.width && metadata?.height) {
       return { width: metadata.width, height: metadata.height };
     }
 
     // 3. Check params.resolution (string like "1024x768")
-    const params = (mediaObj as any)?.params;
-    if (params?.resolution && typeof params.resolution === 'string' && params.resolution.includes('x')) {
-      const [w, h] = params.resolution.split('x').map(Number);
-      if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
-        return { width: w, height: h };
-      }
-    }
+    const paramsResolution = resolutionToDimensions(params?.resolution);
+    if (paramsResolution) return paramsResolution;
 
     // 4. Check metadata.originalParams.orchestrator_details.resolution
-    const resolution = metadata?.originalParams?.orchestrator_details?.resolution;
-    if (resolution && typeof resolution === 'string' && resolution.includes('x')) {
-      const [w, h] = resolution.split('x').map(Number);
-      if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
-        return { width: w, height: h };
+    const orchResolution = resolutionToDimensions(metadata?.originalParams?.orchestrator_details?.resolution);
+    if (orchResolution) return orchResolution;
+
+    // 5. Check for aspect_ratio in params and convert to standard dimensions
+    // This is faster than falling back to project aspect ratio since data is already loaded
+    const aspectRatioSources = [
+      params?.aspect_ratio,
+      params?.custom_aspect_ratio,
+      metadata?.aspect_ratio,
+      metadata?.originalParams?.aspect_ratio,
+      metadata?.originalParams?.orchestrator_details?.aspect_ratio,
+    ];
+
+    for (const ar of aspectRatioSources) {
+      if (ar) {
+        const dims = aspectRatioToDimensions(ar);
+        if (dims) return dims;
       }
     }
 
