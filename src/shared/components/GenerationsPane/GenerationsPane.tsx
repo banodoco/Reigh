@@ -9,7 +9,7 @@ import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { Button } from '@/shared/components/ui/button';
 import { Checkbox } from '@/shared/components/ui/checkbox';
 import { Label } from '@/shared/components/ui/label';
-import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Sparkles, ExternalLink, Search, X, ArrowRight } from 'lucide-react';
+import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Sparkles, ExternalLink, Search, X } from 'lucide-react';
 import { ImageGenerationModal } from '@/shared/components/ImageGenerationModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ImageGallery } from '@/shared/components/ImageGallery';
@@ -499,11 +499,149 @@ const GenerationsPaneComponent: React.FC = () => {
             isPointerEventsEnabled ? 'pointer-events-auto' : 'pointer-events-none'
           )}
         >
-          <div className="px-2 pt-3 pb-2">
-            <div className="flex items-center justify-between min-w-0">
-                <div className="flex items-center gap-3 min-w-0">
-                  <h2 className="text-xl font-light text-zinc-200 ml-2 truncate">Generations</h2>
-                  {/* Search input */}
+          <div className="px-2 pt-3 pb-2 space-y-2">
+            {/* Row 1: Pagination (left) + Media type filter (right) */}
+            <div className="flex items-center justify-between min-w-0 mx-2">
+                {/* Left side: Pagination */}
+                <div className="flex items-center gap-2">
+                  {totalCount > GENERATIONS_PER_PAGE ? (
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => handleServerPageChange(Math.max(1, page - 1))}
+                        disabled={page === 1}
+                        className="p-1 rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronLeft className="h-4 w-4 text-zinc-400" />
+                      </button>
+
+                      {/* Page selector */}
+                      <div className="flex items-center gap-1">
+                        <Select
+                          value={page.toString()}
+                          onValueChange={(value) => handleServerPageChange(parseInt(value))}
+                        >
+                          <SelectTrigger variant="retro-dark" colorScheme="zinc" size="sm" className="h-6 w-9 text-xs px-1 !justify-center [&>span]:!text-center" hideIcon>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent variant="zinc">
+                            {Array.from({ length: Math.ceil(totalCount / GENERATIONS_PER_PAGE) }, (_, i) => (
+                              <SelectItem variant="zinc" key={i + 1} value={(i + 1).toString()} className="text-xs">
+                                {i + 1}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <span className="text-xs text-zinc-400">
+                          <span className="hidden sm:inline">of {Math.ceil(totalCount / GENERATIONS_PER_PAGE)} ({totalCount})</span>
+                          <span className="sm:hidden">/ {Math.ceil(totalCount / GENERATIONS_PER_PAGE)}</span>
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => handleServerPageChange(page + 1)}
+                        disabled={page * GENERATIONS_PER_PAGE >= totalCount}
+                        className="p-1 rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronRight className="h-4 w-4 text-zinc-400" />
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-zinc-400">
+                      {totalCount > 0 ? `${totalCount} item${totalCount !== 1 ? 's' : ''}` : 'No items'}
+                    </span>
+                  )}
+                </div>
+
+                {/* Right side: Media type filter */}
+                <div
+                  className={cn(
+                    "flex items-center transition-all duration-200",
+                    isInteractionDisabled && "pointer-events-none opacity-70"
+                  )}
+                >
+                  <Select
+                    value={mediaTypeFilter}
+                    onValueChange={(value: 'all' | 'image' | 'video') => setMediaTypeFilter(value)}
+                    open={mediaTypeFilterOpen}
+                    onOpenChange={(open) => {
+                      if (isInteractionDisabled && open) {
+                        setMediaTypeFilterOpen(false);
+                        return;
+                      }
+                      setMediaTypeFilterOpen(open);
+                    }}
+                  >
+                    <SelectTrigger variant="retro-dark" size="sm" colorScheme="zinc" className="w-[80px] h-8 text-xs" hideIcon>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent variant="zinc" ref={mediaTypeContentRef}>
+                      <SelectItem variant="zinc" value="all">All</SelectItem>
+                      <SelectItem variant="zinc" value="image">Images</SelectItem>
+                      <SelectItem variant="zinc" value="video">Videos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+            </div>
+
+            {/* Row 2: Shot filter + Search + CTA (left) + Star filter (right) */}
+            <div className="flex items-center justify-between min-w-0 gap-2 mx-2">
+                {/* Left side: Shot filter, search, CTA */}
+                <div
+                  className={cn(
+                    "flex items-center gap-2 min-w-0 flex-shrink",
+                    "transition-all duration-200",
+                    isInteractionDisabled && "pointer-events-none opacity-70"
+                  )}
+                >
+                  <ShotFilter
+                    shots={shotsForFilter}
+                    selectedShotId={selectedShotFilter}
+                    onShotChange={setSelectedShotFilter}
+                    excludePositioned={excludePositioned}
+                    onExcludePositionedChange={setExcludePositioned}
+                    size="sm"
+                    whiteText={true}
+                    checkboxId="exclude-positioned-generations-pane"
+                    triggerWidth="w-[100px] sm:w-[140px] flex-shrink-0 !text-xs"
+                    isMobile={isMobile}
+                    contentRef={shotFilterContentRef}
+                    showPositionFilter={false}
+                    open={shotFilterOpen}
+                    onOpenChange={(open) => {
+                      if (isInteractionDisabled && open) {
+                        setShotFilterOpen(false);
+                        return;
+                      }
+                      setShotFilterOpen(open);
+                    }}
+                  />
+
+                  {/* CTA buttons - only show when on a shot page */}
+                  {currentShotId && (
+                    selectedShotFilter === currentShotId ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedShotFilter('all')}
+                        className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap hidden sm:flex"
+                      >
+                        <ChevronLeft className="h-3 w-3 -mr-0.5" />
+                        All
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedShotFilter(currentShotId)}
+                        className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap hidden sm:flex"
+                      >
+                        <ChevronLeft className="h-3 w-3 -mr-0.5" />
+                        This shot
+                      </Button>
+                    )
+                  )}
+
+                  {/* Search */}
                   <div className="flex items-center">
                     {!isSearchOpen ? (
                       <Button
@@ -511,7 +649,6 @@ const GenerationsPaneComponent: React.FC = () => {
                         size="sm"
                         onClick={() => {
                           setIsSearchOpen(true);
-                          // Focus the input after it renders
                           setTimeout(() => searchInputRef.current?.focus(), 0);
                         }}
                         className="h-7 w-7 p-0 text-zinc-400 hover:text-white hover:bg-zinc-700"
@@ -528,7 +665,7 @@ const GenerationsPaneComponent: React.FC = () => {
                           placeholder="Search..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
-                          className="bg-transparent border-none outline-none text-base lg:text-xs w-24 sm:w-32 text-white placeholder-zinc-400 preserve-case"
+                          className="bg-transparent border-none outline-none text-base lg:text-xs w-20 sm:w-28 text-white placeholder-zinc-400 preserve-case"
                         />
                         <Button
                           variant="ghost"
@@ -549,208 +686,46 @@ const GenerationsPaneComponent: React.FC = () => {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center space-x-2 sm:space-x-4 mr-2 flex-shrink-0">
-                    {/* Star Filter - Button style matching ImageGalleryFilters */}
-                    <div 
-                      className={cn(
-                        "flex items-center transition-all duration-200",
-                        isInteractionDisabled && "pointer-events-none opacity-70"
-                      )}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="p-1 h-8 w-8 text-zinc-400 hover:text-white hover:bg-zinc-700"
-                        onClick={() => setStarredOnly(!starredOnly)}
-                        aria-label={starredOnly ? "Show all items" : "Show only starred items"}
-                      >
-                        <Star
-                          className="h-5 w-5"
-                          fill={starredOnly ? 'currentColor' : 'none'}
-                        />
-                      </Button>
-                    </div>
 
-                    {/* Media Type Filter */}
-                    <div 
-                      className={cn(
-                        "flex items-center space-x-1 sm:space-x-2 transition-all duration-200",
-                        isInteractionDisabled && "pointer-events-none opacity-70"
-                      )}
-                    >
-                      <span className="text-xs text-zinc-400 hidden sm:inline">Type:</span>
-                      <Select 
-                        value={mediaTypeFilter} 
-                        onValueChange={(value: 'all' | 'image' | 'video') => setMediaTypeFilter(value)}
-                        open={mediaTypeFilterOpen}
-                        onOpenChange={(open) => {
-                          // Prevent dropdown from staying open during interaction-disabled period
-                          if (isInteractionDisabled && open) {
-                            setMediaTypeFilterOpen(false);
-                            return;
-                          }
-                          setMediaTypeFilterOpen(open);
-                        }}
-                      >
-                        <SelectTrigger variant="retro-dark" size="sm" colorScheme="zinc" className="w-[80px] h-8 text-xs" hideIcon>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent variant="zinc" ref={mediaTypeContentRef}>
-                          <SelectItem variant="zinc" value="all">All</SelectItem>
-                          <SelectItem variant="zinc" value="image">Images</SelectItem>
-                          <SelectItem variant="zinc" value="video">Videos</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                </div>
-            </div>
-            
-            {/* Shot filter + Pagination row */}
-            <div className="mt-1 mx-2 flex items-start justify-between min-w-0 gap-2">
+                {/* Right side: Star filter */}
                 <div
                   className={cn(
-                    "flex flex-col gap-2 min-w-0 flex-shrink",
-                    "transition-all duration-200",
+                    "flex items-center transition-all duration-200 flex-shrink-0",
                     isInteractionDisabled && "pointer-events-none opacity-70"
                   )}
                 >
-                  {/* Dropdown + CTA button row */}
-                  <div className="flex items-center gap-2">
-                    <ShotFilter
-                      shots={shotsForFilter}
-                      selectedShotId={selectedShotFilter}
-                      onShotChange={setSelectedShotFilter}
-                      excludePositioned={excludePositioned}
-                      onExcludePositionedChange={setExcludePositioned}
-                      size="sm"
-                      whiteText={true}
-                      checkboxId="exclude-positioned-generations-pane"
-                      triggerWidth="w-[100px] sm:w-[160px] flex-shrink-0 !text-xs"
-                      isMobile={isMobile}
-                      contentRef={shotFilterContentRef}
-                      showPositionFilter={false}
-                      open={shotFilterOpen}
-                      onOpenChange={(open) => {
-                        // Prevent dropdown from staying open during interaction-disabled period
-                        if (isInteractionDisabled && open) {
-                          setShotFilterOpen(false);
-                          return;
-                        }
-                        setShotFilterOpen(open);
-                      }}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="p-1 h-8 w-8 text-zinc-400 hover:text-white hover:bg-zinc-700"
+                    onClick={() => setStarredOnly(!starredOnly)}
+                    aria-label={starredOnly ? "Show all items" : "Show only starred items"}
+                  >
+                    <Star
+                      className="h-5 w-5"
+                      fill={starredOnly ? 'currentColor' : 'none'}
                     />
-
-                    {/* Show CTA buttons based on filter state - always next to dropdown */}
-                    {selectedShotFilter === 'no-shot' ? (
-                      // When viewing "Items without shots", show button to go back to all
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedShotFilter('all')}
-                        className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
-                      >
-                        <ArrowRight className="h-3 w-3 mr-1" />
-                        All images
-                      </Button>
-                    ) : currentShotId ? (
-                      // When user is on a shot, toggle between that shot and all
-                      selectedShotFilter === currentShotId ? (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedShotFilter('all')}
-                          className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
-                        >
-                          <ArrowRight className="h-3 w-3 mr-1" />
-                          All images
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedShotFilter(currentShotId)}
-                          className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
-                        >
-                          <ArrowRight className="h-3 w-3 mr-1" />
-                          This shot
-                        </Button>
-                      )
-                    ) : selectedShotFilter === 'all' ? (
-                      // When viewing "All shots" and not on a specific shot, show "Items without shots" button
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedShotFilter('no-shot')}
-                        className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
-                      >
-                        <ArrowRight className="h-3 w-3 mr-1" />
-                        Unassigned
-                      </Button>
-                    ) : null}
-                  </div>
-
-                  {/* Checkbox row - only show when a specific shot is selected */}
-                  {selectedShotFilter !== 'all' && selectedShotFilter !== 'no-shot' && (
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="exclude-positioned-generations-pane"
-                        checked={excludePositioned}
-                        onCheckedChange={(checked) => setExcludePositioned(!!checked)}
-                        className="border-zinc-600 data-[state=checked]:bg-zinc-600"
-                      />
-                      <Label
-                        htmlFor="exclude-positioned-generations-pane"
-                        className="text-xs cursor-pointer text-zinc-300"
-                      >
-                        Exclude items with a position
-                      </Label>
-                    </div>
-                  )}
+                  </Button>
                 </div>
-
-                {totalCount > GENERATIONS_PER_PAGE && (
-                  <div className="flex items-center space-x-1 mt-1 flex-shrink-0">
-                    <button
-                      onClick={() => handleServerPageChange(Math.max(1, page - 1))}
-                      disabled={page === 1}
-                      className="p-1 rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ChevronLeft className="h-4 w-4 text-zinc-400" />
-                    </button>
-                    
-                    {/* Page selector */}
-                    <div className="flex items-center gap-1">
-                      <Select 
-                        value={page.toString()} 
-                        onValueChange={(value) => handleServerPageChange(parseInt(value))}
-                      >
-                        <SelectTrigger variant="retro-dark" colorScheme="zinc" size="sm" className="h-6 w-9 text-xs px-1 !justify-center [&>span]:!text-center" hideIcon>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent variant="zinc">
-                          {Array.from({ length: Math.ceil(totalCount / GENERATIONS_PER_PAGE) }, (_, i) => (
-                            <SelectItem variant="zinc" key={i + 1} value={(i + 1).toString()} className="text-xs">
-                              {i + 1}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <span className="text-xs text-zinc-400">
-                        <span className="hidden sm:inline">of {Math.ceil(totalCount / GENERATIONS_PER_PAGE)} ({totalCount})</span>
-                        <span className="sm:hidden">/ {Math.ceil(totalCount / GENERATIONS_PER_PAGE)}</span>
-                      </span>
-                    </div>
-                    
-                    <button
-                      onClick={() => handleServerPageChange(page + 1)}
-                      disabled={page * GENERATIONS_PER_PAGE >= totalCount}
-                      className="p-1 rounded hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ChevronRight className="h-4 w-4 text-zinc-400" />
-                    </button>
-                  </div>
-                )}
             </div>
+
+            {/* Row 3: Exclude positioned checkbox - only when a specific shot is selected */}
+            {selectedShotFilter !== 'all' && selectedShotFilter !== 'no-shot' && (
+              <div className="flex items-center space-x-2 mx-2">
+                <Checkbox
+                  id="exclude-positioned-generations-pane"
+                  checked={excludePositioned}
+                  onCheckedChange={(checked) => setExcludePositioned(!!checked)}
+                  className="border-zinc-600 data-[state=checked]:bg-zinc-600"
+                />
+                <Label
+                  htmlFor="exclude-positioned-generations-pane"
+                  className="text-xs cursor-pointer text-zinc-300"
+                >
+                  Exclude items with a position
+                </Label>
+              </div>
+            )}
         </div>
         <div
           ref={galleryContainerRef}
