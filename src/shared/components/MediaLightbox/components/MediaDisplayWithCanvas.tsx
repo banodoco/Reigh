@@ -376,7 +376,8 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
               }}
               onLoad={(e) => {
                 const img = e.target as HTMLImageElement;
-                // Only call onImageLoad when the full image (not thumbnail) loads
+                // Call onImageLoad for both thumbnail and full image to set dimensions immediately
+                // This prevents size jump by setting CSS aspectRatio from thumbnail dimensions
                 if (img.src === effectiveImageUrl || !thumbUrl || thumbUrl === effectiveImageUrl) {
                   console.log(`[${debugContext}] ✅ Full image loaded successfully:`, {
                     url: effectiveImageUrl.substring(0, 100),
@@ -389,7 +390,16 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
                     height: img.naturalHeight
                   });
                 } else {
-                  console.log(`[${debugContext}] 🖼️ Thumbnail loaded, preloading full image...`);
+                  // Thumbnail loaded - still call onImageLoad to set aspect ratio immediately
+                  // This prevents the thumbnail from displaying smaller than the final image
+                  console.log(`[${debugContext}] 🖼️ Thumbnail loaded, setting dimensions and preloading full image...`, {
+                    width: img.naturalWidth,
+                    height: img.naturalHeight
+                  });
+                  onImageLoad?.({
+                    width: img.naturalWidth,
+                    height: img.naturalHeight
+                  });
                 }
               }}
               onError={(e) => {

@@ -611,8 +611,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   } = upscaleHook;
 
   // Image dimensions state (needed by inpainting hook)
-  // Initialize from metadata if available to prevent size jump during progressive loading
+  // Initialize from media width/height or metadata to prevent size jump during progressive loading
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(() => {
+    // Check top-level width/height first (from generations table)
+    if ((media as any)?.width && (media as any)?.height) {
+      return { width: (media as any).width, height: (media as any).height };
+    }
+    // Fall back to metadata
     const metadata = media?.metadata as any;
     if (metadata?.width && metadata?.height) {
       return { width: metadata.width, height: metadata.height };
@@ -620,9 +625,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     return null;
   });
 
-  // Update dimensions from metadata when media changes (e.g., switching variants)
+  // Update dimensions when media changes (e.g., switching images or variants)
   // This prevents the "small then big" flash during progressive loading
   React.useEffect(() => {
+    // Check top-level width/height first
+    if ((media as any)?.width && (media as any)?.height) {
+      setImageDimensions({ width: (media as any).width, height: (media as any).height });
+      return;
+    }
+    // Fall back to metadata
     const metadata = media?.metadata as any;
     if (metadata?.width && metadata?.height) {
       setImageDimensions({ width: metadata.width, height: metadata.height });

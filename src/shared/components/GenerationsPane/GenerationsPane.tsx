@@ -87,19 +87,6 @@ const GenerationsPaneComponent: React.FC = () => {
     };
   }, [projectAspectRatio, isMobile, containerWidth]);
 
-  // Lock in skeleton layout to prevent jitter during loading
-  // Calculate once based on window width and never change
-  const stableSkeletonLayout = useRef<{ columns: number; itemsPerPage: number } | null>(null);
-  if (stableSkeletonLayout.current === null) {
-    // Use window width estimate for stable initial value
-    const estimatedWidth = typeof window !== 'undefined' ? Math.floor(window.innerWidth * 0.9) : 800;
-    const stableLayout = getLayoutForAspectRatio(projectAspectRatio, isMobile, estimatedWidth);
-    stableSkeletonLayout.current = {
-      columns: stableLayout.columns,
-      itemsPerPage: stableLayout.columns * PANE_ROWS
-    };
-  }
-
   const GENERATIONS_PER_PAGE = paneLayout.itemsPerPage;
   const { currentShotId } = useCurrentShot();
 
@@ -735,11 +722,12 @@ const GenerationsPaneComponent: React.FC = () => {
         >
             {isLoading && (
                 <SkeletonGallery
-                    count={expectedItemCount ?? stableSkeletonLayout.current.itemsPerPage}
-                    fixedColumns={stableSkeletonLayout.current.columns}
+                    count={expectedItemCount ?? paneLayout.itemsPerPage}
+                    fixedColumns={paneLayout.columns}
                     gapClasses="gap-2 sm:gap-4"
                     whiteText={true}
                     showControls={false}
+                    projectAspectRatio={projectAspectRatio}
                     className="space-y-0 pb-4 pt-2"
                 />
             )}
@@ -760,6 +748,7 @@ const GenerationsPaneComponent: React.FC = () => {
                     lastShotId={lastAffectedShotId || undefined}
                     initialShotFilter={selectedShotFilter}
                     onShotFilterChange={setSelectedShotFilter}
+                    columnsPerRow={paneLayout.columns}
                     onAddToLastShot={(generationId, imageUrl, thumbUrl) => {
                       console.log('[GenerationsPane] ImageGallery onAddToLastShot called', {
                         generationId,

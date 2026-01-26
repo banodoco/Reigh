@@ -1106,6 +1106,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
                 count={stableSkeletonLayout.current.itemsPerPage}
                 fixedColumns={stableSkeletonLayout.current.columns}
                 showControls={true}
+                projectAspectRatio={projectAspectRatio}
               />
             ) : (
               <div className={isLoadingGenerations && isFilterChange ? 'opacity-60 pointer-events-none transition-opacity duration-200' : ''}>
