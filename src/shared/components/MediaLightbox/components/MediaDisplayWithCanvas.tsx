@@ -367,6 +367,12 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
                 // Keep image below settings panel during reposition (z-80 is the panel)
                 zIndex: editMode === 'reposition' ? 40 : undefined,
                 position: editMode === 'reposition' ? 'relative' : undefined,
+                // STABILITY FIX: Use known aspect ratio to prevent size jump when switching variants
+                // When thumbnail loads first (smaller resolution), this keeps the container at the correct aspect ratio
+                // The aspect-ratio is always applied when we have dimensions, ensuring smooth transitions
+                aspectRatio: imageDimensions
+                  ? `${imageDimensions.width} / ${imageDimensions.height}`
+                  : undefined,
               }}
               onLoad={(e) => {
                 const img = e.target as HTMLImageElement;

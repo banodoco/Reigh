@@ -611,7 +611,23 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   } = upscaleHook;
 
   // Image dimensions state (needed by inpainting hook)
-  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  // Initialize from metadata if available to prevent size jump during progressive loading
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(() => {
+    const metadata = media?.metadata as any;
+    if (metadata?.width && metadata?.height) {
+      return { width: metadata.width, height: metadata.height };
+    }
+    return null;
+  });
+
+  // Update dimensions from metadata when media changes (e.g., switching variants)
+  // This prevents the "small then big" flash during progressive loading
+  React.useEffect(() => {
+    const metadata = media?.metadata as any;
+    if (metadata?.width && metadata?.height) {
+      setImageDimensions({ width: metadata.width, height: metadata.height });
+    }
+  }, [media?.id]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Flip functionality removed - use reposition mode instead
