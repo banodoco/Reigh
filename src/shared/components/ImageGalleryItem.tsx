@@ -1048,7 +1048,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
       <>
           {/* Shot Name Badge / Variant Name for Videos - Top Left */}
           {isVideoContent && ((image as any).name || (image.shot_id && simplifiedShotOptions.length > 0) || (image.derivedCount && image.derivedCount > 0)) && (
-          <div className="absolute top-2 left-2 flex flex-col items-start gap-1 z-20">
+          <div className="absolute top-1.5 left-1.5 flex flex-col items-start gap-1 z-20">
               {/* Variant Name */}
               {(image as any).name && (
                 <div className="bg-black/50 text-white text-xs sm:text-sm px-2 py-0.5 rounded-md mb-1 font-medium backdrop-blur-sm preserve-case">
@@ -1088,7 +1088,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           {/* Add to Shot UI - Top Left (for non-video content) */}
           {showAddToShot && simplifiedShotOptions.length > 0 && onAddToLastShot && (
           <div className={cn(
-            "absolute top-2 left-2 flex flex-col items-start gap-1 transition-opacity z-20",
+            "absolute top-1.5 left-1.5 flex flex-col items-start gap-1 transition-opacity z-20",
             isShotSelectorOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
           )}>
               {!isVideoContent && (
@@ -1442,7 +1442,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           )}
           
           {/* Action buttons - Top Right (Delete, Info & Apply) */}
-          <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 mt-8 z-20">
+          <div className="absolute top-1.5 right-1.5 flex flex-col items-end gap-1.5 mt-7 z-20">
               {/* Delete button - Mobile Top Right */}
               {showDelete && isMobile && onDelete && (
                 <Button 
@@ -1603,7 +1603,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           </div>
 
           {/* Bottom Buttons - Star (left), Edit (center), Delete (right) */}
-          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between z-20">
+          <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between z-20">
               {/* Star Button - Left (always visible when starred) */}
               <div className={`flex items-center gap-1.5 transition-opacity ${
                 localStarred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'

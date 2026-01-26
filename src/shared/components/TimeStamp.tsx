@@ -69,10 +69,10 @@ export const TimeStamp: React.FC<TimeStampProps> = ({
   if (!date) return null;
 
   const positionClasses = {
-    'top-left': 'top-2 left-2',
-    'top-right': 'top-2 right-2',
-    'bottom-left': 'bottom-2 left-2',
-    'bottom-right': 'bottom-2 right-2'
+    'top-left': 'top-1.5 left-1.5',
+    'top-right': 'top-1.5 right-1.5',
+    'bottom-left': 'bottom-1.5 left-1.5',
+    'bottom-right': 'bottom-1.5 right-1.5'
   };
 
   // Visibility classes based on hover behavior
