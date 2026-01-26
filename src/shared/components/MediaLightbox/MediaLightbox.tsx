@@ -661,19 +661,28 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       return { width: metadata.width, height: metadata.height };
     }
 
-    // 3. Check params.resolution (string like "1024x768")
-    const paramsResolution = resolutionToDimensions(params?.resolution);
-    if (paramsResolution) return paramsResolution;
+    // 3. Check resolution strings in multiple locations
+    const resolutionSources = [
+      params?.resolution,
+      params?.originalParams?.resolution,
+      params?.orchestrator_details?.resolution,
+      metadata?.resolution,
+      metadata?.originalParams?.resolution,
+      metadata?.originalParams?.orchestrator_details?.resolution,
+    ];
 
-    // 4. Check metadata.originalParams.orchestrator_details.resolution
-    const orchResolution = resolutionToDimensions(metadata?.originalParams?.orchestrator_details?.resolution);
-    if (orchResolution) return orchResolution;
+    for (const res of resolutionSources) {
+      const dims = resolutionToDimensions(res);
+      if (dims) return dims;
+    }
 
-    // 5. Check for aspect_ratio in params and convert to standard dimensions
+    // 4. Check for aspect_ratio in params and convert to standard dimensions
     // This is faster than falling back to project aspect ratio since data is already loaded
     const aspectRatioSources = [
       params?.aspect_ratio,
       params?.custom_aspect_ratio,
+      params?.originalParams?.aspect_ratio,
+      params?.orchestrator_details?.aspect_ratio,
       metadata?.aspect_ratio,
       metadata?.originalParams?.aspect_ratio,
       metadata?.originalParams?.orchestrator_details?.aspect_ratio,
