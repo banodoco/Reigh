@@ -414,6 +414,40 @@ const JoinClipsPage: React.FC = () => {
     }
   }, [selectedProjectId]);
 
+  // Transition prompts (one for each pair) - still managed locally as they're tied to clip IDs
+  const [transitionPrompts, setTransitionPrompts] = useState<TransitionPrompt[]>([]);
+  
+  // Use settings hook for all persisted settings
+  const joinSettings = useJoinClipsSettings(selectedProjectId);
+  
+  // Derive all settings from hook
+  const {
+    prompt: globalPrompt = '',
+    negativePrompt = '',
+    contextFrameCount = 8,
+    gapFrameCount = 12,
+    replaceMode = true,
+    keepBridgingImages,
+    useIndividualPrompts = false,
+    enhancePrompt = true,
+    useInputVideoResolution = false,
+    useInputVideoFps = false,
+    noisedInputVideo = 0,
+    loopFirstClip = false,
+    motionMode = 'basic',
+    phaseConfig,
+    randomSeed = true,
+    selectedPhasePresetId = BUILTIN_JOIN_CLIPS_DEFAULT_ID,
+  } = joinSettings.settings;
+  
+  // Debug: Log enhancePrompt value
+  useEffect(() => {
+    console.log('[JoinClipsPage] enhancePrompt from settings:', enhancePrompt, 'raw value:', joinSettings.settings.enhancePrompt);
+  }, [enhancePrompt, joinSettings.settings.enhancePrompt]);
+  
+  // Track whether settings have completed their initial load
+  const settingsLoaded = joinSettings.status !== 'idle' && joinSettings.status !== 'loading';
+
   // Check for pending join clips from lightbox "Add to Join" button
   // Must wait for settingsLoaded to avoid race condition with settings initialization
   useEffect(() => {
@@ -541,40 +575,6 @@ const JoinClipsPage: React.FC = () => {
     checkPendingJoinClips();
   }, [settingsLoaded]);
 
-  // Transition prompts (one for each pair) - still managed locally as they're tied to clip IDs
-  const [transitionPrompts, setTransitionPrompts] = useState<TransitionPrompt[]>([]);
-  
-  // Use settings hook for all persisted settings
-  const joinSettings = useJoinClipsSettings(selectedProjectId);
-  
-  // Derive all settings from hook
-  const {
-    prompt: globalPrompt = '',
-    negativePrompt = '',
-    contextFrameCount = 8,
-    gapFrameCount = 12,
-    replaceMode = true,
-    keepBridgingImages,
-    useIndividualPrompts = false,
-    enhancePrompt = true,
-    useInputVideoResolution = false,
-    useInputVideoFps = false,
-    noisedInputVideo = 0,
-    loopFirstClip = false,
-    motionMode = 'basic',
-    phaseConfig,
-    randomSeed = true,
-    selectedPhasePresetId = BUILTIN_JOIN_CLIPS_DEFAULT_ID,
-  } = joinSettings.settings;
-  
-  // Debug: Log enhancePrompt value
-  useEffect(() => {
-    console.log('[JoinClipsPage] enhancePrompt from settings:', enhancePrompt, 'raw value:', joinSettings.settings.enhancePrompt);
-  }, [enhancePrompt, joinSettings.settings.enhancePrompt]);
-  
-  // Track whether settings have completed their initial load
-  const settingsLoaded = joinSettings.status !== 'idle' && joinSettings.status !== 'loading';
-  
   // Preload poster images helper - warm up the browser cache
   const preloadPosters = useCallback((posterUrls: string[]): Promise<void[]> => {
     const promises = posterUrls.filter(url => url && !preloadedPostersRef.current.has(url)).map(url => {
