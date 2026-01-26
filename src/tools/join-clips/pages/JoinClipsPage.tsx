@@ -419,24 +419,24 @@ const JoinClipsPage: React.FC = () => {
     const checkPendingJoinClips = async () => {
       try {
         const pendingData = localStorage.getItem('pendingJoinClips');
-        console.log('[JoinClips] checkPendingJoinClips - raw data:', pendingData);
+        console.log('[JoinClipsDebug] checkPendingJoinClips - raw data:', pendingData);
 
         if (!pendingData) {
-          console.log('[JoinClips] No pending clips in localStorage');
+          console.log('[JoinClipsDebug] No pending clips in localStorage');
           return;
         }
 
         const pendingClips: Array<{ videoUrl: string; thumbnailUrl?: string; generationId: string; timestamp: number }> =
           JSON.parse(pendingData);
 
-        console.log('[JoinClips] Parsed pending clips:', pendingClips);
+        console.log('[JoinClipsDebug] Parsed pending clips:', pendingClips);
 
         // Filter to only recent clips (within last 5 minutes)
         const now = Date.now();
         const recentClips = pendingClips.filter(clip => {
           const age = now - clip.timestamp;
           const isRecent = age < 5 * 60 * 1000;
-          console.log('[JoinClips] Clip age check:', {
+          console.log('[JoinClipsDebug] Clip age check:', {
             generationId: clip.generationId,
             ageMs: age,
             ageSeconds: Math.round(age / 1000),
@@ -445,20 +445,20 @@ const JoinClipsPage: React.FC = () => {
           return isRecent;
         });
 
-        console.log('[JoinClips] Recent clips after filter:', recentClips.length);
+        console.log('[JoinClipsDebug] Recent clips after filter:', recentClips.length);
 
         if (recentClips.length === 0) {
-          console.log('[JoinClips] No recent clips, clearing localStorage');
+          console.log('[JoinClipsDebug] No recent clips, clearing localStorage');
           localStorage.removeItem('pendingJoinClips');
           return;
         }
 
         // Process each pending clip
         for (const { videoUrl, thumbnailUrl, generationId } of recentClips) {
-          console.log('[JoinClips] Processing clip:', { videoUrl, thumbnailUrl, generationId });
+          console.log('[JoinClipsDebug] Processing clip:', { videoUrl, thumbnailUrl, generationId });
 
           if (!videoUrl) {
-            console.error('[JoinClips] Clip has no videoUrl, skipping:', generationId);
+            console.error('[JoinClipsDebug] Clip has no videoUrl, skipping:', generationId);
             continue;
           }
 
@@ -467,32 +467,32 @@ const JoinClipsPage: React.FC = () => {
           videoElement.preload = 'metadata';
           const durationPromise = new Promise<number>((resolve) => {
             videoElement.onloadedmetadata = () => {
-              console.log('[JoinClips] Video metadata loaded, duration:', videoElement.duration);
+              console.log('[JoinClipsDebug] Video metadata loaded, duration:', videoElement.duration);
               resolve(videoElement.duration);
             };
             videoElement.onerror = (e) => {
-              console.error('[JoinClips] Video metadata load error:', e, 'URL:', videoUrl);
+              console.error('[JoinClipsDebug] Video metadata load error:', e, 'URL:', videoUrl);
               resolve(0);
             };
             videoElement.src = videoUrl;
           });
           const durationSeconds = await durationPromise;
-          console.log('[JoinClips] Duration extracted:', durationSeconds);
+          console.log('[JoinClipsDebug] Duration extracted:', durationSeconds);
 
           // Find first empty clip slot or add a new one
           const newClipId = generateUUID();
-          console.log('[JoinClips] About to update clips state with:', { videoUrl, thumbnailUrl, durationSeconds, newClipId });
+          console.log('[JoinClipsDebug] About to update clips state with:', { videoUrl, thumbnailUrl, durationSeconds, newClipId });
 
           setClips(prev => {
-            console.log('[JoinClips] setClips callback - previous clips:', prev.length, prev.map(c => ({ id: c.id, hasUrl: !!c.url })));
+            console.log('[JoinClipsDebug] setClips callback - previous clips:', prev.length, prev.map(c => ({ id: c.id, hasUrl: !!c.url })));
 
             // Find first clip without a URL
             const emptyClipIndex = prev.findIndex(clip => !clip.url);
-            console.log('[JoinClips] Empty clip slot index:', emptyClipIndex);
+            console.log('[JoinClipsDebug] Empty clip slot index:', emptyClipIndex);
 
             if (emptyClipIndex !== -1) {
               // Fill the empty slot
-              console.log('[JoinClips] Filling empty slot at index:', emptyClipIndex);
+              console.log('[JoinClipsDebug] Filling empty slot at index:', emptyClipIndex);
               return prev.map((clip, idx) =>
                 idx === emptyClipIndex
                   ? {
@@ -507,7 +507,7 @@ const JoinClipsPage: React.FC = () => {
               );
             } else {
               // Add a new clip
-              console.log('[JoinClips] Adding new clip to end of list');
+              console.log('[JoinClipsDebug] Adding new clip to end of list');
               return [
                 ...prev,
                 {
@@ -522,13 +522,13 @@ const JoinClipsPage: React.FC = () => {
             }
           });
 
-          console.log('[JoinClips] Added clip from lightbox:', videoUrl);
+          console.log('[JoinClipsDebug] Added clip from lightbox:', videoUrl);
         }
 
         // Clear processed clips
         localStorage.removeItem('pendingJoinClips');
       } catch (error) {
-        console.error('[JoinClips] Failed to process pending join clips:', error);
+        console.error('[JoinClipsDebug] Failed to process pending join clips:', error);
       }
     };
 
@@ -588,7 +588,7 @@ const JoinClipsPage: React.FC = () => {
   // Initialize keepBridgingImages to false if undefined (new field for existing projects)
   useEffect(() => {
     if (keepBridgingImages === undefined && settingsLoaded) {
-      console.log('[JoinClips] Initializing keepBridgingImages to false');
+      console.log('[JoinClipsDebug] Initializing keepBridgingImages to false');
       joinSettings.updateField('keepBridgingImages', false);
     }
   }, [keepBridgingImages, settingsLoaded, joinSettings]);
@@ -884,7 +884,7 @@ const JoinClipsPage: React.FC = () => {
     
     if (clipsNeedingDuration.length === 0) return;
     
-    console.log('[JoinClips] Loading duration for', clipsNeedingDuration.length, 'clips');
+    console.log('[JoinClipsDebug] Loading duration for', clipsNeedingDuration.length, 'clips');
     
     // Mark clips as loading
     setClips(prev => prev.map(clip => 
@@ -897,7 +897,7 @@ const JoinClipsPage: React.FC = () => {
     clipsNeedingDuration.forEach(async (clip) => {
       try {
         const metadata = await extractVideoMetadataFromUrl(clip.url);
-        console.log('[JoinClips] Loaded duration for clip:', clip.id.substring(0, 8), metadata.duration_seconds, 'seconds');
+        console.log('[JoinClipsDebug] Loaded duration for clip:', clip.id.substring(0, 8), metadata.duration_seconds, 'seconds');
         
         setClips(prev => prev.map(c => 
           c.id === clip.id
@@ -905,7 +905,7 @@ const JoinClipsPage: React.FC = () => {
             : c
         ));
       } catch (error) {
-        console.error('[JoinClips] Failed to load duration for clip:', clip.id, error);
+        console.error('[JoinClipsDebug] Failed to load duration for clip:', clip.id, error);
         setClips(prev => prev.map(c => 
           c.id === clip.id
             ? { ...c, durationSeconds: 0, metadataLoading: false }
@@ -987,7 +987,7 @@ const JoinClipsPage: React.FC = () => {
     
     // Ensure minimum of 2 clips
     if (clips.length < 2) {
-      console.log('[JoinClips] Less than 2 clips, adding empty slots to reach minimum');
+      console.log('[JoinClipsDebug] Less than 2 clips, adding empty slots to reach minimum');
       const clipsToAdd = 2 - clips.length;
       const newClips = Array.from({ length: clipsToAdd }, () => ({
         id: generateUUID(),
@@ -1013,7 +1013,7 @@ const JoinClipsPage: React.FC = () => {
     
     // If all slots are filled (no trailing empty), add one
     if (clips.every(clip => clip.url)) {
-      console.log('[JoinClips] All slots filled, adding new empty slot');
+      console.log('[JoinClipsDebug] All slots filled, adding new empty slot');
       const newClipId = generateUUID();
       setClips(prev => [...prev, {
         id: newClipId,
@@ -1027,7 +1027,7 @@ const JoinClipsPage: React.FC = () => {
     // If we have more than one trailing empty slot, remove extras (keeping only one)
     // But ensure we always have at least 2 clips total
     if (trailingEmptyCount > 1) {
-      console.log('[JoinClips] Multiple trailing empty slots detected, keeping only one');
+      console.log('[JoinClipsDebug] Multiple trailing empty slots detected, keeping only one');
       const targetLength = Math.max(2, lastNonEmptyIndex + 2); // Keep all non-empty + 1 empty, but minimum 2
       
       // Only update if we actually need to remove clips
@@ -1136,14 +1136,14 @@ const JoinClipsPage: React.FC = () => {
             prompt: 'Uploaded clip for Join',
             thumbnailUrl: posterUrl,
           });
-          console.log('[JoinClips] Generation record created for uploaded clip');
+          console.log('[JoinClipsDebug] Generation record created for uploaded clip');
         } catch (genError) {
-          console.error('[JoinClips] Failed to create generation record:', genError);
+          console.error('[JoinClipsDebug] Failed to create generation record:', genError);
           // Don't fail the upload if generation creation fails
         }
       }
 
-      console.log('[JoinClips] Video uploaded with duration:', durationSeconds, 'seconds');
+      console.log('[JoinClipsDebug] Video uploaded with duration:', durationSeconds, 'seconds');
       return { videoUrl, posterUrl, finalFrameUrl, durationSeconds };
     } catch (error) {
       console.error('Error uploading video:', error);
@@ -1370,7 +1370,7 @@ const JoinClipsPage: React.FC = () => {
         }
       }
       
-      console.log('[JoinClips] Resolution from project:', {
+      console.log('[JoinClipsDebug] Resolution from project:', {
         projectAspectRatio,
         resolutionTuple
       });
@@ -1409,7 +1409,7 @@ const JoinClipsPage: React.FC = () => {
         selected_phase_preset_id: selectedPhasePresetId,
       };
       
-      console.log('[JoinClips] Creating task with params:', taskParams);
+      console.log('[JoinClipsDebug] Creating task with params:', taskParams);
       
       const result = await createJoinClipsTask(taskParams);
       return result;
@@ -1431,7 +1431,7 @@ const JoinClipsPage: React.FC = () => {
       });
     },
     onError: (error) => {
-      console.error('[JoinClips] Task creation failed:', error);
+      console.error('[JoinClipsDebug] Task creation failed:', error);
       toast({
         title: 'Failed to create task',
         description: error instanceof Error ? error.message : 'Failed to create join clips task',
@@ -1492,7 +1492,7 @@ const JoinClipsPage: React.FC = () => {
       
       const reorderedClips = arrayMove(prevClips, oldIndex, newIndex);
       
-      console.log('[JoinClips] Clips reordered:', {
+      console.log('[JoinClipsDebug] Clips reordered:', {
         from: oldIndex,
         to: newIndex,
         newOrder: reorderedClips.map((c, i) => `${i + 1}: ${c.url ? 'video' : 'empty'}`)
@@ -1687,7 +1687,7 @@ const JoinClipsPage: React.FC = () => {
                                   const scale = shortestFrames / framesNeeded;
                                   context = Math.max(4, Math.floor(context * scale));
                                   gap = Math.max(1, Math.floor(gap * scale));
-                                  console.log('[JoinClips] Scaled defaults to fit constraint:', { context, gap, shortestFrames, framesNeeded });
+                                  console.log('[JoinClipsDebug] Scaled defaults to fit constraint:', { context, gap, shortestFrames, framesNeeded });
                                 }
                               }
                               
