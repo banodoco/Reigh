@@ -257,6 +257,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
     addStructureVideo,
     updateStructureVideo,
     removeStructureVideo,
+    setStructureVideos,
   } = useStructureVideo({
     projectId,
     shotId: selectedShot?.id,
@@ -2425,6 +2426,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
             onAddStructureVideo={addStructureVideo}
             onUpdateStructureVideo={updateStructureVideo}
             onRemoveStructureVideo={removeStructureVideo}
+            onSetStructureVideos={setStructureVideos}
             // Audio strip props
             audioUrl={audioUrl}
             audioMetadata={audioMetadata}

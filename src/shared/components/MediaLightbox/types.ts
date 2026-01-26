@@ -1,4 +1,5 @@
 import type { GenerationRow } from '@/types/shots';
+import type { StructureVideoConfigWithMetadata } from '@/shared/lib/tasks/travelBetweenImages';
 
 export interface BrushStroke {
   id: string;
@@ -93,4 +94,16 @@ export interface SegmentSlotModeData {
   onFrameCountChange?: (pairShotGenerationId: string, frameCount: number) => void;
   /** Callback when generate is initiated (for optimistic UI updates) */
   onGenerateStarted?: (pairShotGenerationId: string | null | undefined) => void;
+
+  // Per-segment structure video management (Timeline Mode only)
+  /** Whether in timeline mode (shows structure video upload) vs batch mode (preview only) */
+  isTimelineMode?: boolean;
+  /** All existing structure videos (for overlap detection) */
+  existingStructureVideos?: StructureVideoConfigWithMetadata[];
+  /** Callback to add a structure video for this segment (handles overlap resolution) */
+  onAddSegmentStructureVideo?: (video: StructureVideoConfigWithMetadata) => void;
+  /** Callback to update this segment's structure video */
+  onUpdateSegmentStructureVideo?: (updates: Partial<StructureVideoConfigWithMetadata>) => void;
+  /** Callback to remove this segment's structure video */
+  onRemoveSegmentStructureVideo?: () => void;
 }

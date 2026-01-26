@@ -126,6 +126,8 @@ interface ShotImagesEditorProps {
   onAddStructureVideo?: (video: import("@/shared/lib/tasks/travelBetweenImages").StructureVideoConfigWithMetadata) => void;
   onUpdateStructureVideo?: (index: number, updates: Partial<import("@/shared/lib/tasks/travelBetweenImages").StructureVideoConfigWithMetadata>) => void;
   onRemoveStructureVideo?: (index: number) => void;
+  /** Set the entire structure videos array (for overlap resolution) */
+  onSetStructureVideos?: (videos: import("@/shared/lib/tasks/travelBetweenImages").StructureVideoConfigWithMetadata[]) => void;
   /** Audio strip props */
   audioUrl?: string | null;
   audioMetadata?: { duration: number; name?: string } | null;
@@ -209,6 +211,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   onAddStructureVideo: propOnAddStructureVideo,
   onUpdateStructureVideo: propOnUpdateStructureVideo,
   onRemoveStructureVideo: propOnRemoveStructureVideo,
+  onSetStructureVideos: propOnSetStructureVideos,
   // Audio strip props
   audioUrl: propAudioUrl,
   audioMetadata: propAudioMetadata,
@@ -539,7 +542,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   const previewVideoRefB = useRef<HTMLVideoElement>(null);
   const [activeVideoSlot, setActiveVideoSlot] = useState<'A' | 'B'>('A');
   const [preloadedIndex, setPreloadedIndex] = useState<number | null>(null);
-  
+  // Track which index we're currently preloading (set immediately on load, cleared when canplaythrough fires)
+  const preloadingIndexRef = useRef<number | null>(null);
+
   // Auto-start playback state when dialog opens OR when segment changes (for both video and image segments)
   React.useEffect(() => {
     if (isPreviewTogetherOpen) {
@@ -573,6 +578,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       // Reset dual-video state
       setActiveVideoSlot('A');
       setPreloadedIndex(null);
+      preloadingIndexRef.current = null;
     }
   }, [isPreviewTogetherOpen]);
   
@@ -836,11 +842,13 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         uni3cEndPercent: coveringVideo.uni3c_end_percent ?? 0.1,
       } : undefined,
       structureVideoUrl: coveringVideo?.path,
-      structureVideoFrameRange: coveringVideo ? {
+      // Always provide frame range in Timeline Mode so uploads work even when no video exists yet
+      // For preview, we need video metadata; for uploads, we just need segment frame range
+      structureVideoFrameRange: (effectiveGenerationMode === 'timeline' || coveringVideo) ? {
         segmentStart: pairStartFrame,
         segmentEnd: pairEndFrame,
-        videoTotalFrames: coveringVideo.metadata?.total_frames ?? 60,
-        videoFps: coveringVideo.metadata?.frame_rate ?? 24,
+        videoTotalFrames: coveringVideo?.metadata?.total_frames ?? 60,
+        videoFps: coveringVideo?.metadata?.frame_rate ?? 24,
       } : undefined,
       onFrameCountChange: (pairShotGenerationId: string, frameCount: number) => {
         // In batch mode, don't update timeline
@@ -857,6 +865,120 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       onGenerateStarted: (pairShotGenerationId) => {
         addOptimisticPending(pairShotGenerationId);
       },
+
+      // Per-segment structure video management (Timeline Mode only)
+      isTimelineMode: effectiveGenerationMode === 'timeline',
+      existingStructureVideos: propStructureVideos ?? [],
+      onAddSegmentStructureVideo: (video) => {
+        // Timeline mode only - add structure video for this segment
+        if (effectiveGenerationMode !== 'timeline') return;
+
+        // If we have setStructureVideos, use it for proper overlap resolution
+        if (propOnSetStructureVideos) {
+          const newStart = video.start_frame ?? 0;
+          const newEnd = video.end_frame ?? Infinity;
+
+          console.log('[SegmentStructureVideo] Adding video with overlap resolution:', {
+            newRange: `${newStart}-${newEnd}`,
+            existingVideos: (propStructureVideos || []).map(v => `${v.start_frame ?? 0}-${v.end_frame ?? '∞'}`),
+          });
+
+          // Resolve overlaps: use flatMap to handle splitting
+          const updatedVideos = (propStructureVideos || []).flatMap((existing) => {
+            const existingStart = existing.start_frame ?? 0;
+            const existingEnd = existing.end_frame ?? Infinity;
+
+            // No overlap - keep as is
+            if (newEnd <= existingStart || newStart >= existingEnd) {
+              return [existing];
+            }
+
+            // Existing is completely within new range - remove entirely
+            if (existingStart >= newStart && existingEnd <= newEnd) {
+              console.log('[SegmentStructureVideo] Removing video completely covered:', {
+                existingRange: `${existingStart}-${existingEnd}`,
+              });
+              return [];
+            }
+
+            // Existing spans across new video - SPLIT into two parts
+            if (existingStart < newStart && existingEnd > newEnd) {
+              console.log('[SegmentStructureVideo] Splitting video around new segment:', {
+                existingRange: `${existingStart}-${existingEnd}`,
+                beforePart: `${existingStart}-${newStart}`,
+                afterPart: `${newEnd}-${existingEnd}`,
+              });
+              return [
+                { ...existing, end_frame: newStart },      // Part before
+                { ...existing, start_frame: newEnd },     // Part after
+              ];
+            }
+
+            // Existing starts before new, ends within new - trim end
+            if (existingStart < newStart) {
+              console.log('[SegmentStructureVideo] Trimming video end:', {
+                existingRange: `${existingStart}-${existingEnd}`,
+                newEnd: newStart,
+              });
+              return [{ ...existing, end_frame: newStart }];
+            }
+
+            // Existing starts within new, ends after new - trim start
+            if (existingEnd > newEnd) {
+              console.log('[SegmentStructureVideo] Trimming video start:', {
+                existingRange: `${existingStart}-${existingEnd}`,
+                newStart: newEnd,
+              });
+              return [{ ...existing, start_frame: newEnd }];
+            }
+
+            // Shouldn't reach here, but keep as is
+            return [existing];
+          });
+
+          // Filter out any videos that ended up with zero or negative length
+          const validVideos = updatedVideos.filter(v => {
+            const start = v.start_frame ?? 0;
+            const end = v.end_frame ?? Infinity;
+            if (end <= start) {
+              console.log('[SegmentStructureVideo] Removing zero-length video:', {
+                range: `${start}-${end}`,
+              });
+              return false;
+            }
+            return true;
+          });
+
+          // Add the new video and set the entire array
+          console.log('[SegmentStructureVideo] Final video array:', {
+            newVideo: `${video.start_frame}-${video.end_frame}`,
+            existingAfterTrim: validVideos.map(v => `${v.start_frame ?? 0}-${v.end_frame ?? '∞'}`),
+            removedCount: updatedVideos.length - validVideos.length,
+          });
+          propOnSetStructureVideos([...validVideos, video]);
+        } else if (propOnAddStructureVideo) {
+          // Fallback: just add without overlap handling
+          propOnAddStructureVideo(video);
+        }
+      },
+      onUpdateSegmentStructureVideo: (updates) => {
+        // Find the index of the covering video and update it
+        if (!propOnUpdateStructureVideo || !coveringVideo || !propStructureVideos) return;
+
+        const index = propStructureVideos.findIndex(v => v.path === coveringVideo.path);
+        if (index >= 0) {
+          propOnUpdateStructureVideo(index, updates);
+        }
+      },
+      onRemoveSegmentStructureVideo: () => {
+        // Find the index of the covering video and remove it
+        if (!propOnRemoveStructureVideo || !coveringVideo || !propStructureVideos) return;
+
+        const index = propStructureVideos.findIndex(v => v.path === coveringVideo.path);
+        if (index >= 0) {
+          propOnRemoveStructureVideo(index);
+        }
+      },
     };
   }, [
     segmentSlotLightboxIndex,
@@ -872,6 +994,10 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     defaultNegativePrompt,
     resolvedProjectResolution,
     addOptimisticPending,
+    propOnAddStructureVideo,
+    propOnUpdateStructureVideo,
+    propOnRemoveStructureVideo,
+    propOnSetStructureVideos,
   ]);
 
   // Unified frame count update handler - called from MediaLightbox segment slot mode
@@ -1122,18 +1248,38 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     const nextIndex = (safeIndex + 1) % previewableSegments.length;
     const nextSegment = previewableSegments[nextIndex];
 
-    // Only preload if next segment has video and we haven't already preloaded it
-    if (!nextSegment?.hasVideo || preloadedIndex === nextIndex) return;
+    // Only preload if next segment has video and we haven't already preloaded it (or aren't currently preloading it)
+    if (!nextSegment?.hasVideo || preloadedIndex === nextIndex || preloadingIndexRef.current === nextIndex) return;
 
     // Get the inactive video element
     const inactiveVideo = activeVideoSlot === 'A' ? previewVideoRefB.current : previewVideoRef.current;
     if (!inactiveVideo) return;
 
+    // Mark that we're preloading this index
+    preloadingIndexRef.current = nextIndex;
+
+    // Handler for when video is ready to play
+    const handleCanPlayThrough = () => {
+      // Only set preloadedIndex if this is still the index we're preloading
+      if (preloadingIndexRef.current === nextIndex) {
+        setPreloadedIndex(nextIndex);
+        preloadingIndexRef.current = null;
+        console.log('[SeamlessCut] Video ready to play:', { nextIndex });
+      }
+      inactiveVideo.removeEventListener('canplaythrough', handleCanPlayThrough);
+    };
+
+    // Listen for video ready event before marking as preloaded
+    inactiveVideo.addEventListener('canplaythrough', handleCanPlayThrough);
+
     // Preload the next video
     inactiveVideo.src = nextSegment.videoUrl!;
     inactiveVideo.load();
-    setPreloadedIndex(nextIndex);
     console.log('[SeamlessCut] Preloading next video:', { nextIndex, url: nextSegment.videoUrl?.substring(0, 50) });
+
+    return () => {
+      inactiveVideo.removeEventListener('canplaythrough', handleCanPlayThrough);
+    };
   }, [isPreviewTogetherOpen, currentPreviewIndex, previewableSegments, activeVideoSlot, preloadedIndex]);
 
   // Set active video src and start playback
@@ -2759,10 +2905,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                     {/* Dual video elements for seamless cuts */}
                     {currentSegment.hasVideo && (
                       <>
-                        {/* Video A - visible when activeVideoSlot === 'A' */}
+                        {/* Video A - on top when activeVideoSlot === 'A', behind when 'B' */}
+                        {/* Using z-index instead of invisible so the outgoing video acts as backdrop until incoming renders */}
                         <video
                           ref={previewVideoRef}
-                          className={`absolute inset-0 w-full h-full object-contain cursor-pointer ${activeVideoSlot !== 'A' ? 'invisible' : ''}`}
+                          className={`absolute inset-0 w-full h-full object-contain cursor-pointer ${activeVideoSlot === 'A' ? 'z-10' : 'z-0 pointer-events-none'}`}
                           playsInline
                           muted={activeVideoSlot !== 'A'}
                           onClick={() => {
@@ -2833,10 +2980,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                             setCurrentPreviewIndex(nextIndex);
                           }}
                         />
-                        {/* Video B - visible when activeVideoSlot === 'B' */}
+                        {/* Video B - on top when activeVideoSlot === 'B', behind when 'A' */}
+                        {/* Using z-index instead of invisible so the outgoing video acts as backdrop until incoming renders */}
                         <video
                           ref={previewVideoRefB}
-                          className={`absolute inset-0 w-full h-full object-contain cursor-pointer ${activeVideoSlot !== 'B' ? 'invisible' : ''}`}
+                          className={`absolute inset-0 w-full h-full object-contain cursor-pointer ${activeVideoSlot === 'B' ? 'z-10' : 'z-0 pointer-events-none'}`}
                           playsInline
                           muted={activeVideoSlot !== 'B'}
                           onClick={() => {
@@ -2993,7 +3141,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                               prev > 0 ? prev - 1 : previewableSegments.length - 1
                             );
                           }}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-10 w-10"
+                          className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10"
                         >
                           <ChevronLeft className="h-6 w-6" />
                         </Button>
@@ -3009,15 +3157,15 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                               (prev + 1) % previewableSegments.length
                             );
                           }}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-10 h-10 w-10"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white z-20 h-10 w-10"
                         >
                           <ChevronRight className="h-6 w-6" />
                         </Button>
                       </>
                     )}
                     
-                    {/* Controls overlay */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 pt-8">
+                    {/* Controls overlay - z-20 to be above videos (z-10) */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 pt-8 z-20">
                       <div className="flex items-center gap-3">
                         <button
                           type="button"

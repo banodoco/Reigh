@@ -349,14 +349,22 @@ export function useVideoRegenerateMode({
       : undefined;
 
     // Extract structure video props
+    // In Timeline Mode with segmentSlotMode, prefer segment-level structure video data
+    // over shot-level defaults (since segmentSlotMode has per-segment coverage info)
     const firstStructureVideo = shotStructureVideos?.[0];
-    const structureVideoType = firstStructureVideo?.structure_type as 'uni3c' | 'flow' | 'canny' | 'depth' | undefined;
-    const structureVideoDefaults = firstStructureVideo ? {
+    const shotStructureVideoType = firstStructureVideo?.structure_type as 'uni3c' | 'flow' | 'canny' | 'depth' | undefined;
+    const shotStructureVideoDefaults = firstStructureVideo ? {
       motionStrength: (firstStructureVideo.motion_strength as number) ?? 1.2,
       treatment: ((firstStructureVideo.treatment as string) ?? 'adjust') as 'adjust' | 'clip',
       uni3cEndPercent: (firstStructureVideo.uni3c_end_percent as number) ?? 0.1,
     } : undefined;
-    const structureVideoUrl = firstStructureVideo?.path as string | undefined;
+    const shotStructureVideoUrl = firstStructureVideo?.path as string | undefined;
+
+    // Use segment-level data from segmentSlotMode when available (Timeline Mode),
+    // falling back to shot-level data
+    const structureVideoType = segmentSlotMode?.structureVideoType ?? shotStructureVideoType;
+    const structureVideoDefaults = segmentSlotMode?.structureVideoDefaults ?? shotStructureVideoDefaults;
+    const structureVideoUrl = segmentSlotMode?.structureVideoUrl ?? shotStructureVideoUrl;
 
     return {
       params: taskParams as Record<string, any>,
@@ -378,7 +386,13 @@ export function useVideoRegenerateMode({
       structureVideoType,
       structureVideoDefaults,
       structureVideoUrl,
+      structureVideoFrameRange: segmentSlotMode?.structureVideoFrameRange,
       onUpdateStructureVideoDefaults: handleUpdateStructureVideoDefaults,
+      // Per-segment structure video management (from segmentSlotMode)
+      isTimelineMode: segmentSlotMode?.isTimelineMode,
+      onAddSegmentStructureVideo: segmentSlotMode?.onAddSegmentStructureVideo,
+      onUpdateSegmentStructureVideo: segmentSlotMode?.onUpdateSegmentStructureVideo,
+      onRemoveSegmentStructureVideo: segmentSlotMode?.onRemoveSegmentStructureVideo,
     };
   }, [
     canRegenerate,

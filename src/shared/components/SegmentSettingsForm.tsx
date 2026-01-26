@@ -26,17 +26,25 @@ import { Label } from '@/shared/components/ui/label';
 import { Slider } from '@/shared/components/ui/slider';
 import { Switch } from '@/shared/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/shared/components/ui/collapsible';
-import { ChevronLeft, Loader2, RotateCcw, Save, Video } from 'lucide-react';
+import { ChevronLeft, Loader2, RotateCcw, Save, Video, X, Images } from 'lucide-react';
 import { MotionPresetSelector } from '@/shared/components/MotionPresetSelector';
 import { detectGenerationMode, BUILTIN_I2V_PRESET, BUILTIN_VACE_PRESET } from './segmentSettingsUtils';
 import { ActiveLoRAsDisplay } from '@/shared/components/ActiveLoRAsDisplay';
 import { LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
 import { DefaultableTextarea } from '@/shared/components/DefaultableTextarea';
-import { usePublicLoras, type LoraModel } from '@/shared/hooks/useResources';
+import { DatasetBrowserModal } from '@/shared/components/DatasetBrowserModal';
+import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { usePublicLoras, useCreateResource, type LoraModel, type Resource, type StructureVideoMetadata } from '@/shared/hooks/useResources';
+import { useUserUIState } from '@/shared/hooks/useUserUIState';
+import { uploadVideoToStorage, extractVideoMetadata } from '@/shared/lib/videoUploader';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import { quantizeFrameCount, framesToSeconds } from '@/tools/travel-between-images/components/Timeline/utils/time-utils';
 import type { PhaseConfig } from '@/tools/travel-between-images/settings';
 import type { ActiveLora } from '@/shared/hooks/useLoraManager';
 import type { SegmentSettings } from './segmentSettingsUtils';
+import type { StructureVideoConfigWithMetadata } from '@/shared/lib/tasks/travelBetweenImages';
 import { stripModeFromPhaseConfig } from './segmentSettingsUtils';
 
 // =============================================================================
@@ -149,6 +157,16 @@ export interface SegmentSettingsFormProps {
    * Use 4 for p-4 containers (default), 6 for p-6 containers.
    */
   edgeExtendAmount?: 4 | 6;
+
+  // Per-segment structure video management (Timeline Mode only)
+  /** Whether in timeline mode (shows structure video upload) vs batch mode (preview only) */
+  isTimelineMode?: boolean;
+  /** Callback to add a structure video for this segment */
+  onAddSegmentStructureVideo?: (video: StructureVideoConfigWithMetadata) => void;
+  /** Callback to update this segment's structure video */
+  onUpdateSegmentStructureVideo?: (updates: Partial<StructureVideoConfigWithMetadata>) => void;
+  /** Callback to remove this segment's structure video */
+  onRemoveSegmentStructureVideo?: () => void;
 }
 
 // =============================================================================
@@ -163,18 +181,34 @@ interface StructureVideoPreviewProps {
     videoTotalFrames: number;
     videoFps: number;
   };
+  /** Called when all frames have been captured and displayed */
+  onLoadComplete?: () => void;
 }
 
-const StructureVideoPreview: React.FC<StructureVideoPreviewProps> = ({ videoUrl, frameRange }) => {
+/**
+ * Extracts and displays 3 frames (start, mid, end) from a structure video.
+ *
+ * Uses a single async effect with proper cancellation to:
+ * 1. Load video metadata
+ * 2. Seek to each frame position
+ * 3. Capture frame to canvas
+ * 4. Notify parent when complete
+ */
+const StructureVideoPreview: React.FC<StructureVideoPreviewProps> = ({
+  videoUrl,
+  frameRange,
+  onLoadComplete,
+}) => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRefs = [useRef<HTMLCanvasElement>(null), useRef<HTMLCanvasElement>(null), useRef<HTMLCanvasElement>(null)];
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [currentCapture, setCurrentCapture] = useState(0);
+  // Stable refs array - doesn't change between renders
+  const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([null, null, null]);
+  const [capturedCount, setCapturedCount] = useState(0);
+  // Track which URL the captures are for - prevents showing stale frames when URL changes
+  const [capturedForUrl, setCapturedForUrl] = useState<string | null>(null);
 
   // Calculate the 3 frame positions (start, middle, end of segment's portion)
   const framePositions = useMemo(() => {
     const { segmentStart, segmentEnd, videoTotalFrames, videoFps } = frameRange;
-    const segmentFrames = segmentEnd - segmentStart;
 
     // Map segment frames to video frames (simple linear mapping)
     const videoFrameStart = Math.floor((segmentStart / (segmentEnd || 1)) * videoTotalFrames);
@@ -188,44 +222,97 @@ const StructureVideoPreview: React.FC<StructureVideoPreviewProps> = ({ videoUrl,
     ];
   }, [frameRange]);
 
-  // Capture frames sequentially after video loads
+  // Single effect to handle entire capture flow with proper cancellation
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !isLoaded || currentCapture >= 3) return;
+    if (!video) return;
 
-    const captureFrame = () => {
-      const canvas = canvasRefs[currentCapture].current;
-      if (!canvas || !video.videoWidth) return;
+    let cancelled = false;
+    setCapturedCount(0);
+    setCapturedForUrl(null); // Clear immediately so stale frames don't show
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(video, 0, 0);
+    const captureAllFrames = async () => {
+      // Wait for video metadata to load
+      if (video.readyState < 1) {
+        await new Promise<void>((resolve, reject) => {
+          const onLoad = () => { video.removeEventListener('error', onError); resolve(); };
+          const onError = () => { video.removeEventListener('loadedmetadata', onLoad); reject(new Error('Video failed to load')); };
+          video.addEventListener('loadedmetadata', onLoad, { once: true });
+          video.addEventListener('error', onError, { once: true });
+        });
       }
 
-      // Move to next frame
-      if (currentCapture < 2) {
-        setCurrentCapture(prev => prev + 1);
-        video.currentTime = framePositions[currentCapture + 1].time;
+      if (cancelled) return;
+
+      // Capture each frame sequentially
+      for (let i = 0; i < 3; i++) {
+        if (cancelled) return;
+
+        // Seek to frame position
+        video.currentTime = framePositions[i].time;
+        await new Promise<void>(resolve => {
+          video.addEventListener('seeked', () => resolve(), { once: true });
+        });
+
+        if (cancelled) return;
+
+        // Capture to canvas
+        const canvas = canvasRefs.current[i];
+        if (canvas && video.videoWidth) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(video, 0, 0);
+          }
+        }
+
+        // Mark which URL these captures are for (on first frame)
+        if (i === 0) {
+          setCapturedForUrl(videoUrl);
+        }
+        // Update count to reveal this frame
+        setCapturedCount(i + 1);
+      }
+
+      // All frames captured - notify parent
+      if (!cancelled) {
+        onLoadComplete?.();
       }
     };
 
-    video.onseeked = captureFrame;
-    video.currentTime = framePositions[currentCapture].time;
+    captureAllFrames().catch(err => {
+      if (!cancelled) {
+        console.error('[StructureVideoPreview] Failed to capture frames:', err);
+      }
+    });
 
     return () => {
-      video.onseeked = null;
+      cancelled = true;
     };
-  }, [isLoaded, currentCapture, framePositions]);
+  }, [videoUrl, framePositions, onLoadComplete]);
+
+  // Only show as loaded if captures are for current URL
+  const isFullyLoaded = capturedCount >= 3 && capturedForUrl === videoUrl;
+  // Helper to check if a specific frame should be visible
+  const isFrameCaptured = (i: number) => capturedForUrl === videoUrl && capturedCount > i;
 
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-2 text-[10px]">
-        <span className="text-muted-foreground">
-          Frames {framePositions[0].frame} - {framePositions[2].frame} of structure video
-        </span>
-        <span className="text-primary/70 italic">Make changes on the timeline</span>
+        {isFullyLoaded ? (
+          <>
+            <span className="text-muted-foreground">
+              Frames {framePositions[0].frame} - {framePositions[2].frame} of structure video
+            </span>
+            <span className="text-primary/70 italic">Make changes on the timeline</span>
+          </>
+        ) : (
+          <>
+            <Loader2 className="w-3 h-3 animate-spin text-primary" />
+            <span className="text-muted-foreground">Loading video frames...</span>
+          </>
+        )}
       </div>
       <div className="flex gap-1">
         {/* Hidden video for seeking */}
@@ -236,15 +323,19 @@ const StructureVideoPreview: React.FC<StructureVideoPreviewProps> = ({ videoUrl,
           muted
           playsInline
           crossOrigin="anonymous"
-          onLoadedMetadata={() => setIsLoaded(true)}
         />
         {/* 3 frame previews */}
         {[0, 1, 2].map((i) => (
           <div key={i} className="flex-1 relative">
+            {/* Canvas always rendered (stable ref for drawing) - invisible until captured for current URL */}
             <canvas
-              ref={canvasRefs[i]}
-              className="w-full aspect-video bg-muted/50 rounded object-cover"
+              ref={el => { canvasRefs.current[i] = el; }}
+              className={`w-full aspect-video rounded object-cover ${!isFrameCaptured(i) ? 'invisible' : ''}`}
             />
+            {/* Skeleton shown until frame is captured for current URL */}
+            {!isFrameCaptured(i) && (
+              <div className="absolute inset-0 bg-muted rounded animate-pulse" />
+            )}
             <span className="absolute bottom-0 left-0 right-0 text-[8px] text-center bg-black/60 text-white py-0.5 rounded-b">
               {framePositions[i].label}
             </span>
@@ -290,6 +381,11 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   enhancePromptEnabled,
   onEnhancePromptChange,
   edgeExtendAmount = 4,
+  // Per-segment structure video management
+  isTimelineMode,
+  onAddSegmentStructureVideo,
+  onUpdateSegmentStructureVideo,
+  onRemoveSegmentStructureVideo,
 }) => {
   // UI state
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -297,9 +393,29 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [isSavingDefaults, setIsSavingDefaults] = useState(false);
   const [saveDefaultsSuccess, setSaveDefaultsSuccess] = useState(false);
+  const [showVideoBrowser, setShowVideoBrowser] = useState(false);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [pendingVideoUrl, setPendingVideoUrl] = useState<string | null>(null); // Track pending video until frames are captured
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const addFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Callback when StructureVideoPreview finishes capturing all frames
+  const handleVideoPreviewLoaded = useCallback(() => {
+    setPendingVideoUrl(null);
+  }, []);
+
+  // Show loading state when uploading OR waiting for frames to be captured
+  const isVideoLoading = isUploadingVideo || !!pendingVideoUrl;
 
   // Fetch available LoRAs
   const { data: availableLoras = [] } = usePublicLoras();
+
+  // Resource creation hook for video upload
+  const createResource = useCreateResource();
+
+  // Privacy defaults for new resources
+  const { value: privacyDefaults } = useUserUIState('privacyDefaults', { resourcesPublic: true, generationsPublic: false });
 
   // Detect generation mode from model name
   const generationMode = useMemo(() => {
@@ -442,6 +558,133 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   }, [onSaveAsShotDefaults]);
 
   // ==========================================================================
+  // STRUCTURE VIDEO UPLOAD HANDLERS (Timeline Mode Only)
+  // ==========================================================================
+
+  // Handle selecting a video from the browser
+  const handleVideoResourceSelect = useCallback((resource: Resource) => {
+    if (!onAddSegmentStructureVideo || !structureVideoFrameRange) return;
+
+    const metadata = resource.metadata as StructureVideoMetadata;
+    console.log('[SegmentSettingsForm] Video selected from browser:', {
+      resourceId: resource.id,
+      videoUrl: metadata.videoUrl,
+    });
+
+    const newVideo: StructureVideoConfigWithMetadata = {
+      path: metadata.videoUrl,
+      start_frame: structureVideoFrameRange.segmentStart,
+      end_frame: structureVideoFrameRange.segmentEnd,
+      treatment: settings.structureTreatment ?? structureVideoDefaults?.treatment ?? 'adjust',
+      motion_strength: settings.structureMotionStrength ?? structureVideoDefaults?.motionStrength ?? 1.2,
+      structure_type: 'uni3c', // Default to uni3c for new uploads
+      uni3c_end_percent: settings.structureUni3cEndPercent ?? structureVideoDefaults?.uni3cEndPercent ?? 0.1,
+      metadata: metadata.videoMetadata ?? null,
+      resource_id: resource.id,
+    };
+
+    // Set pending state to show loading until props update
+    setPendingVideoUrl(metadata.videoUrl);
+    onAddSegmentStructureVideo(newVideo);
+    setShowVideoBrowser(false);
+  }, [onAddSegmentStructureVideo, structureVideoFrameRange, settings, structureVideoDefaults]);
+
+  // Process uploaded video file
+  const processVideoFile = useCallback(async (file: File) => {
+    if (!onAddSegmentStructureVideo || !structureVideoFrameRange) return;
+
+    // Validate file type
+    const validTypes = ['video/mp4', 'video/webm', 'video/quicktime'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Invalid file type. Please upload an MP4, WebM, or MOV file.');
+      return;
+    }
+
+    // Validate file size (max 200MB)
+    const maxSizeMB = 200;
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > maxSizeMB) {
+      toast.error(`File too large. Maximum size is ${maxSizeMB}MB`);
+      return;
+    }
+
+    try {
+      setIsUploadingVideo(true);
+      setUploadProgress(0);
+
+      // Extract metadata
+      const metadata = await extractVideoMetadata(file);
+      setUploadProgress(25);
+
+      // Upload to storage (we need projectId from context - for now use a placeholder path)
+      // Note: In a real implementation, we'd need projectId and shotId passed down
+      const { data: { user } } = await supabase.auth.getUser();
+      const uploadPath = `structure-videos/${user?.id || 'anonymous'}/${Date.now()}-${file.name}`;
+      const videoUrl = await uploadVideoToStorage(
+        file,
+        '', // projectId - will use default bucket path
+        '', // shotId
+        (progress) => setUploadProgress(25 + (progress * 0.65))
+      );
+      setUploadProgress(90);
+
+      // Create resource for reuse
+      const now = new Date().toISOString();
+      const resourceMetadata: StructureVideoMetadata = {
+        name: `Guidance Video ${new Date().toLocaleString()}`,
+        videoUrl: videoUrl,
+        thumbnailUrl: null,
+        videoMetadata: metadata,
+        created_by: {
+          is_you: true,
+          username: user?.email || 'user',
+        },
+        is_public: privacyDefaults.resourcesPublic,
+        createdAt: now,
+      };
+
+      const resource = await createResource.mutateAsync({
+        type: 'structure-video',
+        metadata: resourceMetadata,
+      });
+      setUploadProgress(100);
+
+      // Create the structure video config
+      const newVideo: StructureVideoConfigWithMetadata = {
+        path: videoUrl,
+        start_frame: structureVideoFrameRange.segmentStart,
+        end_frame: structureVideoFrameRange.segmentEnd,
+        treatment: settings.structureTreatment ?? structureVideoDefaults?.treatment ?? 'adjust',
+        motion_strength: settings.structureMotionStrength ?? structureVideoDefaults?.motionStrength ?? 1.2,
+        structure_type: 'uni3c',
+        uni3c_end_percent: settings.structureUni3cEndPercent ?? structureVideoDefaults?.uni3cEndPercent ?? 0.1,
+        metadata: metadata,
+        resource_id: resource.id,
+      };
+
+      // Set pending state to show loading until props update
+      setPendingVideoUrl(videoUrl);
+      onAddSegmentStructureVideo(newVideo);
+    } catch (error) {
+      console.error('[SegmentSettingsForm] Upload failed:', error);
+      toast.error(`Failed to upload video: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsUploadingVideo(false);
+      setUploadProgress(0);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [onAddSegmentStructureVideo, structureVideoFrameRange, settings, structureVideoDefaults, createResource, privacyDefaults]);
+
+  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      processVideoFile(file);
+    }
+  }, [processVideoFile]);
+
+  // ==========================================================================
   // RENDER
   // ==========================================================================
 
@@ -579,19 +822,32 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               />
             </div>
 
-            {/* Enhance Prompt Toggle */}
-            {onEnhancePromptChange && (
-              <div className="flex items-center space-x-2 p-2 bg-muted/30 rounded-lg border">
+            {/* Enhance Prompt Toggle & Make Primary Variant */}
+            <div className="flex gap-2">
+              {onEnhancePromptChange && (
+                <div className="flex items-center space-x-2 p-2 bg-muted/30 rounded-lg border flex-1">
+                  <Switch
+                    id="enhance-prompt-segment"
+                    checked={enhancePromptEnabled ?? !hasEnhancedPrompt}
+                    onCheckedChange={onEnhancePromptChange}
+                  />
+                  <Label htmlFor="enhance-prompt-segment" className="text-sm font-medium cursor-pointer flex-1">
+                    Enhance Prompt
+                  </Label>
+                </div>
+              )}
+              <div className="flex items-center space-x-2 p-2 bg-muted/30 rounded-lg border flex-1">
                 <Switch
-                  id="enhance-prompt-segment"
-                  checked={enhancePromptEnabled ?? !hasEnhancedPrompt}
-                  onCheckedChange={onEnhancePromptChange}
+                  id="make-primary-segment"
+                  checked={isRegeneration ? settings.makePrimaryVariant : true}
+                  onCheckedChange={isRegeneration ? (value) => onChange({ makePrimaryVariant: value }) : undefined}
+                  disabled={!isRegeneration}
                 />
-                <Label htmlFor="enhance-prompt-segment" className="text-sm font-medium cursor-pointer flex-1">
-                  Enhance Prompt
+                <Label htmlFor="make-primary-segment" className="text-sm font-medium cursor-pointer flex-1">
+                  Make Primary
                 </Label>
               </div>
-            )}
+            </div>
           </div>
         );
       })()}
@@ -640,20 +896,6 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               </div>
             )}
 
-            {/* Make Primary Variant Toggle */}
-            {isRegeneration && (
-              <div className="flex items-center justify-between">
-                <Label htmlFor="make-primary" className="text-sm cursor-pointer">
-                  Make primary variant
-                </Label>
-                <Switch
-                  id="make-primary"
-                  checked={settings.makePrimaryVariant}
-                  onCheckedChange={(value) => onChange({ makePrimaryVariant: value })}
-                />
-              </div>
-            )}
-
             {/* Negative Prompt */}
             <DefaultableTextarea
               label="Negative Prompt:"
@@ -671,30 +913,6 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               }}
               containerClassName="space-y-1.5"
             />
-
-            {/* Model & Resolution Info */}
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="flex flex-col">
-                <span className="text-muted-foreground">Model</span>
-                <span className="font-medium truncate" title={modelName || 'Default'}>
-                  {(modelName || 'wan_2_2_i2v').replace('wan_2_2_', '').replace(/_/g, ' ')}
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-muted-foreground">Resolution</span>
-                <span className="font-medium">
-                  {resolution || 'Auto'}
-                </span>
-              </div>
-            </div>
-
-            {/* Seed Info */}
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">Seed</span>
-              <span className="font-mono font-medium">
-                {settings.randomSeed ? 'Random' : (settings.seed || 'Random')}
-              </span>
-            </div>
 
             {/* Motion Controls */}
             {(() => {
@@ -755,23 +973,248 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               );
             })()}
 
-            {/* Structure Video Overrides - only shown when segment has structure video */}
+            {/* Structure Video Section */}
+            {/* Timeline Mode: Loading state when uploading or waiting for props (no existing video) */}
+            {isTimelineMode && isVideoLoading && !structureVideoType && (
+              <div className="space-y-3 pt-3 border-t border-border/50">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <Video className="w-3.5 h-3.5" />
+                  <span>Structure Video</span>
+                  <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                </div>
+                {/* Skeleton preview */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <span>Loading video...</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} className="flex-1 relative">
+                        <div className="w-full aspect-video bg-muted/50 rounded animate-pulse" />
+                        <span className="absolute bottom-0 left-0 right-0 text-[8px] text-center bg-black/60 text-white py-0.5 rounded-b">
+                          {i === 0 ? 'Start' : i === 1 ? 'Mid' : 'End'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Timeline Mode: Add Structure Video (when no video exists and not loading) */}
+            {isTimelineMode && !structureVideoType && !isVideoLoading && onAddSegmentStructureVideo && (
+              <div className="space-y-3 pt-3 border-t border-border/50">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <Video className="w-3.5 h-3.5" />
+                  <span>Structure Video</span>
+                </div>
+                <div className="space-y-2">
+                  <input
+                    ref={addFileInputRef}
+                    type="file"
+                    accept="video/mp4,video/webm,video/quicktime"
+                    onChange={handleFileSelect}
+                    disabled={isUploadingVideo}
+                    className="hidden"
+                    id="segment-structure-video-upload"
+                  />
+                  <div className="flex gap-2">
+                    <Label htmlFor="segment-structure-video-upload" className="m-0 cursor-pointer flex-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isUploadingVideo}
+                        className="w-full"
+                        asChild
+                      >
+                        <span>
+                          {isUploadingVideo ? (
+                            <>
+                              <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                              {Math.round(uploadProgress)}%
+                            </>
+                          ) : (
+                            <>
+                              <Video className="w-3 h-3 mr-2" />
+                              Upload
+                            </>
+                          )}
+                        </span>
+                      </Button>
+                    </Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isUploadingVideo}
+                      onClick={() => setShowVideoBrowser(true)}
+                      className="flex-1"
+                    >
+                      <Images className="w-3 h-3 mr-2" />
+                      Browse
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Add a motion guidance video for this segment
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Structure Video Overrides - shown when segment has structure video */}
             {structureVideoType && (
               <div className="space-y-3 pt-3 border-t border-border/50">
                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                   <Video className="w-3.5 h-3.5" />
-                  <span>Structure Video Overrides</span>
+                  <span>Structure Video {isTimelineMode ? '' : 'Overrides'}</span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground/80">
                     {structureVideoType === 'uni3c' ? 'Uni3C' : structureVideoType === 'flow' ? 'Optical Flow' : structureVideoType === 'canny' ? 'Canny' : structureVideoType === 'depth' ? 'Depth' : structureVideoType}
                   </span>
                 </div>
 
-                {/* 3-Frame Preview */}
+                {/* 3-Frame Preview with Remove button overlay */}
                 {structureVideoUrl && structureVideoFrameRange && (
-                  <StructureVideoPreview
-                    videoUrl={structureVideoUrl}
-                    frameRange={structureVideoFrameRange}
-                  />
+                  <div className="relative">
+                    {/* Remove button - top right of preview */}
+                    {isTimelineMode && onRemoveSegmentStructureVideo && !isVideoLoading && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onRemoveSegmentStructureVideo}
+                        disabled={isUploadingVideo}
+                        className="absolute -top-1 -right-1 z-10 h-6 w-6 p-0 rounded-full bg-background/80 hover:bg-destructive/20 text-destructive hover:text-destructive"
+                        title="Remove video"
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    )}
+                    {/* Show skeleton when waiting for new video props to arrive, otherwise show preview */}
+                    {pendingVideoUrl && pendingVideoUrl !== structureVideoUrl && !isUploadingVideo ? (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                          <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                          <span>Loading new video...</span>
+                        </div>
+                        <div className="flex gap-1">
+                          {[0, 1, 2].map((i) => (
+                            <div key={i} className="flex-1 relative">
+                              <div className="w-full aspect-video bg-muted/50 rounded animate-pulse" />
+                              <span className="absolute bottom-0 left-0 right-0 text-[8px] text-center bg-black/60 text-white py-0.5 rounded-b">
+                                {i === 0 ? 'Start' : i === 1 ? 'Mid' : 'End'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <StructureVideoPreview
+                        videoUrl={structureVideoUrl}
+                        frameRange={structureVideoFrameRange}
+                        onLoadComplete={handleVideoPreviewLoaded}
+                      />
+                    )}
+                  </div>
+                )}
+                {/* Skeleton when no preview URL yet but loading */}
+                {isVideoLoading && !structureVideoUrl && structureVideoFrameRange && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>Loading video...</span>
+                    </div>
+                    <div className="flex gap-1">
+                      {[0, 1, 2].map((i) => (
+                        <div key={i} className="flex-1 relative">
+                          <div className="w-full aspect-video bg-muted/50 rounded animate-pulse" />
+                          <span className="absolute bottom-0 left-0 right-0 text-[8px] text-center bg-black/60 text-white py-0.5 rounded-b">
+                            {i === 0 ? 'Start' : i === 1 ? 'Mid' : 'End'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Treatment Mode Selector with Upload/Browse - Timeline Mode Only */}
+                {isTimelineMode && (
+                  <div className="space-y-1.5">
+                    <div className="flex gap-2">
+                      {/* Treatment selector - left half */}
+                      <div className="flex-1">
+                        <Label className="text-xs font-medium">Treatment:</Label>
+                        <SegmentedControl
+                          value={settings.structureTreatment ?? structureVideoDefaults?.treatment ?? 'adjust'}
+                          onValueChange={(v) => onChange({ structureTreatment: v as 'adjust' | 'clip' })}
+                          className="w-full mt-1"
+                          size="sm"
+                        >
+                          <SegmentedControlItem
+                            value="adjust"
+                            className="flex-1"
+                            title="Stretch or compress video to match segment duration"
+                          >
+                            Fit to Range
+                          </SegmentedControlItem>
+                          <SegmentedControlItem
+                            value="clip"
+                            className="flex-1"
+                            title="Use video frames directly — extra frames are trimmed if video is longer"
+                          >
+                            1:1 Mapping
+                          </SegmentedControlItem>
+                        </SegmentedControl>
+                      </div>
+                      {/* Upload/Browse buttons - right half */}
+                      {onAddSegmentStructureVideo && (
+                        <div className="flex-1">
+                          <Label className="text-xs font-medium">Replace:</Label>
+                          <div className="flex gap-1 mt-1">
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="video/mp4,video/webm,video/quicktime"
+                              onChange={handleFileSelect}
+                              disabled={isUploadingVideo}
+                              className="hidden"
+                              id="segment-structure-video-replace"
+                            />
+                            <Label htmlFor="segment-structure-video-replace" className="m-0 cursor-pointer flex-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isUploadingVideo}
+                                className="w-full h-8"
+                                asChild
+                              >
+                                <span>
+                                  {isUploadingVideo ? (
+                                    <>
+                                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                      {Math.round(uploadProgress)}%
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Video className="w-3 h-3 mr-1" />
+                                      Upload
+                                    </>
+                                  )}
+                                </span>
+                              </Button>
+                            </Label>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={isUploadingVideo}
+                              onClick={() => setShowVideoBrowser(true)}
+                              className="flex-1 h-8"
+                            >
+                              <Images className="w-3 h-3 mr-1" />
+                              Browse
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
 
                 {/* Motion Strength */}
@@ -835,6 +1278,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                     </div>
                   </div>
                 )}
+
               </div>
             )}
           </div>
@@ -858,6 +1302,17 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
             })}
             lora_type="Wan I2V"
           />
+
+          {/* Structure Video Browser Modal - Timeline Mode Only */}
+          {isTimelineMode && (
+            <DatasetBrowserModal
+              isOpen={showVideoBrowser}
+              onOpenChange={setShowVideoBrowser}
+              resourceType="structure-video"
+              title="Browse Guidance Videos"
+              onResourceSelect={handleVideoResourceSelect}
+            />
+          )}
         </CollapsibleContent>
       </Collapsible>
 

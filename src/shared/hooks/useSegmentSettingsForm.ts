@@ -27,6 +27,7 @@
 import { useMemo } from 'react';
 import { useSegmentSettings, UseSegmentSettingsOptions } from './useSegmentSettings';
 import type { SegmentSettingsFormProps } from '@/shared/components/SegmentSettingsForm';
+import type { StructureVideoConfigWithMetadata } from '@/shared/lib/tasks/travelBetweenImages';
 
 export interface UseSegmentSettingsFormOptions extends UseSegmentSettingsOptions {
   // These are passed through to the form
@@ -59,6 +60,16 @@ export interface UseSegmentSettingsFormOptions extends UseSegmentSettingsOptions
     treatment?: 'adjust' | 'clip';
     uni3cEndPercent?: number;
   }) => Promise<void>;
+
+  // Per-segment structure video management (Timeline Mode only)
+  /** Whether in timeline mode (shows structure video upload) vs batch mode (preview only) */
+  isTimelineMode?: boolean;
+  /** Callback to add a structure video for this segment */
+  onAddSegmentStructureVideo?: (video: StructureVideoConfigWithMetadata) => void;
+  /** Callback to update this segment's structure video */
+  onUpdateSegmentStructureVideo?: (updates: Partial<StructureVideoConfigWithMetadata>) => void;
+  /** Callback to remove this segment's structure video */
+  onRemoveSegmentStructureVideo?: () => void;
 }
 
 export interface UseSegmentSettingsFormReturn {
@@ -129,6 +140,11 @@ export function useSegmentSettingsForm(
     structureVideoType,
     structureVideoUrl,
     structureVideoFrameRange,
+    // Per-segment structure video management
+    isTimelineMode,
+    onAddSegmentStructureVideo,
+    onUpdateSegmentStructureVideo,
+    onRemoveSegmentStructureVideo,
   } = options;
 
   // Get all segment settings data
@@ -189,6 +205,12 @@ export function useSegmentSettingsForm(
     structureVideoDefaults,
     structureVideoUrl,
     structureVideoFrameRange,
+
+    // Per-segment structure video management
+    isTimelineMode,
+    onAddSegmentStructureVideo,
+    onUpdateSegmentStructureVideo,
+    onRemoveSegmentStructureVideo,
   }), [
     settings,
     updateSettings,
@@ -213,6 +235,10 @@ export function useSegmentSettingsForm(
     structureVideoDefaults,
     structureVideoUrl,
     structureVideoFrameRange,
+    isTimelineMode,
+    onAddSegmentStructureVideo,
+    onUpdateSegmentStructureVideo,
+    onRemoveSegmentStructureVideo,
   ]);
 
   return {

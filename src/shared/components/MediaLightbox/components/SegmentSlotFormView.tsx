@@ -72,6 +72,11 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
     structureVideoType: segmentSlotMode.structureVideoType,
     structureVideoUrl: segmentSlotMode.structureVideoUrl,
     structureVideoFrameRange: segmentSlotMode.structureVideoFrameRange,
+    // Per-segment structure video management (Timeline Mode only)
+    isTimelineMode: segmentSlotMode.isTimelineMode,
+    onAddSegmentStructureVideo: segmentSlotMode.onAddSegmentStructureVideo,
+    onUpdateSegmentStructureVideo: segmentSlotMode.onUpdateSegmentStructureVideo,
+    onRemoveSegmentStructureVideo: segmentSlotMode.onRemoveSegmentStructureVideo,
   });
 
   // Extract enhanced prompt from form props

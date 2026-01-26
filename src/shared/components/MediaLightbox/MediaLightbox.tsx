@@ -358,6 +358,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+
+  // Lock body scroll when lightbox is open on desktop
+  // (On mobile, Radix's modal={true} handles this, but on desktop we use modal={false}
+  // to allow TasksPane interaction, so we need manual scroll locking)
+  useEffect(() => {
+    if (isMobile) return; // Radix handles mobile
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isMobile]);
+
   const { selectedProjectId, projects } = useProject();
   const currentProject = projects.find(p => p.id === selectedProjectId);
   const projectAspectRatio = currentProject?.aspectRatio;

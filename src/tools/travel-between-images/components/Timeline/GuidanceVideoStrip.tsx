@@ -1162,8 +1162,8 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
         
         {/* Frame range indicator - bottom of strip */}
         {outputStartFrame !== undefined && !readOnly && (
-          <div 
-            className="absolute bottom-0 flex justify-between items-center text-[9px] text-muted-foreground font-mono"
+          <div
+            className="absolute bottom-0 z-50 flex justify-between items-center text-[9px] text-muted-foreground font-mono"
             style={{
               left: useAbsolutePosition ? '2px' : '16px',
               right: useAbsolutePosition ? '2px' : '16px',
@@ -1185,7 +1185,7 @@ export const GuidanceVideoStrip: React.FC<GuidanceVideoStripProps> = ({
                 }
                 onTreatmentChange(newTreatment);
               }}>
-                <SelectTrigger variant="retro" size="sm" className="h-4 w-[72px] text-[8px] px-1 py-0 bg-background/90 font-sans [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
+                <SelectTrigger variant="retro" size="sm" className="h-4 w-[72px] text-[8px] px-1 py-0 !bg-background hover:!bg-background font-sans [&>span]:line-clamp-none [&>span]:whitespace-nowrap">
                   <SelectValue>
                     {treatment === 'adjust' ? 'Fit to range' : '1:1 mapping'}
                   </SelectValue>

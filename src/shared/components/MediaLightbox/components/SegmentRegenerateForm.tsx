@@ -15,6 +15,7 @@ import { createIndividualTravelSegmentTask } from '@/shared/lib/tasks/individual
 import { useIncomingTasks } from '@/shared/contexts/IncomingTasksContext';
 import { useTaskStatusCounts } from '@/shared/hooks/useTasks';
 import { supabase } from '@/integrations/supabase/client';
+import type { StructureVideoConfigWithMetadata } from '@/shared/lib/tasks/travelBetweenImages';
 
 export interface SegmentRegenerateFormProps {
   /** Generation params from the current video */
@@ -72,6 +73,16 @@ export interface SegmentRegenerateFormProps {
     treatment?: 'adjust' | 'clip';
     uni3cEndPercent?: number;
   }) => Promise<void>;
+
+  // Per-segment structure video management (Timeline Mode only)
+  /** Whether in timeline mode (shows structure video upload) vs batch mode (preview only) */
+  isTimelineMode?: boolean;
+  /** Callback to add a structure video for this segment */
+  onAddSegmentStructureVideo?: (video: StructureVideoConfigWithMetadata) => void;
+  /** Callback to update this segment's structure video */
+  onUpdateSegmentStructureVideo?: (updates: Partial<StructureVideoConfigWithMetadata>) => void;
+  /** Callback to remove this segment's structure video */
+  onRemoveSegmentStructureVideo?: () => void;
 }
 
 export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
@@ -96,6 +107,11 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   structureVideoUrl,
   structureVideoFrameRange,
   onUpdateStructureVideoDefaults,
+  // Per-segment structure video management
+  isTimelineMode,
+  onAddSegmentStructureVideo,
+  onUpdateSegmentStructureVideo,
+  onRemoveSegmentStructureVideo,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -130,6 +146,11 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
     structureVideoUrl,
     structureVideoFrameRange,
     onUpdateStructureVideoDefaults,
+    // Per-segment structure video management
+    isTimelineMode,
+    onAddSegmentStructureVideo,
+    onUpdateSegmentStructureVideo,
+    onRemoveSegmentStructureVideo,
   });
 
   // Extract enhanced prompt from form props
