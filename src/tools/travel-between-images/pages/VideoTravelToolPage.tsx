@@ -39,6 +39,7 @@ import { useVideoGalleryPreloader } from '@/shared/hooks/useVideoGalleryPreloade
 import { useGenerations, useDeleteGeneration } from '@/shared/hooks/useGenerations';
 import { cn } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { getLayoutForAspectRatio } from '@/shared/components/ImageGallery/utils';
 import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { LoadingSkeleton } from '../components/LoadingSkeleton';
@@ -143,7 +144,39 @@ const VideoTravelToolPage: React.FC = () => {
   
   // Mobile detection for mode handling
   const isMobile = useIsMobile();
-  const itemsPerPage = isMobile ? 20 : 12; // Mobile: 20 (10 rows of 2), Desktop: 12 (4 rows of 3)
+
+  // Dynamic itemsPerPage based on aspect ratio layout (same logic as ImageGallery)
+  // Use window width as estimate since videos view spans full width
+  const [windowWidth, setWindowWidth] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1200
+  );
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const videoLayoutConfig = useMemo(() => {
+    // Use the same layout calculation as ImageGallery, but with ~50% columns and max 3 rows
+    const layout = getLayoutForAspectRatio(projectAspectRatio, isMobile, windowWidth * 0.95);
+    const videoColumns = Math.max(3, Math.floor(layout.columns / 3)); // ~33% of image columns, min 3 (GRID_COLUMN_CLASSES minimum)
+    const videoRows = Math.min(3, layout.rows); // Max 3 rows
+    const result = videoColumns * videoRows;
+    console.log('[VideoTravelToolPage] Dynamic video layout calculation:', {
+      projectAspectRatio,
+      isMobile,
+      windowWidth,
+      imageColumns: layout.columns,
+      videoColumns,
+      imageRows: layout.rows,
+      videoRows,
+      itemsPerPage: result,
+    });
+    return { columns: videoColumns, itemsPerPage: result };
+  }, [projectAspectRatio, isMobile, windowWidth]);
+
+  const itemsPerPage = videoLayoutConfig.itemsPerPage;
+  const videoColumnsPerRow = videoLayoutConfig.columns;
   
   // Preload all shot video counts for the project
   const { getShotVideoCount, getFinalVideoCount, logCacheState, isLoading: isLoadingProjectCounts, error: projectCountsError, invalidateOnVideoChanges } = useProjectVideoCountsCache(selectedProjectId);
@@ -1598,6 +1631,7 @@ const VideoTravelToolPage: React.FC = () => {
                 selectedProjectId,
                 projectAspectRatio,
                 itemsPerPage,
+                columnsPerRow: videoColumnsPerRow,
                 shots,
               }}
               filters={{

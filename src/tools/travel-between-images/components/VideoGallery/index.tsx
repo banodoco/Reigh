@@ -34,6 +34,7 @@ import {
 } from './components';
 import { SkeletonGallery } from '@/shared/components/ui/skeleton-gallery';
 import { useContainerWidth } from '@/shared/components/ImageGallery/hooks';
+import { getLayoutForAspectRatio, GRID_COLUMN_CLASSES, SKELETON_COLUMNS } from '@/shared/components/ImageGallery/utils';
 import {
   sortVideoOutputsByDate,
   transformUnifiedGenerationsData,
@@ -180,61 +181,40 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
   // Track container width for responsive layout
   const [galleryContainerRef, containerWidth] = useContainerWidth();
 
-  // Video-specific layout configuration
-  // Videos are larger than images, so we use fewer columns and items per page
-  const VIDEO_LAYOUT = {
-    TARGET_WIDTH: 280, // Target video width in pixels (larger than images)
-    GAP: 16, // Gap between videos (matches gap-4)
-    MIN_COLUMNS: 1,
-    MAX_COLUMNS: 4,
-    ROWS_PER_PAGE: 2, // Show 2 rows of videos per page
-  };
+  // Mobile detection - must be declared before useMemo that depends on it
+  const isMobile = useIsMobile();
 
-  // Calculate responsive columns based on container width
+  // Use the same layout logic as ImageGallery, then scale down for videos (~50% columns)
+  const imageLayout = React.useMemo(() => {
+    return getLayoutForAspectRatio(projectAspectRatio, isMobile, containerWidth);
+  }, [projectAspectRatio, isMobile, containerWidth]);
+
+  // Scale down to ~25% of image columns for videos (videos are larger)
   const videoLayout = React.useMemo(() => {
-    // Calculate columns from container width
-    let columns: number;
-    if (containerWidth && containerWidth > 0) {
-      const effectiveWidth = VIDEO_LAYOUT.TARGET_WIDTH + VIDEO_LAYOUT.GAP;
-      columns = Math.floor((containerWidth + VIDEO_LAYOUT.GAP) / effectiveWidth);
-      columns = Math.max(VIDEO_LAYOUT.MIN_COLUMNS, Math.min(VIDEO_LAYOUT.MAX_COLUMNS, columns));
-    } else {
-      // Fallback based on aspect ratio when container width unknown
-      if (!projectAspectRatio) {
-        columns = 2;
-      } else {
-        const [width, height] = projectAspectRatio.split(':').map(Number);
-        if (width && height) {
-          const aspectRatio = width / height;
-          if (aspectRatio >= 16 / 9) {
-            columns = 2; // Wide videos: 2 per row
-          } else if (aspectRatio < 4 / 3) {
-            columns = 3; // Tall videos: 3 per row
-          } else {
-            columns = 2; // Standard: 2 per row
-          }
-        } else {
-          columns = 2;
-        }
-      }
-    }
+    const videoColumns = Math.max(3, Math.floor(imageLayout.columns * 0.25));
+    const clampedColumns = Math.max(3, Math.min(12, videoColumns)) as keyof typeof GRID_COLUMN_CLASSES;
+    const rows = 2; // Show 2 rows of videos per page
 
-    const itemsPerPage = columns * VIDEO_LAYOUT.ROWS_PER_PAGE;
+    console.log('[VideoGalleryLayout] Using ImageGallery logic scaled to 25%:', {
+      containerWidth,
+      imageColumns: imageLayout.columns,
+      videoColumns,
+      clampedColumns,
+    });
 
     return {
-      columns,
-      itemsPerPage,
-      // For skeleton gallery
-      skeletonColumns: { base: Math.min(columns, 2), lg: columns },
+      columns: clampedColumns,
+      itemsPerPage: clampedColumns * rows,
+      gridColumnClasses: GRID_COLUMN_CLASSES[clampedColumns],
+      skeletonColumns: SKELETON_COLUMNS[clampedColumns],
     };
-  }, [containerWidth, projectAspectRatio]);
+  }, [imageLayout.columns, containerWidth]);
 
   const itemsPerPage = videoLayout.itemsPerPage;
 
   // Server-side pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const taskDetailsButtonRef = useRef<HTMLButtonElement>(null);
-  const isMobile = useIsMobile();
   // Treat iPads/tablets as mobile for lightbox layout width decisions.
   // This is more defensive than useIsMobile alone to handle "Request Desktop Website" cases on iPadOS.
   const isTouchLikeDevice = React.useMemo(() => {
@@ -972,15 +952,7 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
     return { aspectRatio: '16/9' }; // Fallback
   }, [projectAspectRatio]);
 
-  // Dynamic grid column style based on calculated layout
-  // Uses inline style for truly responsive columns instead of fixed breakpoint classes
-  const gridStyle = React.useMemo(() => ({
-    display: 'grid',
-    gridTemplateColumns: `repeat(${videoLayout.columns}, minmax(0, 1fr))`,
-    gap: '1rem', // gap-4
-    contain: 'content',
-  }), [videoLayout.columns]);
-
+  
   // ===============================================================================
   // RENDER
   // ===============================================================================
@@ -1020,8 +992,8 @@ const VideoOutputsGallery: React.FC<VideoOutputsGalleryProps> = ({
           />
         ) : (
           <>
-            {/* Video grid - responsive columns based on container width */}
-            <div style={gridStyle}>
+            {/* Video grid - responsive columns using Tailwind breakpoints */}
+            <div className={`grid ${videoLayout.gridColumnClasses} gap-4`} style={{ contain: 'content' }}>
               {displaySortedVideoOutputs.map((video, index) => {
                 const originalIndex = sortedVideoOutputs.findIndex(v => v.id === video.id);
 

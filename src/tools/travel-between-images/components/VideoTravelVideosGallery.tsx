@@ -24,6 +24,7 @@ export interface VideosQueryProps {
   selectedProjectId: string | null | undefined;
   projectAspectRatio: string | null | undefined;
   itemsPerPage: number;
+  columnsPerRow?: number;
   shots: Shot[] | undefined;
 }
 
@@ -83,6 +84,7 @@ export const VideoTravelVideosGallery: React.FC<VideoTravelVideosGalleryProps> =
     selectedProjectId,
     projectAspectRatio,
     itemsPerPage,
+    columnsPerRow,
     shots,
   } = query;
 
@@ -150,7 +152,7 @@ export const VideoTravelVideosGallery: React.FC<VideoTravelVideosGalleryProps> =
         <div className="pb-2">
           <SkeletonGallery
             count={skeletonCount}
-            columns={SKELETON_COLUMNS[3]}
+            columns={SKELETON_COLUMNS[columnsPerRow as keyof typeof SKELETON_COLUMNS] || SKELETON_COLUMNS[3]}
             showControls={true}
             projectAspectRatio={projectAspectRatio}
           />
@@ -192,7 +194,8 @@ export const VideoTravelVideosGallery: React.FC<VideoTravelVideosGalleryProps> =
           onSearchChange={(val) => { setVideoSearchTerm(val); setVideoPage(1); }}
           initialStarredFilter={videoStarredOnly}
           onStarredFilterChange={(val) => { setVideoStarredOnly(val); setVideoPage(1); }}
-          columnsPerRow={3}
+          projectAspectRatio={projectAspectRatio}
+          columnsPerRow={columnsPerRow}
           showShare={false}
           onDelete={deletion?.onDelete}
           isDeleting={deletion?.isDeleting}
