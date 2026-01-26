@@ -2585,7 +2585,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         {structureVideoPath && (
                           <div className="mb-6">
                             <div className="mb-4">
-                              <SectionHeader title="Structure" theme="green" />
+                              <SectionHeader title="Camera Guidance" theme="green" />
                             </div>
                             <div className="space-y-4">
                               {/* Strength and End side by side (uni3c hardcoded) */}

@@ -508,60 +508,6 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
             </div>
           </div>
 
-          {/* Motion strength - hidden when shown elsewhere (like Structure section) */}
-          {!hideStructureSettings && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Motion strength and End Percent (uni3c hardcoded) */}
-              <div className="space-y-4">
-                {/* Strength slider */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Strength:</Label>
-                    <span className="text-sm font-medium">{motionStrength.toFixed(1)}x</span>
-                  </div>
-                  <Slider
-                    value={[motionStrength]}
-                    onValueChange={([value]) => onMotionStrengthChange(value)}
-                    min={0}
-                    max={2}
-                    step={0.1}
-                    className="w-full"
-                    disabled={readOnly}
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>0x</span>
-                    <span>1x</span>
-                    <span>2x</span>
-                  </div>
-                </div>
-
-                {/* Uni3C End Percent - shown below strength when uni3c is selected */}
-                {structureType === 'uni3c' && onUni3cEndPercentChange && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">End Percent:</Label>
-                      <span className="text-sm font-medium">{(uni3cEndPercent * 100).toFixed(0)}%</span>
-                    </div>
-                    <Slider
-                      value={[uni3cEndPercent]}
-                      onValueChange={([value]) => onUni3cEndPercentChange(value)}
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      className="w-full"
-                      disabled={readOnly}
-                    />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>0%</span>
-                      <span>50%</span>
-                      <span>100%</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Delete button at bottom - desktop only */}
           <div className="mt-auto pt-2 hidden md:block">
             {!readOnly && (

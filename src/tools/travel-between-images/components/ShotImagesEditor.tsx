@@ -1890,7 +1890,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 {selectedShotId && projectId && propOnStructureVideoChange && (
                   <>
                     <div className="mb-4 mt-6">
-                      <SectionHeader title="Guidance Video" theme="green" />
+                      <SectionHeader title="Camera Guidance Video" theme="green" />
                     </div>
                     {/* Guidance Video Upload Skeleton */}
                     <div className="mb-4">
@@ -2163,7 +2163,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 {selectedShotId && projectId && propOnStructureVideoChange && (propStructureVideoPath || !readOnly) && (
                   <>
                     <div className="mb-4 mt-6">
-                      <SectionHeader title="Guidance Video" theme="green" />
+                      <SectionHeader title="Camera Guidance Video" theme="green" />
                     </div>
                     <BatchGuidanceVideo
                       shotId={selectedShotId}
