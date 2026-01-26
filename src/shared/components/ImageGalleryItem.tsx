@@ -1603,11 +1603,11 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           </div>
 
           {/* Bottom Buttons - Star (left), Edit (center), Delete (right) */}
-          <div className={`absolute bottom-2 left-2 right-2 flex items-center justify-between transition-opacity z-20 ${
-            localStarred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-          }`}>
-              {/* Star Button - Left */}
-              <div className="flex items-center gap-1.5">
+          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between z-20">
+              {/* Star Button - Left (always visible when starred) */}
+              <div className={`flex items-center gap-1.5 transition-opacity ${
+                localStarred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+              }`}>
                 {showStar && (
                 <Button
                     variant="secondary"
@@ -1651,8 +1651,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                 )}
               </div>
 
-              {/* Edit Button - Center */}
-              <div className="flex items-center gap-1.5">
+              {/* Edit Button - Center (only visible on hover) */}
+              <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 {!image.isVideo && showEdit && (
                   <Button
                       variant="secondary"
@@ -1669,8 +1669,8 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                 )}
               </div>
 
-              {/* Delete Button - Right */}
-              <div className="flex items-center gap-1.5">
+              {/* Delete Button - Right (only visible on hover) */}
+              <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 {!isMobile && onDelete && showDelete && (
                 <Button
                     variant="destructive"
