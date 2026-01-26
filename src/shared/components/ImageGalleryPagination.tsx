@@ -192,12 +192,12 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
               onValueChange={handlePageSelect}
               disabled={loadingButton !== null}
             >
-              <SelectTrigger variant={whiteText ? "retro-dark" : "default"} colorScheme={whiteText ? "zinc" : "default"} size="sm" className="h-8 w-16 text-sm">
+              <SelectTrigger variant={whiteText ? "retro-dark" : "retro"} colorScheme={whiteText ? "zinc" : "default"} size="sm" className="h-8 w-12 text-sm !justify-center [&>span]:!text-center" hideIcon>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent variant={whiteText ? "zinc" : "default"}>
+              <SelectContent variant={whiteText ? "zinc" : "retro"} className="!min-w-0 w-14">
                 {Array.from({ length: totalPages }, (_, i) => (
-                  <SelectItem variant={whiteText ? "zinc" : "default"} key={i + 1} value={(i + 1).toString()} className="text-sm">
+                  <SelectItem variant={whiteText ? "zinc" : "retro"} key={i + 1} value={(i + 1).toString()} className="text-sm !px-0 !justify-center [&>span]:!text-center [&>span]:!w-full">
                     {i + 1}
                   </SelectItem>
                 ))}
@@ -273,12 +273,12 @@ export const ImageGalleryPagination: React.FC<ImageGalleryPaginationProps> = ({
                   onValueChange={(value) => handlePageSelect(value, true)}
                   disabled={loadingButton !== null}
                 >
-                  <SelectTrigger variant="retro" size="sm" className="h-8 w-16 text-sm">
+                  <SelectTrigger variant="retro" size="sm" className="h-8 w-12 text-sm !justify-center [&>span]:!text-center" hideIcon>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent variant="retro">
+                  <SelectContent variant="retro" className="!min-w-0 w-14">
                     {Array.from({ length: totalPages }, (_, i) => (
-                      <SelectItem variant="retro" key={i + 1} value={(i + 1).toString()} className="text-sm">
+                      <SelectItem variant="retro" key={i + 1} value={(i + 1).toString()} className="text-sm !px-0 !justify-center [&>span]:!text-center [&>span]:!w-full">
                         {i + 1}
                       </SelectItem>
                     ))}

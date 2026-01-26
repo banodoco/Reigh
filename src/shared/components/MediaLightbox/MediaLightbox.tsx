@@ -610,35 +610,70 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleToggleUpscaled,
   } = upscaleHook;
 
-  // Image dimensions state (needed by inpainting hook)
-  // Initialize from media width/height or metadata to prevent size jump during progressive loading
-  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(() => {
-    // Check top-level width/height first (from generations table)
-    if ((media as any)?.width && (media as any)?.height) {
-      return { width: (media as any).width, height: (media as any).height };
+  // Helper to extract dimensions from media object (checks multiple sources)
+  const extractDimensionsFromMedia = React.useCallback((mediaObj: typeof media): { width: number; height: number } | null => {
+    if (!mediaObj) return null;
+
+    // 1. Check top-level width/height first (from generations table)
+    if ((mediaObj as any)?.width && (mediaObj as any)?.height) {
+      return { width: (mediaObj as any).width, height: (mediaObj as any).height };
     }
-    // Fall back to metadata
-    const metadata = media?.metadata as any;
+
+    // 2. Check metadata.width/height
+    const metadata = mediaObj?.metadata as any;
     if (metadata?.width && metadata?.height) {
       return { width: metadata.width, height: metadata.height };
     }
+
+    // 3. Check params.resolution (string like "1024x768")
+    const params = (mediaObj as any)?.params;
+    if (params?.resolution && typeof params.resolution === 'string' && params.resolution.includes('x')) {
+      const [w, h] = params.resolution.split('x').map(Number);
+      if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
+        return { width: w, height: h };
+      }
+    }
+
+    // 4. Check metadata.originalParams.orchestrator_details.resolution
+    const resolution = metadata?.originalParams?.orchestrator_details?.resolution;
+    if (resolution && typeof resolution === 'string' && resolution.includes('x')) {
+      const [w, h] = resolution.split('x').map(Number);
+      if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
+        return { width: w, height: h };
+      }
+    }
+
     return null;
+  }, []);
+
+  // Image dimensions state (needed by inpainting hook)
+  // Initialize from media to prevent size jump during progressive loading
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(() => {
+    return extractDimensionsFromMedia(media);
   });
 
   // Update dimensions when media changes (e.g., switching images or variants)
   // This prevents the "small then big" flash during progressive loading
-  React.useEffect(() => {
-    // Check top-level width/height first
-    if ((media as any)?.width && (media as any)?.height) {
-      setImageDimensions({ width: (media as any).width, height: (media as any).height });
-      return;
+  // IMPORTANT: useLayoutEffect runs synchronously BEFORE browser paint,
+  // so dimensions are updated before the user sees anything (prevents flicker on rapid clicks)
+  React.useLayoutEffect(() => {
+    const dims = extractDimensionsFromMedia(media);
+    console.log('[LightboxDimensions] Extracting dimensions from media:', {
+      mediaId: media?.id?.substring(0, 8),
+      hasWidth: !!(media as any)?.width,
+      hasMetadataWidth: !!(media?.metadata as any)?.width,
+      hasParamsResolution: !!(media as any)?.params?.resolution,
+      paramsResolution: (media as any)?.params?.resolution,
+      hasOrchestratorResolution: !!(media?.metadata as any)?.originalParams?.orchestrator_details?.resolution,
+      extractedDims: dims,
+      keepingPrevious: !dims,
+    });
+    // Only update if we have new dimensions - otherwise keep previous as fallback
+    if (dims) {
+      setImageDimensions(dims);
     }
-    // Fall back to metadata
-    const metadata = media?.metadata as any;
-    if (metadata?.width && metadata?.height) {
-      setImageDimensions({ width: metadata.width, height: metadata.height });
-    }
-  }, [media?.id]);
+    // Note: Previous dimensions are kept if extraction fails, providing a smoother experience
+  }, [media?.id, extractDimensionsFromMedia]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Flip functionality removed - use reposition mode instead
@@ -1559,6 +1594,35 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       onTrimModeChange?.(false);
     },
   });
+
+  // Compute effective dimensions that are GUARANTEED to have a value
+  // This is computed synchronously during render, so there's no flicker
+  // Priority: extracted/loaded dimensions > project aspect ratio > 16:9 default
+  const effectiveImageDimensions = React.useMemo(() => {
+    // Use actual dimensions if we have them
+    if (imageDimensions) {
+      return imageDimensions;
+    }
+
+    // Fallback to project aspect ratio
+    if (projectAspectRatio) {
+      const resolution = ASPECT_RATIO_TO_RESOLUTION[projectAspectRatio];
+      if (resolution && resolution.includes('x')) {
+        const [w, h] = resolution.split('x').map(Number);
+        if (!isNaN(w) && !isNaN(h) && w > 0 && h > 0) {
+          console.log('[LightboxDimensions] Using project aspect ratio for effective dims:', {
+            projectAspectRatio,
+            resolution,
+          });
+          return { width: w, height: h };
+        }
+      }
+    }
+
+    // Absolute last resort: 16:9 default
+    console.log('[LightboxDimensions] Using 16:9 default for effective dims');
+    return { width: 1920, height: 1080 };
+  }, [imageDimensions, projectAspectRatio]);
 
   // Extract source_task_id and check if variant already has orchestrator_details
   const { variantSourceTaskId, variantHasOrchestratorDetails } = useMemo(() => {
@@ -3320,7 +3384,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       tasksPaneWidth={effectiveTasksPaneOpen && !isMobile ? effectiveTasksPaneWidth : 0}
                       debugContext="Desktop"
                       // Konva-based stroke overlay props
-                      imageDimensions={imageDimensions}
+                      imageDimensions={effectiveImageDimensions}
                       brushStrokes={brushStrokes}
                       currentStroke={currentStroke}
                       isDrawing={isDrawing}
@@ -3472,7 +3536,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         onRepositionFlipH={toggleFlipH}
                         onRepositionFlipV={toggleFlipV}
                         onRepositionReset={resetTransform}
-                        imageDimensions={imageDimensions}
+                        imageDimensions={effectiveImageDimensions}
                         brushStrokes={brushStrokes}
                         onUndo={handleUndo}
                         onClearMask={handleClearMask}
@@ -3744,7 +3808,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                       containerClassName="w-full h-full"
                       debugContext="Mobile Stacked"
                       // Konva-based stroke overlay props
-                      imageDimensions={imageDimensions}
+                      imageDimensions={effectiveImageDimensions}
                       brushStrokes={brushStrokes}
                       currentStroke={currentStroke}
                       isDrawing={isDrawing}
@@ -3840,7 +3904,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                         onRepositionFlipH={toggleFlipH}
                         onRepositionFlipV={toggleFlipV}
                         onRepositionReset={resetTransform}
-                        imageDimensions={imageDimensions}
+                        imageDimensions={effectiveImageDimensions}
                         brushStrokes={brushStrokes}
                         onUndo={handleUndo}
                         onClearMask={handleClearMask}
@@ -4147,7 +4211,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                     containerClassName="w-full h-full"
                     debugContext="Regular Centered"
                     // Konva-based stroke overlay props
-                    imageDimensions={imageDimensions}
+                    imageDimensions={effectiveImageDimensions}
                     brushStrokes={brushStrokes}
                     currentStroke={currentStroke}
                     isDrawing={isDrawing}

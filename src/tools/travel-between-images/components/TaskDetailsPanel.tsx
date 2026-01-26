@@ -151,8 +151,7 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
     <div className={wrapperClass}>
       {!hideHeader && (
         <div className="flex-shrink-0 p-4 border-b">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-light">Generation Task Details</h3>
+          <div className="flex items-center justify-end">
             {taskId && (
               <button
                 onClick={() => {

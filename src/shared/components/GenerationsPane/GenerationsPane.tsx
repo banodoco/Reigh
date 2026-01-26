@@ -510,9 +510,9 @@ const GenerationsPaneComponent: React.FC = () => {
                           <SelectTrigger variant="retro-dark" colorScheme="zinc" size="sm" className="h-6 w-9 text-xs px-1 !justify-center [&>span]:!text-center" hideIcon>
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent variant="zinc">
+                          <SelectContent variant="zinc" className="!min-w-0 w-11">
                             {Array.from({ length: Math.ceil(totalCount / GENERATIONS_PER_PAGE) }, (_, i) => (
-                              <SelectItem variant="zinc" key={i + 1} value={(i + 1).toString()} className="text-xs">
+                              <SelectItem variant="zinc" key={i + 1} value={(i + 1).toString()} className="text-xs !px-0 !justify-center [&>span]:!text-center [&>span]:!w-full">
                                 {i + 1}
                               </SelectItem>
                             ))}

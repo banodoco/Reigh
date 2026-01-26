@@ -973,7 +973,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
 
   return (
     <PageFadeIn>
-      <div className="flex flex-col space-y-6 pb-6 px-4 max-w-7xl mx-auto pt-4">
+      <div className="flex flex-col space-y-6 pb-6 px-4 max-w-7xl mx-auto pt-2">
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-light tracking-tight text-foreground">Image Generation</h1>
@@ -1012,7 +1012,7 @@ const ImageGenerationToolPage: React.FC = React.memo(() => {
       {/* Render only if API key is valid and state is loaded */}
       {hasValidFalApiKey && isFormExpanded !== undefined && (
         <>
-          <div ref={collapsibleContainerRef} className="mb-6">
+          <div ref={collapsibleContainerRef} className="mb-8">
             <Collapsible 
               open={isFormExpanded} 
               onOpenChange={handleCollapsibleOpenChange}

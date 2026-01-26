@@ -186,9 +186,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
       {/* Mobile: stack rows for better spacing */}
       {isMobile ? (
         <div className="flex flex-col gap-2">
-          {/* Row 1: Title + Close button */}
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-light">Generation Task Details</h2>
+          {/* Row 1: Close button */}
+          <div className="flex items-center justify-end">
             <Button
               variant="ghost"
               size="sm"
@@ -235,9 +234,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
       ) : (
         /* Desktop: single row */
         <div className="flex items-center justify-between">
-          {/* Left side - title + copy id */}
+          {/* Left side - copy id */}
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-light">Generation Task Details</h2>
             {taskId && (
               <button
                 onClick={handleCopyId}

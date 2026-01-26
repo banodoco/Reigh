@@ -609,7 +609,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
       <div
         ref={galleryContainerRef}
         className={cn(
-          reducedSpacing ? 'space-y-3' : 'space-y-6',
+          reducedSpacing ? 'space-y-6' : 'space-y-6',
           reducedSpacing ? 'pb-0' : ((!hidePagination && !hideBottomPagination) ? 'pb-[62px]' : 'pb-0'),
           className
         )}

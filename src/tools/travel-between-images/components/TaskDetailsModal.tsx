@@ -173,7 +173,7 @@ const TaskDetailsModal: React.FC<TaskDetailsModalProps> = ({ generationId, child
         <div className={modal.headerClass}>
           <DialogHeader>
             <div className="flex items-center justify-between">
-              <DialogTitle className="text-xl font-light">Generation Task Details</DialogTitle>
+              <DialogTitle className="sr-only">Task Details</DialogTitle>
               {taskId && (
                 <button
                   onClick={() => {
