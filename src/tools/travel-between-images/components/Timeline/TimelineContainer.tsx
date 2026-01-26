@@ -1156,7 +1156,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             /* Add guidance video controls - styled like zoom controls, on the right */
             <div className={`flex items-center gap-2 pointer-events-auto bg-background/95 backdrop-blur-sm px-2 py-1 rounded shadow-md border border-border/50 ${hasNoImages ? 'opacity-30 blur-[0.5px]' : ''}`}>
               <span className="text-xs text-muted-foreground whitespace-nowrap">
-                Guidance video:
+                Camera Guidance Video:
               </span>
               <input
                 type="file"

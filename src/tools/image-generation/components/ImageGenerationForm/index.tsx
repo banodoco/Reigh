@@ -349,7 +349,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     : undefined;
   const referenceCountFromCache = cachedProjectSettings?.references?.length ?? 0;
   
-  // Track the highest reference count we've seen - once we know we have N references, never drop below that
+  // Track reference count during hydration to prevent skeleton flicker
+  // This is reset on deletion via handleDeleteReference
   const lastKnownReferenceCount = useRef<number>(0);
   const currentCount = projectImageSettings?.references?.length ?? referenceCountFromCache;
   if (currentCount > lastKnownReferenceCount.current) {
@@ -413,6 +414,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     });
 
     hasCleanedInvalidReferencePointersRef.current[selectedProjectId] = true;
+    // Reset reference count tracker to match cleaned count
+    lastKnownReferenceCount.current = cleanedReferences.length;
     updateProjectImageSettings('project', {
       references: cleanedReferences,
       selectedReferenceIdByShot: cleanedSelections,
@@ -2062,8 +2065,8 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     // Optimistic UI update
     try {
       queryClient.setQueryData(['toolSettings', 'project-image-settings', selectedProjectId, undefined], (prev: any) => {
-        const next = { 
-          ...(prev || {}), 
+        const next = {
+          ...(prev || {}),
           references: filteredPointers,
           selectedReferenceIdByShot: updatedSelections
         };
@@ -2073,13 +2076,17 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
     } catch (e) {
       console.warn('[RefSettings] Failed to set optimistic cache data', e);
     }
-    
+
+    // Reset the reference count tracker to match the new count
+    // This prevents stale skeleton placeholders from showing after deletion
+    lastKnownReferenceCount.current = filteredPointers.length;
+
     // Persist to database (debounced)
     await updateProjectImageSettings('project', {
       references: filteredPointers,
       selectedReferenceIdByShot: updatedSelections
     });
-    
+
     markAsInteracted();
   }, [hydratedReferences, referencePointers, selectedReferenceIdByShot, deleteStyleReference, updateProjectImageSettings, markAsInteracted, queryClient, selectedProjectId]);
   
