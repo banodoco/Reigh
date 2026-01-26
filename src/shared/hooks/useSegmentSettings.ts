@@ -850,11 +850,11 @@ export function useSegmentSettings({
   }, [pairShotGenerationId, instanceId, queryClient]);
 
   // Reset to shot defaults by clearing all segment overrides AND enhanced prompt
-  // Convention: '' for strings, null for other types = clear the override
-  const resetSettings = useCallback(() => {
+  // This saves the cleared state to DB, then clears local state so form shows defaults immediately
+  const resetSettings = useCallback(async () => {
     const clearedSettings: SegmentSettings = {
       // Clear all overridable fields
-      // '' for strings = clear override
+      // '' for strings = clear override (buildMetadataUpdate interprets this as "delete from DB")
       // null for other types = clear override
       prompt: '',
       negativePrompt: '',
@@ -882,12 +882,29 @@ export function useSegmentSettings({
       shotId: shotId?.substring(0, 8) || null,
     });
 
+    // Set cleared values temporarily so saveSettings can persist them to DB
     setLocalSettings(clearedSettings);
-    setIsDirty(true); // Mark dirty so cleared state gets saved
+    setIsDirty(true);
 
-    // Also clear the enhanced prompt from metadata (fire and forget)
+    // Clear enhanced prompt (fire and forget)
     clearEnhancedPrompt();
-  }, [instanceId, shotId, settings.numFrames, clearEnhancedPrompt]);
+
+    // Save immediately (don't wait for auto-save debounce)
+    // This persists the "clear" operation to DB
+    if (pairShotGenerationId) {
+      // Cancel any pending auto-save
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+      await saveSettings();
+    }
+
+    // NOW clear local state so form falls back to mergedSettings (which shows shot defaults)
+    // This must happen AFTER save, otherwise saveSettings would save the wrong values
+    setLocalSettings(null);
+    setIsDirty(false);
+  }, [instanceId, shotId, settings.numFrames, clearEnhancedPrompt, pairShotGenerationId, saveSettings]);
 
   // Extract enhanced prompt from pair metadata (AI-generated, stored separately)
   const enhancedPrompt = (pairMetadata as Record<string, any> | null)?.enhanced_prompt as string | undefined;
