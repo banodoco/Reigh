@@ -129,6 +129,10 @@ export function useButtonGroupProps({
       showingUpscaled,
       handleUpscale,
       handleToggleUpscaled,
+      // Star button (moved from bottomRight)
+      localStarred,
+      handleToggleStar,
+      toggleStarPending,
     },
 
     bottomRight: {

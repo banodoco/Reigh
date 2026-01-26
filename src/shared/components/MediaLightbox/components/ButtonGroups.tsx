@@ -130,9 +130,32 @@ interface BottomLeftControlsProps extends BaseButtonGroupProps {
   handleToggleUpscaled: () => void; // Kept for API compatibility, but not used
 }
 
-export const BottomLeftControls: React.FC<BottomLeftControlsProps> = () => {
-  // Upscale button removed
-  return null;
+export const BottomLeftControls: React.FC<BottomLeftControlsProps & {
+  localStarred?: boolean;
+  handleToggleStar?: () => void;
+  toggleStarPending?: boolean;
+}> = ({
+  readOnly,
+  localStarred,
+  handleToggleStar,
+  toggleStarPending,
+}) => {
+  // Star button in bottom left
+  if (readOnly || !handleToggleStar) return null;
+
+  return (
+    <div className="absolute bottom-4 left-4 flex items-center space-x-2 z-10">
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={handleToggleStar}
+        disabled={toggleStarPending}
+        className="transition-colors bg-black/50 hover:bg-black/70 text-white"
+      >
+        <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
+      </Button>
+    </div>
+  );
 };
 
 // ============================================================================
@@ -169,22 +192,9 @@ export const BottomRightControls: React.FC<BottomRightControlsProps> = ({
   addToJoinSuccess,
   onGoToJoin,
 }) => {
-  // Keep visible in edit mode - users can star and add to references while editing
+  // Keep visible in edit mode - users can add to references while editing
   return (
     <div className="absolute bottom-4 right-4 flex items-center space-x-2 z-10">
-      {/* Star Button */}
-      {!readOnly && (
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={handleToggleStar}
-          disabled={toggleStarPending}
-          className="transition-colors bg-black/50 hover:bg-black/70 text-white"
-        >
-          <Star className={`h-4 w-4 ${localStarred ? 'fill-current' : ''}`} />
-        </Button>
-      )}
-
       {/* Add to References Button */}
       {!readOnly && !isVideo && selectedProjectId && (
         <Tooltip>
