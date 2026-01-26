@@ -140,6 +140,13 @@ export interface SegmentSettingsFormProps {
   enhancePromptEnabled?: boolean;
   /** Callback when enhance prompt toggle changes */
   onEnhancePromptChange?: (enabled: boolean) => void;
+
+  // Layout customization
+  /**
+   * Amount (in Tailwind spacing units) to extend Advanced Settings to container edges.
+   * Use 4 for p-4 containers (default), 6 for p-6 containers.
+   */
+  edgeExtendAmount?: 4 | 6;
 }
 
 // =============================================================================
@@ -279,6 +286,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   onClearEnhancedPrompt,
   enhancePromptEnabled,
   onEnhancePromptChange,
+  edgeExtendAmount = 4,
 }) => {
   // UI state
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -597,8 +605,8 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
             <ChevronLeft className={`w-3 h-3 transition-transform ${showAdvanced ? '-rotate-90' : ''}`} />
           </Button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="-mx-4">
-          <div className="space-y-3 p-3 bg-muted/30 border-y border-border/50">
+        <CollapsibleContent className={edgeExtendAmount === 6 ? '-mx-6' : '-mx-4'}>
+          <div className={`space-y-3 bg-muted/30 border-y border-border/50 ${edgeExtendAmount === 6 ? 'px-6 py-3' : 'p-3'}`}>
             {/* Before/After Each Prompt - only show if shot has defaults */}
             {(shotDefaults?.textBeforePrompts !== undefined || shotDefaults?.textAfterPrompts !== undefined) && (
               <div className="grid grid-cols-2 gap-2">

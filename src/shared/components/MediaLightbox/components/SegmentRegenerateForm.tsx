@@ -246,7 +246,13 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
           const enhancedPromptResult = enhanceResult?.enhanced_prompt?.trim() || promptToEnhance;
           console.log('[SegmentRegenerateForm] ✅ Enhanced prompt:', enhancedPromptResult.substring(0, 80) + '...');
 
-          // 2. Store enhanced prompt in metadata
+          // 2. Apply before/after text to the enhanced prompt
+          const beforeText = effectiveSettings.textBeforePrompts?.trim() || '';
+          const afterText = effectiveSettings.textAfterPrompts?.trim() || '';
+          const finalPrompt = [beforeText, enhancedPromptResult, afterText].filter(Boolean).join(' ');
+          console.log('[SegmentRegenerateForm] 📝 Final prompt with before/after:', finalPrompt.substring(0, 100) + '...');
+
+          // 3. Store enhanced prompt in metadata
           if (pairShotGenerationId && enhancedPromptResult !== promptToEnhance) {
             const { data: current } = await supabase
               .from('shot_generations')
@@ -268,9 +274,9 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
             queryClient.invalidateQueries({ queryKey: ['pair-metadata', pairShotGenerationId] });
           }
 
-          // 3. Build task params with enhanced prompt
+          // 4. Build task params with final prompt (enhanced + before/after)
           const taskParams = buildTaskParams(
-            { ...effectiveSettings, prompt: enhancedPromptResult },
+            { ...effectiveSettings, prompt: finalPrompt },
             {
               projectId,
               shotId,
@@ -286,7 +292,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
             }
           );
 
-          // 4. Create task
+          // 5. Create task
           const result = await createIndividualTravelSegmentTask(taskParams);
 
           if (!result.task_id) {
@@ -320,8 +326,14 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
         await saveSettings();
       }
 
-      // Build task params using effective settings (merged with shot defaults)
-      const taskParams = buildTaskParams(effectiveSettings, {
+      // Apply before/after text to the prompt
+      const beforeText = effectiveSettings.textBeforePrompts?.trim() || '';
+      const afterText = effectiveSettings.textAfterPrompts?.trim() || '';
+      const basePrompt = effectiveSettings.prompt?.trim() || '';
+      const finalPrompt = [beforeText, basePrompt, afterText].filter(Boolean).join(' ');
+
+      // Build task params using effective settings with final prompt
+      const taskParams = buildTaskParams({ ...effectiveSettings, prompt: finalPrompt }, {
         projectId,
         shotId,
         generationId,
@@ -374,16 +386,15 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   ]);
 
   return (
-    <div className="p-4">
-      <SegmentSettingsForm
-        {...formProps}
-        onSubmit={handleSubmit}
-        isSubmitting={isSubmitting}
-        onFrameCountChange={handleFrameCountChange}
-        enhancePromptEnabled={effectiveEnhanceEnabled}
-        onEnhancePromptChange={setEnhancePromptEnabled}
-      />
-    </div>
+    <SegmentSettingsForm
+      {...formProps}
+      onSubmit={handleSubmit}
+      isSubmitting={isSubmitting}
+      onFrameCountChange={handleFrameCountChange}
+      enhancePromptEnabled={effectiveEnhanceEnabled}
+      onEnhancePromptChange={setEnhancePromptEnabled}
+      edgeExtendAmount={6}
+    />
   );
 };
 
