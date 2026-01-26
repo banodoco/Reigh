@@ -43,10 +43,10 @@ export const CharacterAnimateDetails: React.FC<TaskDetailsProps> = ({
           <p className={`${config.textSize} font-medium text-muted-foreground`}>
             {mode === 'animate' ? '✨ Character to animate' : '✨ Character to insert'}
           </p>
-          <div className="relative group flex-shrink-0" style={{ width: '160px' }}>
-            <img 
-              src={characterImageUrl} 
-              alt="Character" 
+          <div className={`relative group flex-shrink-0 ${isMobile ? 'w-20' : 'w-40'}`}>
+            <img
+              src={characterImageUrl}
+              alt="Character"
               className="w-full object-cover rounded border shadow-sm transition-transform group-hover:scale-105"
             />
           </div>
@@ -59,7 +59,7 @@ export const CharacterAnimateDetails: React.FC<TaskDetailsProps> = ({
           <p className={`${config.textSize} font-medium text-muted-foreground`}>
             {mode === 'animate' ? '🎬 Source of movement' : '🎬 Video to replace character in'}
           </p>
-          <div className="relative group flex-shrink-0 cursor-pointer" style={{ width: '160px' }}>
+          <div className={`relative group flex-shrink-0 cursor-pointer ${isMobile ? 'w-20' : 'w-40'}`}>
             {!videoLoaded ? (
               <div 
                 className="w-full aspect-video bg-black rounded border shadow-sm flex items-center justify-center"

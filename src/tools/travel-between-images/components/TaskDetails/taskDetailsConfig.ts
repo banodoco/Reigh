@@ -79,7 +79,7 @@ export function getVariantConfig(
       iconSize: 'h-3 w-3',
       labelCase: 'uppercase tracking-wide',
       gridCols: 'grid-cols-2',
-      imageGridCols: isMobile ? 'grid-cols-3' : inputImagesCount <= 4 ? 'grid-cols-4' : inputImagesCount <= 8 ? 'grid-cols-4' : 'grid-cols-6',
+      imageGridCols: isMobile ? 'grid-cols-6' : inputImagesCount <= 4 ? 'grid-cols-4' : inputImagesCount <= 8 ? 'grid-cols-4' : 'grid-cols-6',
       maxImages: isMobile ? 6 : inputImagesCount <= 4 ? 4 : inputImagesCount <= 8 ? 8 : 11,
       promptLength: isMobile ? 100 : 150,
       negativePromptLength: isMobile ? 100 : 150,

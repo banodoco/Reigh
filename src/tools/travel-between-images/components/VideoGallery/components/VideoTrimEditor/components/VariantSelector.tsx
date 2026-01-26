@@ -246,128 +246,131 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex flex-col gap-2 p-2 bg-background/90 backdrop-blur-sm rounded-lg border border-border/50 shadow-lg overflow-hidden">
-        {/* Header row */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground">Variants:</span>
-            {/* Relationship filter buttons - only show when viewing a variant with relationships */}
-            {hasRelationships && (
-              <div className="flex items-center gap-1">
+        {/* Header section - stacks on mobile, single row on desktop */}
+        <div className={cn("flex gap-2", isMobile ? "flex-col" : "items-center justify-between")}>
+          {/* Row 1: Label + Action buttons */}
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Variants ({variants.length})</span>
+            {/* Action buttons */}
+            <div className="flex items-center gap-1">
+              {/* Make new image button */}
+              {onPromoteToGeneration && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button
-                      onClick={() => setRelationshipFilter(relationshipFilter === 'parents' ? 'all' : 'parents')}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handlePromoteToGeneration}
+                      disabled={localIsPromoting || isPromoting}
                       className={cn(
-                        'flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-colors',
-                        relationshipFilter === 'parents'
-                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
-                          : 'bg-muted/50 text-muted-foreground hover:bg-muted',
-                        parentVariants.size === 0 && 'opacity-50 cursor-not-allowed'
+                        "h-auto min-h-6 text-xs px-2 py-1 gap-1 whitespace-normal text-left",
+                        promoteSuccess && "bg-green-500/20 border-green-500/50 text-green-400"
                       )}
-                      disabled={parentVariants.size === 0}
                     >
-                      <ArrowUp className="w-2.5 h-2.5" />
-                      <span>Based on ({parentVariants.size})</span>
-                    </button>
+                      {localIsPromoting || isPromoting ? (
+                        <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                      ) : promoteSuccess ? (
+                        <Check className="w-3 h-3 shrink-0" />
+                      ) : (
+                        <ImagePlus className="w-3 h-3 shrink-0" />
+                      )}
+                      {promoteSuccess ? 'Created!' : 'New image'}
+                    </Button>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="z-[100001]">
-                    <p>Show variants this is based on</p>
+                    <p>Create a standalone image from this variant</p>
                   </TooltipContent>
                 </Tooltip>
-
+              )}
+              {/* Make main button */}
+              {isViewingNonPrimary && onMakePrimary ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <button
-                      onClick={() => setRelationshipFilter(relationshipFilter === 'children' ? 'all' : 'children')}
-                      className={cn(
-                        'flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-colors',
-                        relationshipFilter === 'children'
-                          ? 'bg-purple-500/20 text-purple-400 border border-purple-500/50'
-                          : 'bg-muted/50 text-muted-foreground hover:bg-muted',
-                        childVariants.size === 0 && 'opacity-50 cursor-not-allowed'
-                      )}
-                      disabled={childVariants.size === 0}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleMakePrimary}
+                      disabled={isMakingPrimary}
+                      className="h-auto min-h-6 text-xs px-2 py-1 gap-1 whitespace-normal text-left"
                     >
-                      <ArrowDown className="w-2.5 h-2.5" />
-                      <span>Based on this ({childVariants.size})</span>
-                    </button>
+                      {isMakingPrimary ? (
+                        <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                      ) : (
+                        <Star className="w-3 h-3 shrink-0" />
+                      )}
+                      Make main
+                    </Button>
                   </TooltipTrigger>
                   <TooltipContent side="top" className="z-[100001]">
-                    <p>Show variants based on this one</p>
+                    <p>Set this variant as the primary display version</p>
                   </TooltipContent>
                 </Tooltip>
+              ) : activeVariant?.is_primary ? (
+                <div className="flex items-center gap-1 h-6 text-xs px-2 text-green-500">
+                  <Star className="w-3 h-3 fill-current" />
+                  <span>Main variant</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
 
-                {relationshipFilter !== 'all' && (
+          {/* Row 2 (mobile) / same row (desktop): Relationship filter buttons */}
+          {hasRelationships && (
+            <div className="flex items-center gap-1 justify-start">
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <button
-                    onClick={() => setRelationshipFilter('all')}
-                    className="p-0.5 rounded hover:bg-muted text-muted-foreground"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="flex items-start gap-1">
-            {/* Make new image button - for any variant when promote handler provided */}
-            {onPromoteToGeneration && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handlePromoteToGeneration}
-                    disabled={localIsPromoting || isPromoting}
+                    onClick={() => setRelationshipFilter(relationshipFilter === 'parents' ? 'all' : 'parents')}
                     className={cn(
-                      "h-auto min-h-6 text-xs px-2 py-1 gap-1 whitespace-normal text-left",
-                      promoteSuccess && "bg-green-500/20 border-green-500/50 text-green-400"
+                      'flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-colors',
+                      relationshipFilter === 'parents'
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50'
+                        : 'bg-muted/50 text-muted-foreground hover:bg-muted',
+                      parentVariants.size === 0 && 'opacity-50 cursor-not-allowed'
                     )}
+                    disabled={parentVariants.size === 0}
                   >
-                    {localIsPromoting || isPromoting ? (
-                      <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                    ) : promoteSuccess ? (
-                      <Check className="w-3 h-3 shrink-0" />
-                    ) : (
-                      <ImagePlus className="w-3 h-3 shrink-0" />
-                    )}
-                    {promoteSuccess ? 'Created!' : 'New image'}
-                  </Button>
+                    <ArrowUp className="w-2.5 h-2.5" />
+                    <span>Based on ({parentVariants.size})</span>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="z-[100001]">
-                  <p>Create a standalone image from this variant</p>
+                  <p>Show variants this is based on</p>
                 </TooltipContent>
               </Tooltip>
-            )}
-            {/* Make main button */}
-            {isViewingNonPrimary && onMakePrimary ? (
+
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleMakePrimary}
-                    disabled={isMakingPrimary}
-                    className="h-auto min-h-6 text-xs px-2 py-1 gap-1 whitespace-normal text-left"
-                  >
-                    {isMakingPrimary ? (
-                      <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                    ) : (
-                      <Star className="w-3 h-3 shrink-0" />
+                  <button
+                    onClick={() => setRelationshipFilter(relationshipFilter === 'children' ? 'all' : 'children')}
+                    className={cn(
+                      'flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] transition-colors',
+                      relationshipFilter === 'children'
+                        ? 'bg-purple-500/20 text-purple-400 border border-purple-500/50'
+                        : 'bg-muted/50 text-muted-foreground hover:bg-muted',
+                      childVariants.size === 0 && 'opacity-50 cursor-not-allowed'
                     )}
-                    Make main
-                  </Button>
+                    disabled={childVariants.size === 0}
+                  >
+                    <ArrowDown className="w-2.5 h-2.5" />
+                    <span>Based on this ({childVariants.size})</span>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="z-[100001]">
-                  <p>Set this variant as the primary display version</p>
+                  <p>Show variants based on this one</p>
                 </TooltipContent>
               </Tooltip>
-            ) : activeVariant?.is_primary ? (
-              <div className="flex items-center gap-1 h-6 text-xs px-2 text-green-500">
-                <Star className="w-3 h-3 fill-current" />
-                <span>Main variant</span>
-              </div>
-            ) : null}
-          </div>
+
+              {relationshipFilter !== 'all' && (
+                <button
+                  onClick={() => setRelationshipFilter('all')}
+                  className="p-0.5 rounded hover:bg-muted text-muted-foreground"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Pagination info - at top */}
@@ -404,9 +407,13 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
           </div>
         )}
 
-        {/* Variants grid - 4 per row, scrollable */}
+        {/* Variants grid - responsive columns, no internal scroll (parent handles scrolling) */}
         {/* p-0.5 ensures ring-2 on selected variant isn't clipped on any side */}
-        <div className="grid grid-cols-4 gap-1 w-full overflow-y-auto flex-1 min-h-0 p-0.5">
+        {/* items-start prevents grid items from stretching vertically */}
+        <div className={cn(
+          "grid gap-1 w-full p-0.5 items-start",
+          isMobile ? "grid-cols-3" : "grid-cols-4"
+        )}>
           {paginatedVariants.map((variant) => {
             const isActive = variant.id === activeVariantId;
             const isPrimary = variant.is_primary;
@@ -441,7 +448,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                   }
                 }}
                 className={cn(
-                  'relative flex flex-col items-center p-0.5 rounded transition-all w-full touch-manipulation',
+                  'relative block p-0.5 rounded transition-all w-full touch-manipulation',
                   'hover:bg-muted/80',
                   // Primary (main) variant gets green ring
                   isPrimary && !isActive && 'ring-2 ring-green-500 bg-green-500/10',
@@ -454,16 +461,16 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                   isChild && !isActive && !isPrimary && 'ring-1 ring-purple-500/50'
                 )}
               >
-                {/* Thumbnail - use thumbnail_url if available, otherwise fall back to location (works for images) */}
-                <div className="relative w-full aspect-video rounded overflow-hidden bg-muted">
+                {/* Thumbnail - use padding-based aspect ratio for reliable 16:9 sizing */}
+                <div className="relative w-full rounded overflow-hidden bg-muted" style={{ paddingBottom: '56.25%' }}>
                   {(variant.thumbnail_url || variant.location) ? (
                     <img
                       src={variant.thumbnail_url || variant.location}
                       alt={label}
-                      className="w-full h-full object-cover pointer-events-none"
+                      className="absolute inset-0 w-full h-full object-cover pointer-events-none"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
+                    <div className="absolute inset-0 w-full h-full flex items-center justify-center">
                       <Icon className="w-4 h-4 text-muted-foreground" />
                     </div>
                   )}

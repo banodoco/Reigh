@@ -4,6 +4,7 @@ export { useImageGalleryFiltersOptimized as useImageGalleryFilters } from './use
 export { useImageGalleryPagination } from './useImageGalleryPagination';
 export { useImageGalleryActions } from './useImageGalleryActions';
 export { useMobileInteractions } from './useMobileInteractions';
+export { useContainerWidth } from './useContainerWidth';
 
 // Export types (using the optimized implementations)
 export type { UseImageGalleryStateOptimizedProps as UseImageGalleryStateProps, UseImageGalleryStateOptimizedReturn as UseImageGalleryStateReturn } from './useImageGalleryStateOptimized';

@@ -8,8 +8,11 @@ export {
   TIMEOUTS,
   MOBILE_SCROLL_OFFSET,
   DESKTOP_SCROLL_OFFSET,
+  TARGET_IMAGE_WIDTH,
   parseAspectRatio,
   getColumnsForAspectRatio,
   getItemsPerPageForColumns,
   getLayoutForAspectRatio,
+  getTargetImageWidth,
+  calculateDynamicColumns,
 } from './imageGallery-constants';

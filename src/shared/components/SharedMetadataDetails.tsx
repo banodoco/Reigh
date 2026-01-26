@@ -82,10 +82,18 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
   const negativePrompt = (metadata as any).originalParams?.orchestrator_details?.negative_prompt || 
                         metadata.negative_prompt;
   
-  const model = (metadata as any).originalParams?.orchestrator_details?.model || metadata.model;
+  const model = metadata.model || (metadata as any).originalParams?.model || (metadata as any).originalParams?.orchestrator_details?.model;
   const seed = metadata.seed || (metadata as any).originalParams?.orchestrator_details?.seed;
-  const resolution = (metadata as any).originalParams?.orchestrator_details?.resolution;
+  const resolution = (metadata as any).originalParams?.orchestrator_details?.resolution || metadata.resolution;
   const dimensions = metadata.width && metadata.height ? `${metadata.width}×${metadata.height}` : resolution;
+
+  // Additional generation settings
+  const steps = (metadata as any).steps || (metadata as any).originalParams?.steps;
+  const hiresScale = (metadata as any).hires_scale || (metadata as any).originalParams?.hires_scale;
+  const hiresSteps = (metadata as any).hires_steps || (metadata as any).originalParams?.hires_steps;
+  const hiresDenoise = (metadata as any).hires_denoise || (metadata as any).originalParams?.hires_denoise;
+  const lightningPhase1 = (metadata as any).lightning_lora_strength_phase_1 || (metadata as any).originalParams?.lightning_lora_strength_phase_1;
+  const lightningPhase2 = (metadata as any).lightning_lora_strength_phase_2 || (metadata as any).originalParams?.lightning_lora_strength_phase_2;
 
   // Get LoRAs from multiple possible locations
   const additionalLoras = (metadata as any).originalParams?.orchestrator_details?.additional_loras;
@@ -351,6 +359,56 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generation Settings */}
+      {(model || steps || hiresScale) && (
+        <div className="pt-2 border-t border-muted-foreground/20">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            {model && (
+              <div className="flex items-center gap-2">
+                <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground`}>Model</p>
+                <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>{getModelDisplayName(model)}</p>
+              </div>
+            )}
+            {steps && (
+              <div className="flex items-center gap-2">
+                <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground`}>Steps</p>
+                <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>{steps}</p>
+              </div>
+            )}
+            {hiresScale && (
+              <div className="flex items-center gap-2">
+                <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground`}>Hires Scale</p>
+                <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>{hiresScale}x</p>
+              </div>
+            )}
+            {hiresSteps && (
+              <div className="flex items-center gap-2">
+                <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground`}>Hires Steps</p>
+                <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>{hiresSteps}</p>
+              </div>
+            )}
+            {hiresDenoise !== undefined && (
+              <div className="flex items-center gap-2">
+                <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground`}>Hires Denoise</p>
+                <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>{hiresDenoise}</p>
+              </div>
+            )}
+            {lightningPhase1 !== undefined && (
+              <div className="flex items-center gap-2">
+                <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground`}>Lightning P1</p>
+                <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>{lightningPhase1}</p>
+              </div>
+            )}
+            {lightningPhase2 !== undefined && (
+              <div className="flex items-center gap-2">
+                <p className={`${config.textSize} ${config.fontWeight} text-muted-foreground`}>Lightning P2</p>
+                <p className={`${config.textSize} ${config.fontWeight} text-foreground`}>{lightningPhase2}</p>
+              </div>
+            )}
           </div>
         </div>
       )}

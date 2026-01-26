@@ -20,6 +20,7 @@ import {
   useImageGalleryPagination,
   useImageGalleryActions,
   useMobileInteractions,
+  useContainerWidth,
 } from './hooks';
 
 // Import components
@@ -146,12 +147,15 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
   // Get project context for cache clearing and aspect ratio
   const { selectedProjectId, projects } = useProject();
   const { currentShotId } = useCurrentShot();
-  
+
   // Get current project's aspect ratio
   const currentProject = projects.find(p => p.id === selectedProjectId);
   const projectAspectRatio = currentProject?.aspectRatio;
   const rawIsMobile = useIsMobile();
   const { toast } = useToast();
+
+  // Measure container width for dynamic column calculation
+  const [galleryContainerRef, containerWidth] = useContainerWidth();
   
   // Fallback mobile detection in case useIsMobile fails
   const isMobile = rawIsMobile ?? (typeof window !== 'undefined' && window.innerWidth < 768);
@@ -187,13 +191,15 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
   const { navigateToShot } = useShotNavigation();
 
   // Compute aspect-ratio-aware layout (columns, itemsPerPage, skeletonColumns)
-  // This adjusts columns based on image dimensions:
-  // - Wide images (16:9) → fewer columns (6)
-  // - Square images (1:1) → medium columns (7)
-  // - Tall images (9:16) → more columns (9)
+  // This adjusts columns based on both image dimensions AND container width:
+  // - Wide images (16:9) → larger target width → fewer columns
+  // - Tall images (9:16) → smaller target width → more columns
+  // - Wider containers → more columns fit
+  // - Narrower containers → fewer columns fit
+  // Tweak TARGET_IMAGE_WIDTH.BASE in imageGallery-constants.ts to adjust density
   const aspectRatioLayout = React.useMemo(() => {
-    return getLayoutForAspectRatio(projectAspectRatio, isMobile);
-  }, [projectAspectRatio, isMobile]);
+    return getLayoutForAspectRatio(projectAspectRatio, isMobile, containerWidth);
+  }, [projectAspectRatio, isMobile, containerWidth]);
 
   // Use aspect-ratio-aware defaults, but allow explicit override via props
   const effectiveColumnsPerRow = columnsPerRow !== 5 ? columnsPerRow : aspectRatioLayout.columns;
@@ -598,11 +604,14 @@ const ImageGallery: React.FC<ImageGalleryProps> = React.memo((props) => {
 
   return (
     <TooltipProvider>
-      <div className={cn(
-        reducedSpacing ? 'space-y-3' : 'space-y-6',
-        reducedSpacing ? 'pb-0' : ((!hidePagination && !hideBottomPagination) ? 'pb-[62px]' : 'pb-0'),
-        className
-      )}>
+      <div
+        ref={galleryContainerRef}
+        className={cn(
+          reducedSpacing ? 'space-y-3' : 'space-y-6',
+          reducedSpacing ? 'pb-0' : ((!hidePagination && !hideBottomPagination) ? 'pb-[62px]' : 'pb-0'),
+          className
+        )}
+      >
         {/* Header section with pagination and filters */}
         <div ref={stateHook.galleryTopRef}>
           <ImageGalleryHeader

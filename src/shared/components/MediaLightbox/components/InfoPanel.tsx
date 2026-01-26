@@ -165,58 +165,109 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
     );
   };
 
+  // Handle ID copy with simple approach that works on all devices
+  // Set state immediately (synchronously) for instant feedback, don't wait for clipboard promise
+  const handleCopyId = () => {
+    if (!taskId) return;
+    setIdCopied(true);
+    setTimeout(() => setIdCopied(false), 2000);
+    // Copy to clipboard async - don't block on it
+    navigator.clipboard.writeText(taskId).catch(() => {
+      // Silently fail - we already showed feedback
+    });
+  };
+
   // Render the header
   const renderHeader = () => (
     <div className={cn(
-      "flex-shrink-0 flex items-center justify-between border-b border-border p-4 bg-background",
-      isMobile && "sticky top-0 z-[80]"
+      "flex-shrink-0 border-b border-border bg-background",
+      isMobile ? "sticky top-0 z-[80] p-3" : "p-4"
     )}>
-      {/* Left side - title + copy id + optional variant link */}
-      <div className="flex items-center gap-2">
-        <h2 className={cn("font-light", isMobile ? "text-base" : "text-lg")}>Generation Task Details</h2>
-        {taskId && (
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(taskId);
-              setIdCopied(true);
-              setTimeout(() => setIdCopied(false), 2000);
-            }}
-            className={`px-2 py-1 text-xs rounded transition-colors ${
-              idCopied
-                ? "text-green-400"
-                : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
-            }`}
-          >
-            {idCopied ? 'copied' : 'id'}
-          </button>
-        )}
-        {/* Variant quick-link for mobile */}
-        {isMobile && hasVariants && (
-          <button
-            onClick={() => variantsSectionRef?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            className="flex items-center gap-1 ml-2 text-xs text-muted-foreground hover:text-foreground transition-colors group"
-          >
-            <span>({variants.length})</span>
-            <svg className="w-2.5 h-2.5 group-hover:translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-            </svg>
-          </button>
-        )}
-      </div>
+      {/* Mobile: stack rows for better spacing */}
+      {isMobile ? (
+        <div className="flex flex-col gap-2">
+          {/* Row 1: Title + Close button */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-light">Generation Task Details</h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-8 w-8 p-0 hover:bg-muted"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          {/* Row 2: ID + variant link on left, Info/Edit toggle on right */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {taskId && (
+                <button
+                  onClick={handleCopyId}
+                  className={cn(
+                    "px-2 py-1 text-xs rounded transition-colors touch-manipulation active:scale-95",
+                    idCopied
+                      ? "text-green-400 bg-green-400/10"
+                      : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
+                  )}
+                >
+                  {idCopied ? 'copied' : 'id'}
+                </button>
+              )}
+              {hasVariants && (
+                <button
+                  onClick={() => variantsSectionRef?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
+                >
+                  <span>variants ({variants.length})</span>
+                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {renderImageToggle()}
+              {renderVideoToggle()}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Desktop: single row */
+        <div className="flex items-center justify-between">
+          {/* Left side - title + copy id */}
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-light">Generation Task Details</h2>
+            {taskId && (
+              <button
+                onClick={handleCopyId}
+                className={cn(
+                  "px-2 py-1 text-xs rounded transition-colors touch-manipulation",
+                  idCopied
+                    ? "text-green-400"
+                    : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+                )}
+              >
+                {idCopied ? 'copied' : 'id'}
+              </button>
+            )}
+          </div>
 
-      {/* Right side - toggles and close button */}
-      <div className="flex items-center gap-3">
-        {renderImageToggle()}
-        {renderVideoToggle()}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="h-8 w-8 p-0 hover:bg-muted"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
+          {/* Right side - toggles and close button */}
+          <div className="flex items-center gap-3">
+            {renderImageToggle()}
+            {renderVideoToggle()}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-8 w-8 p-0 hover:bg-muted"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -248,82 +299,42 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
     />
   );
 
-  // Render variants section
+  // Render variants section - matches EditPanelLayout styling
   const renderVariants = () => {
     if (!hasVariants) return null;
 
-    if (isMobile) {
-      return (
-        <div
-          ref={variantsSectionRef}
-          className="px-3 pb-2 -mt-2 max-h-[120px] overflow-y-auto flex-shrink-0"
-        >
-          <VariantSelector
-            variants={variants}
-            activeVariantId={activeVariant?.id || null}
-            onVariantSelect={onVariantSelect}
-            onMakePrimary={onMakePrimary}
-            isLoading={isLoadingVariants}
-            onPromoteToGeneration={onPromoteToGeneration}
-            isPromoting={isPromoting}
-            onDeleteVariant={onDeleteVariant}
-          />
-        </div>
-      );
-    }
+    // Match EditPanelLayout: border-t, consistent padding
+    const variantPadding = isMobile ? 'pt-2 mt-2 px-3 pb-2' : 'pt-4 mt-4 p-6';
 
     return (
       <div
         ref={variantsSectionRef}
-        className="flex-shrink-0 overflow-y-auto max-h-[200px]"
+        className={cn("border-t border-border", variantPadding)}
       >
-        <div className="p-4 pt-2">
-          <VariantSelector
-            variants={variants}
-            activeVariantId={activeVariant?.id || null}
-            onVariantSelect={onVariantSelect}
-            onMakePrimary={onMakePrimary}
-            isLoading={isLoadingVariants}
-            onPromoteToGeneration={onPromoteToGeneration}
-            isPromoting={isPromoting}
-            onDeleteVariant={onDeleteVariant}
-          />
-        </div>
+        <VariantSelector
+          variants={variants}
+          activeVariantId={activeVariant?.id || null}
+          onVariantSelect={onVariantSelect}
+          onMakePrimary={onMakePrimary}
+          isLoading={isLoadingVariants}
+          onPromoteToGeneration={onPromoteToGeneration}
+          isPromoting={isPromoting}
+          onDeleteVariant={onDeleteVariant}
+        />
       </div>
     );
   };
 
-  // Desktop layout: split when variants, full height otherwise
-  if (!isMobile) {
-    return (
-      <div className="w-full h-full flex flex-col">
-        {renderHeader()}
-
-        {hasVariants ? (
-          <div className="flex-1 flex flex-col min-h-0">
-            {/* Task details - takes remaining space, scrollable */}
-            <div className="flex-1 overflow-y-auto min-h-0">
-              {renderTaskDetails()}
-            </div>
-            {/* Variants section */}
-            {renderVariants()}
-          </div>
-        ) : (
-          /* No variants - full height for task details */
-          <div className="flex-1 overflow-y-auto">
-            {renderTaskDetails()}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // Mobile layout: simple flow
+  // Both desktop and mobile: variants inside scroll area (matches EditPanelLayout)
   return (
-    <div className="w-full">
+    <div className={cn("w-full flex flex-col", !isMobile && "h-full")}>
       {renderHeader()}
-      {renderTaskDetails()}
-      {renderVariants()}
+
+      {/* Scrollable content area - contains both task details and variants */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {renderTaskDetails()}
+        {renderVariants()}
+      </div>
     </div>
   );
 };

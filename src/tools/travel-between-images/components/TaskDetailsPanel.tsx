@@ -129,8 +129,26 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
     );
   }
 
+  // When hideHeader is true, we're embedded in a parent scroll container (like InfoPanel)
+  // so don't force height or add our own ScrollArea
+  const wrapperClass = hideHeader
+    ? `flex flex-col ${className}`
+    : `flex flex-col h-full ${className}`;
+
+  // Match EditPanelLayout padding: p-6 desktop, p-3 mobile
+  const padding = isMobile ? 'p-3' : 'p-6';
+
+  const contentWrapper = (content: React.ReactNode) => {
+    if (hideHeader) {
+      // No scroll wrapper - parent handles scrolling
+      return <div className={padding}>{content}</div>;
+    }
+    // Use ScrollArea for standalone usage
+    return <ScrollArea className={`flex-1 ${padding} overflow-y-auto`}>{content}</ScrollArea>;
+  };
+
   return (
-    <div className={`flex flex-col h-full ${className}`}>
+    <div className={wrapperClass}>
       {!hideHeader && (
         <div className="flex-shrink-0 p-4 border-b">
           <div className="flex items-center justify-between">
@@ -154,8 +172,8 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
           </div>
         </div>
       )}
-      
-      <ScrollArea className="flex-1 p-4 overflow-y-auto">
+
+      {contentWrapper(
         <div className="space-y-6">
           {/* Generation Summary Section */}
           <div className="space-y-3">
@@ -281,8 +299,8 @@ const TaskDetailsPanel: React.FC<TaskDetailsPanelProps> = ({
           {/* Derived Generations Section - Show AFTER detailed parameters */}
           {derivedSection}
         </div>
-      </ScrollArea>
-      
+      )}
+
       {/* Footer with controls - Sticky to bottom - only show when Apply Settings is available */}
       {onApplySettingsFromTask && task && taskId && (
         <div className="flex-shrink-0 border-t bg-gradient-to-t from-background via-background to-background/95 sticky bottom-0">

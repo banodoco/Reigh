@@ -140,10 +140,11 @@ async function fetchShotSpecificGenerations({
   
   // Add positioned filter if needed
   if (filters?.excludePositioned) {
-    // Show only unpositioned items: array contains null OR -1 (sentinel for unpositioned)
-    // Use PostgREST 'cs.' operator (contains) to check if array contains null or -1
-    // Note: We need OR logic since an item might have [null] or [-1] or both
-    dataQuery = dataQuery.or(`shot_data->${shotId}.cs.[null],shot_data->${shotId}.cs.[-1]`);
+    // Show only unpositioned items: value is null or -1 (sentinel for unpositioned)
+    // Handle both data formats:
+    // - Single-value format: { "shot_id": null } or { "shot_id": -1 }
+    // - Array format: { "shot_id": [null] } or { "shot_id": [-1] }
+    dataQuery = dataQuery.or(`shot_data->${shotId}.eq.null,shot_data->${shotId}.eq.-1,shot_data->${shotId}.cs.[null],shot_data->${shotId}.cs.[-1]`);
   }
   
   // Apply media type filter at database level for performance

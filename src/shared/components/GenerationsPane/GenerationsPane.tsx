@@ -7,7 +7,9 @@ import { smartPreloadImages, initializePrefetchOperations, smartCleanupOldPages,
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchGenerations } from '@/shared/hooks/useGenerations';
 import { Button } from '@/shared/components/ui/button';
-import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Eye, Sparkles, ExternalLink, Search, X, Images } from 'lucide-react';
+import { Checkbox } from '@/shared/components/ui/checkbox';
+import { Label } from '@/shared/components/ui/label';
+import { LockIcon, UnlockIcon, Square, ChevronLeft, ChevronRight, Star, Sparkles, ExternalLink, Search, X, ArrowRight } from 'lucide-react';
 import { ImageGenerationModal } from '@/shared/components/ImageGenerationModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ImageGallery } from '@/shared/components/ImageGallery';
@@ -587,84 +589,105 @@ const GenerationsPaneComponent: React.FC = () => {
             
             {/* Shot filter + Pagination row */}
             <div className="mt-1 mx-2 flex items-start justify-between min-w-0 gap-2">
-                <div 
+                <div
                   className={cn(
-                    "flex items-center gap-2 min-w-0 flex-shrink",
+                    "flex flex-col gap-2 min-w-0 flex-shrink",
                     "transition-all duration-200",
                     isInteractionDisabled && "pointer-events-none opacity-70"
                   )}
                 >
-                  <ShotFilter
-                    shots={shotsForFilter}
-                    selectedShotId={selectedShotFilter}
-                    onShotChange={setSelectedShotFilter}
-                    excludePositioned={excludePositioned}
-                    onExcludePositionedChange={setExcludePositioned}
-                    size="sm"
-                    whiteText={true}
-                    checkboxId="exclude-positioned-generations-pane"
-                    triggerWidth="w-[100px] sm:w-[160px] flex-shrink-0 !text-xs"
-                    isMobile={isMobile}
-                    contentRef={shotFilterContentRef}
-                    className="flex flex-col space-y-2"
-                    open={shotFilterOpen}
-                    onOpenChange={(open) => {
-                      // Prevent dropdown from staying open during interaction-disabled period
-                      if (isInteractionDisabled && open) {
-                        setShotFilterOpen(false);
-                        return;
-                      }
-                      setShotFilterOpen(open);
-                    }}
-                  />
-                  
-                  {/* Show CTA buttons based on filter state */}
-                  {selectedShotFilter === 'no-shot' ? (
-                    // When viewing "Items without shots", show button to go back to all
-                    <Button
-                      variant="ghost"
+                  {/* Dropdown + CTA button row */}
+                  <div className="flex items-center gap-2">
+                    <ShotFilter
+                      shots={shotsForFilter}
+                      selectedShotId={selectedShotFilter}
+                      onShotChange={setSelectedShotFilter}
+                      excludePositioned={excludePositioned}
+                      onExcludePositionedChange={setExcludePositioned}
                       size="sm"
-                      onClick={() => setSelectedShotFilter('all')}
-                      className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
-                    >
-                      <Eye className="h-3 w-3 mr-1" />
-                      <span className="hidden sm:inline">View all items</span>
-                    </Button>
-                  ) : currentShotId ? (
-                    // When user is on a shot, toggle between that shot and all
-                    selectedShotFilter === currentShotId ? (
+                      whiteText={true}
+                      checkboxId="exclude-positioned-generations-pane"
+                      triggerWidth="w-[100px] sm:w-[160px] flex-shrink-0 !text-xs"
+                      isMobile={isMobile}
+                      contentRef={shotFilterContentRef}
+                      showPositionFilter={false}
+                      open={shotFilterOpen}
+                      onOpenChange={(open) => {
+                        // Prevent dropdown from staying open during interaction-disabled period
+                        if (isInteractionDisabled && open) {
+                          setShotFilterOpen(false);
+                          return;
+                        }
+                        setShotFilterOpen(open);
+                      }}
+                    />
+
+                    {/* Show CTA buttons based on filter state - always next to dropdown */}
+                    {selectedShotFilter === 'no-shot' ? (
+                      // When viewing "Items without shots", show button to go back to all
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setSelectedShotFilter('all')}
                         className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
                       >
-                        <Eye className="h-3 w-3 mr-1" />
-                        <span className="hidden sm:inline">See all images</span>
+                        <ArrowRight className="h-3 w-3 mr-1" />
+                        All images
                       </Button>
-                    ) : (
+                    ) : currentShotId ? (
+                      // When user is on a shot, toggle between that shot and all
+                      selectedShotFilter === currentShotId ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedShotFilter('all')}
+                          className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
+                        >
+                          <ArrowRight className="h-3 w-3 mr-1" />
+                          All images
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedShotFilter(currentShotId)}
+                          className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
+                        >
+                          <ArrowRight className="h-3 w-3 mr-1" />
+                          This shot
+                        </Button>
+                      )
+                    ) : selectedShotFilter === 'all' ? (
+                      // When viewing "All shots" and not on a specific shot, show "Items without shots" button
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setSelectedShotFilter(currentShotId)}
+                        onClick={() => setSelectedShotFilter('no-shot')}
                         className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
                       >
-                        <Eye className="h-3 w-3 mr-1" />
-                        <span className="hidden sm:inline">View my shot</span>
+                        <ArrowRight className="h-3 w-3 mr-1" />
+                        Unassigned
                       </Button>
-                    )
-                  ) : selectedShotFilter === 'all' ? (
-                    // When viewing "All shots" and not on a specific shot, show "Items without shots" button
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedShotFilter('no-shot')}
-                      className="h-7 px-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 whitespace-nowrap"
-                    >
-                      <Eye className="h-3 w-3 mr-1" />
-                      <span className="hidden sm:inline">Items without shots</span>
-                    </Button>
-                  ) : null}
+                    ) : null}
+                  </div>
+
+                  {/* Checkbox row - only show when a specific shot is selected */}
+                  {selectedShotFilter !== 'all' && selectedShotFilter !== 'no-shot' && (
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="exclude-positioned-generations-pane"
+                        checked={excludePositioned}
+                        onCheckedChange={(checked) => setExcludePositioned(!!checked)}
+                        className="border-zinc-600 data-[state=checked]:bg-zinc-600"
+                      />
+                      <Label
+                        htmlFor="exclude-positioned-generations-pane"
+                        className="text-xs cursor-pointer text-zinc-300"
+                      >
+                        Exclude items with a position
+                      </Label>
+                    </div>
+                  )}
                 </div>
 
                 {totalCount > GENERATIONS_PER_PAGE && (

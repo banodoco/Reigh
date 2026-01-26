@@ -69,9 +69,10 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     tasksPaneWidth 
   } = usePanes();
 
-  // In selection/move mode, use configured columns. Otherwise, use 2 cols for pair-per-row view
+  // Use columns from useDeviceDetection (phones=2, tablet portrait=3, tablet landscape=4)
+  // This ensures the grid scales appropriately for different screen sizes
   const isInMoveMode = mobileSelectedIds.length > 0;
-  const effectiveColumns = isInMoveMode ? columns : 2;
+  const effectiveColumns = columns;
   
   const mobileGridColsClass = {
     2: 'grid-cols-2',
@@ -338,11 +339,10 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
     enhancedPromptsKeys: enhancedPrompts ? Object.keys(enhancedPrompts) : [],
   });
 
-  // Determine grid columns for positioning logic
-  const gridColumns = isInMoveMode ? columns : 2;
+  // Determine grid columns for positioning logic (same as effectiveColumns)
+  const gridColumns = columns;
 
   // Always use grid view - no mode switching to prevent component unmount/remount flashing
-  // When not in move mode, grid uses 2 columns (gridColumns variable)
   return (
     <>
       <div className={cn("grid gap-3 pt-6 overflow-visible", mobileGridColsClass)}>
