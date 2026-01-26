@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/shared/components/ui/label";
 import { Switch } from "@/shared/components/ui/switch";
 import { Slider } from "@/shared/components/ui/slider";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import { useProject } from "@/shared/contexts/ProjectContext";
 import { toast } from "sonner";
 import { useUpdateShotImageOrder, useAddImageToShotWithoutPosition } from "@/shared/hooks/useShots";
@@ -2461,17 +2462,30 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                 {/* Toggle header - selected option on left, swap icon, other option on right */}
                 {/* Hidden when stitchAfterGenerate is enabled OR when there are 2 or fewer images */}
                 {stitchAfterGenerate || simpleFilteredImages.length <= 2 ? (
-                  <span className="text-base sm:text-lg font-light text-foreground">
-                    {simpleFilteredImages.length <= 1 ? 'Generate' : 'Batch Generate'}
-                  </span>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    {/* Left position: active option */}
+                  <div className="flex items-center justify-between w-full">
                     <span className="text-base sm:text-lg font-light text-foreground">
-                      {generateMode === 'batch' ? 'Batch Generate' : 'Join Segments'}
+                      {simpleFilteredImages.length <= 1 ? 'Generate' : 'Batch Generate'}
                     </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-xs bg-primary/15 text-primary px-2.5 py-1 rounded-full font-medium cursor-help">
+                          Shot Defaults
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>These settings are used as defaults for individual<br />segment generation and batch generation.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      {/* Left position: active option */}
+                      <span className="text-base sm:text-lg font-light text-foreground">
+                        {generateMode === 'batch' ? 'Batch Generate' : 'Join Segments'}
+                      </span>
 
-                    {/* Swap button with arrows */}
+                      {/* Swap button with arrows */}
                     <button
                       onClick={() => {
                         console.log('[JoinSegmentsDebug] Toggle clicked (swap button):', {
@@ -2516,6 +2530,21 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         : 'Batch Generate'
                       }
                     </button>
+                    </div>
+
+                    {/* Shot Defaults badge - only show in batch mode, far right */}
+                    {generateMode === 'batch' && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-xs bg-primary/15 text-primary px-2.5 py-1 rounded-full font-medium cursor-help">
+                            Shot Defaults
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>These settings are used as defaults for individual<br />segment generation and batch generation.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                 )}
             </CardHeader>
