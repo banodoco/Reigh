@@ -164,7 +164,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
 
     setFullImageLoaded(newFullImageLoaded);
 
-    // Debug: Log sizing mode
+    // Debug: Log sizing mode (imageDimensions read from ref-stable prop, not a dependency)
     const willForceThumbnailSize = imageDimensions && !newFullImageLoaded && isShowingThumbnail;
     console.log(`[${debugContext}] 📐 Sizing mode:`, {
       fullImageLoaded: newFullImageLoaded,
@@ -175,7 +175,11 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
       willForceThumbnailSize,
       sizingMode: willForceThumbnailSize ? 'FORCED_FULL_SIZE' : 'NATURAL_SIZE',
     });
-  }, [effectiveImageUrl, thumbUrl, debugContext, onImageLoad, imageDimensions]);
+    // NOTE: imageDimensions is intentionally NOT in deps to avoid infinite loop:
+    // This effect calls onImageLoad which updates imageDimensions in parent,
+    // which would trigger this effect again if imageDimensions was a dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveImageUrl, thumbUrl, debugContext, onImageLoad]);
 
   // Measure the actual image element for Konva Stage size and position
   // This is more accurate than measuring the wrapper because the image has the

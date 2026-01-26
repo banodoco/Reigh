@@ -665,15 +665,7 @@ export const ImageGalleryLightbox: React.FC<ImageGalleryLightboxProps> = ({
           toolTypeOverride={toolTypeOverride}
           positionedInSelectedShot={positionedInSelectedShot}
           associatedWithoutPositionInSelectedShot={associatedWithoutPositionInSelectedShot}
-          onNavigateToGeneration={(() => {
-            console.log('[DerivedNav:Gallery] 📤 Passing onNavigateToGeneration to MediaLightbox', {
-              hasHandler: !!handleNavigateToGeneration,
-              handlerType: typeof handleNavigateToGeneration,
-              mediaId: enhancedMedia?.id.substring(0, 8),
-              timestamp: Date.now()
-            });
-            return handleNavigateToGeneration;
-          })()}
+          onNavigateToGeneration={handleNavigateToGeneration}
           onOpenExternalGeneration={handleOpenExternalGeneration}
         />
       )}
