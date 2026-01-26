@@ -12,13 +12,16 @@ interface TimeStampProps {
   position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   /** Show only on hover (default: true) */
   showOnHover?: boolean;
+  /** Hide on hover - visible normally, hidden when hovering (default: false) */
+  hideOnHover?: boolean;
 }
 
 export const TimeStamp: React.FC<TimeStampProps> = ({
   createdAt,
   className = '',
   position = 'top-left',
-  showOnHover = true
+  showOnHover = true,
+  hideOnHover = false
 }) => {
   const isMobile = useIsMobile();
   const [isHovered, setIsHovered] = React.useState(false);
@@ -72,7 +75,14 @@ export const TimeStamp: React.FC<TimeStampProps> = ({
     'bottom-right': 'bottom-2 right-2'
   };
 
-  const hoverClass = showOnHover ? 'opacity-0 group-hover:opacity-100 transition-opacity' : 'opacity-100';
+  // Visibility classes based on hover behavior
+  // hideOnHover: visible normally, hidden on hover
+  // showOnHover: hidden normally, shown on hover
+  const hoverClass = hideOnHover
+    ? 'opacity-100 group-hover:opacity-0 transition-opacity'
+    : showOnHover
+      ? 'opacity-0 group-hover:opacity-100 transition-opacity'
+      : 'opacity-100';
 
   // Format time with live updates - triggers recalculation when updateTrigger changes
   const formattedTime = React.useMemo(() => {

@@ -1422,11 +1422,12 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
           </div>
           )}
 
-          {/* Timestamp - Top Right */}
-          <TimeStamp 
-            createdAt={image.createdAt} 
+          {/* Timestamp - Top Right (hides on hover to show action buttons) */}
+          <TimeStamp
+            createdAt={image.createdAt}
             position="top-right"
-            showOnHover={false} // Always show for all devices
+            showOnHover={false}
+            hideOnHover={true}
             className="z-30"
           />
 
@@ -1601,166 +1602,94 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
               )}
           </div>
 
-          {/* Bottom Right Buttons - Delete, Download */}
-              {!isMobile && (onDelete && showDelete || showDownload) && (
-              <div className="absolute bottom-2 right-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                  {/* Delete button - Desktop */}
-                  {onDelete && showDelete && (
-                  <Button
-                      variant="destructive"
-                      size="icon"
-                      className="h-7 w-7 p-0 rounded-full"
-                      onClick={(e) => {
-                          e.stopPropagation();
-                          onDelete(image.id!);
-                      }}
-                      disabled={isCurrentDeleting}
-                  >
-                      {isCurrentDeleting ? (
-                          <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
-                      ) : (
-                          <Trash2 className="h-3.5 w-3.5" />
-                      )}
-                  </Button>
-                  )}
-                  {/* Download Button - Desktop Bottom Right */}
-                  {showDownload && (
+          {/* Bottom Buttons - Star (left), Edit (center), Delete (right) */}
+          <div className={`absolute bottom-2 left-2 right-2 flex items-center justify-between transition-opacity z-20 ${
+            localStarred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}>
+              {/* Star Button - Left */}
+              <div className="flex items-center gap-1.5">
+                {showStar && (
+                <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                    onClick={(e) => {
+                        e.stopPropagation(); // Prevent lightbox from opening
+                        if (isTogglingStar) return;
+                        setIsTogglingStar(true);
+                        const nextStarred = !localStarred;
+                        // Optimistically update local state for immediate UI feedback
+                        setLocalStarred(nextStarred);
+                        // For variants, use the parent generation_id; otherwise use the image id
+                        const targetId = (image as any).metadata?.generation_id || (image as any).generation_id || image.id!;
+                        try {
+                          if (onToggleStar) {
+                            onToggleStar(targetId, nextStarred);
+                            // Assume parent handles async; release immediately to avoid global dulling
+                            setIsTogglingStar(false);
+                          } else {
+                            toggleStarMutation.mutate(
+                              { id: targetId, starred: nextStarred },
+                              {
+                                onSettled: () => {
+                                  setIsTogglingStar(false);
+                                },
+                              }
+                            );
+                          }
+                        } catch (_) {
+                          setIsTogglingStar(false);
+                          setLocalStarred(!nextStarred); // Rollback on error
+                        }
+                    }}
+                    disabled={isTogglingStar}
+                >
+                    <Star
+                        className={`h-3.5 w-3.5 ${localStarred ? 'fill-current' : ''}`}
+                    />
+                </Button>
+                )}
+              </div>
+
+              {/* Edit Button - Center */}
+              <div className="flex items-center gap-1.5">
+                {!image.isVideo && showEdit && (
                   <Button
                       variant="secondary"
                       size="icon"
                       className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
                       onClick={(e) => {
                           e.stopPropagation();
-                          // Generate a sanitized filename from prompt + short ID
-                          const shortId = image.id && image.id.length > 8 ? image.id.substring(0, 8) : (image.id || 'media');
-                          let downloadFilename = `media_${shortId}`;
-                          if (image.prompt && typeof image.prompt === 'string' && image.prompt.trim()) {
-                            // Sanitize prompt for filesystem: remove invalid chars, replace spaces with underscores, truncate
-                            const sanitized = image.prompt
-                              .replace(/[<>:"/\\|?*]/g, '')
-                              .replace(/\s+/g, '_')
-                              .replace(/_+/g, '_')
-                              .replace(/^_|_$/g, '')
-                              .trim()
-                              .substring(0, 40)
-                              .replace(/_$/, '');
-                            if (sanitized) {
-                              downloadFilename = `${sanitized}_${shortId}`;
-                            }
-                          }
-                          onDownloadImage(
-                            image.url || '',
-                            downloadFilename,
-                            image.id,
-                            image.isVideo,
-                            image.contentType // Pass stored MIME type for proper file extension
-                          );
+                          onOpenLightbox(image, true); // Pass true to auto-enter edit mode
                       }}
-                      title="Download"
+                      title="Edit image"
                   >
-                      <Download className="h-3.5 w-3.5" />
+                      <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                  )}
+                )}
               </div>
-          )}
 
-          {/* Bottom Left Buttons - Star, Edit Image */}
-          <div className={`absolute bottom-2 left-2 flex items-center gap-1.5 transition-opacity z-20 ${
-            localStarred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-          }`}>
-              {/* Star Button */}
-              {showStar && (
-              <Button
-                  variant="secondary"
-                  size="icon"
-                  className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
-                  onClick={(e) => {
-                      e.stopPropagation(); // Prevent lightbox from opening
-                      if (isTogglingStar) return;
-                      setIsTogglingStar(true);
-                      const nextStarred = !localStarred;
-                      // Optimistically update local state for immediate UI feedback
-                      setLocalStarred(nextStarred);
-                      // For variants, use the parent generation_id; otherwise use the image id
-                      const targetId = (image as any).metadata?.generation_id || (image as any).generation_id || image.id!;
-                      try {
-                        if (onToggleStar) {
-                          onToggleStar(targetId, nextStarred);
-                          // Assume parent handles async; release immediately to avoid global dulling
-                          setIsTogglingStar(false);
-                        } else {
-                          toggleStarMutation.mutate(
-                            { id: targetId, starred: nextStarred },
-                            {
-                              onSettled: () => {
-                                setIsTogglingStar(false);
-                              },
-                            }
-                          );
-                        }
-                      } catch (_) {
-                        setIsTogglingStar(false);
-                        setLocalStarred(!nextStarred); // Rollback on error
-                      }
-                  }}
-                  disabled={isTogglingStar}
-              >
-                  <Star 
-                      className={`h-3.5 w-3.5 ${localStarred ? 'fill-current' : ''}`} 
-                  />
-              </Button>
-              )}
-
-              {/* Apply Settings Button - Bottom Left (next to Star) */}
-              {image.metadata && onApplySettings && (
-                <TooltipProvider>
-                  <Tooltip>
-                      <TooltipTrigger asChild>
-                          <Button 
-                              variant="secondary"
-                              size="icon" 
-                              className={`h-7 w-7 p-0 rounded-full text-white transition-all ${
-                                settingsApplied 
-                                  ? 'bg-green-500 hover:bg-green-600' 
-                                  : 'bg-black/50 hover:bg-black/70'
-                              }`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onApplySettings(image.metadata!);
-                                setSettingsApplied(true);
-                                setTimeout(() => setSettingsApplied(false), 2000);
-                              }}
-                              disabled={settingsApplied}
-                          >
-                              {settingsApplied ? (
-                                <Check className="h-3.5 w-3.5" />
-                              ) : (
-                                <CornerDownLeft className="h-3.5 w-3.5" />
-                              )}
-                          </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {settingsApplied ? 'Settings applied!' : 'Apply settings'}
-                      </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              
-              {/* Edit Image Button - Desktop and Mobile, images only */}
-              {!image.isVideo && showEdit && (
+              {/* Delete Button - Right */}
+              <div className="flex items-center gap-1.5">
+                {!isMobile && onDelete && showDelete && (
                 <Button
-                    variant="secondary"
+                    variant="destructive"
                     size="icon"
-                    className="h-7 w-7 p-0 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                    className="h-7 w-7 p-0 rounded-full"
                     onClick={(e) => {
                         e.stopPropagation();
-                        onOpenLightbox(image, true); // Pass true to auto-enter edit mode
+                        onDelete(image.id!);
                     }}
-                    title="Edit image"
+                    disabled={isCurrentDeleting}
                 >
-                    <Pencil className="h-3.5 w-3.5" />
+                    {isCurrentDeleting ? (
+                        <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
+                    ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                    )}
                 </Button>
-              )}
+                )}
+              </div>
           </div>
       </>)
       }
