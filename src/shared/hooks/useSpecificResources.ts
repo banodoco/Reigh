@@ -51,14 +51,16 @@ export const useSpecificResources = (resourceIds: string[]) => {
   
   // Combine results
   const result = useMemo(() => {
-    const isLoading = queries.some(q => q.isLoading);
+    // Only report loading if we have NO data yet
+    // Once we have some data, new fetches happen in the background without blocking UI
     const data = queries
       .map(q => q.data)
       .filter((r): r is Resource => r !== null && r !== undefined);
-    
+    const isLoading = data.length === 0 && queries.some(q => q.isLoading);
+
     return { data, isLoading };
   }, [queries]);
-  
+
   return result;
 };
 

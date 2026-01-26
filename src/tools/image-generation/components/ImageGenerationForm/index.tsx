@@ -1797,10 +1797,11 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
       
       console.log('[RefSettings] ✅ Created resource:', resource.id);
       
-      // Create lightweight pointer
+      // Create lightweight pointer with createdAt for sorting (newest first)
       const newPointer: ReferenceImage = {
         id: nanoid(),
         resourceId: resource.id,
+        createdAt: new Date().toISOString(),
       };
       
       console.log('[RefSettings] ➕ Creating reference pointer:', newPointer);
@@ -1940,6 +1941,7 @@ export const ImageGenerationForm = forwardRef<ImageGenerationFormHandles, ImageG
         subjectDescription: '',
         styleBoostTerms: '',
         referenceMode: referenceMode,
+        createdAt: new Date().toISOString(), // For sorting (newest first)
         ...modeDefaults,
       };
       

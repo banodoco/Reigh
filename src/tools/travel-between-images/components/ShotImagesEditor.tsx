@@ -534,11 +534,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   const [crossfadeProgress, setCrossfadeProgress] = useState(0);
   const crossfadeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // State for video-to-video crossfade transitions
-  const [videoTransitionFrame, setVideoTransitionFrame] = useState<string | null>(null);
-  const [videoTransitionOpacity, setVideoTransitionOpacity] = useState(1);
-  const videoTransitionTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const transitionCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Dual video element approach for seamless cuts between videos
+  // One video plays while the other preloads the next segment
+  const previewVideoRefB = useRef<HTMLVideoElement>(null);
+  const [activeVideoSlot, setActiveVideoSlot] = useState<'A' | 'B'>('A');
+  const [preloadedIndex, setPreloadedIndex] = useState<number | null>(null);
   
   // Preview video effects - handles video segments
   React.useEffect(() => {
@@ -578,6 +578,13 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       if (crossfadeTimerRef.current) {
         clearInterval(crossfadeTimerRef.current);
         crossfadeTimerRef.current = null;
+      }
+      // Reset video transition state
+      setVideoTransitionFrame(null);
+      setVideoTransitionOpacity(1);
+      if (videoTransitionTimerRef.current) {
+        clearInterval(videoTransitionTimerRef.current);
+        videoTransitionTimerRef.current = null;
       }
     }
   }, [isPreviewTogetherOpen]);
@@ -1217,12 +1224,16 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        setCurrentPreviewIndex(prev => 
+        // Clear transition frame on manual navigation
+        setVideoTransitionFrame(null);
+        setCurrentPreviewIndex(prev =>
           prev > 0 ? prev - 1 : previewableSegments.length - 1
         );
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        setCurrentPreviewIndex(prev => 
+        // Clear transition frame on manual navigation
+        setVideoTransitionFrame(null);
+        setCurrentPreviewIndex(prev =>
           (prev + 1) % previewableSegments.length
         );
       }
@@ -2857,8 +2868,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                           </div>
                         )}
                       </div>
-                    )}
-                    
+                    ) : null}
+
                     {/* Hidden audio element for background audio sync */}
                     {propAudioUrl && (
                       <audio
@@ -2877,7 +2888,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                           size="lg"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setCurrentPreviewIndex(prev => 
+                            // Clear transition frame on manual navigation
+                            setVideoTransitionFrame(null);
+                            setCurrentPreviewIndex(prev =>
                               prev > 0 ? prev - 1 : previewableSegments.length - 1
                             );
                           }}
@@ -2890,7 +2903,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                           size="lg"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setCurrentPreviewIndex(prev => 
+                            // Clear transition frame on manual navigation
+                            setVideoTransitionFrame(null);
+                            setCurrentPreviewIndex(prev =>
                               (prev + 1) % previewableSegments.length
                             );
                           }}
@@ -3029,7 +3044,11 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                               : 'opacity-60 hover:opacity-100'
                           }`}
                           style={{ width: 64, height: 36 }}
-                          onClick={() => setCurrentPreviewIndex(idx)}
+                          onClick={() => {
+                            // Clear transition frame on manual navigation
+                            setVideoTransitionFrame(null);
+                            setCurrentPreviewIndex(idx);
+                          }}
                           aria-label={`Go to segment ${segment.index + 1}`}
                         >
                           <img

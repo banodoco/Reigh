@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useSpecificResources } from '@/shared/hooks/useSpecificResources';
-import { useListResources, useListPublicResources, StyleReferenceMetadata, Resource } from '@/shared/hooks/useResources';
+import { StyleReferenceMetadata, Resource } from '@/shared/hooks/useResources';
 import { ReferenceImage, HydratedReferenceImage } from '../components/ImageGenerationForm/types';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -121,7 +121,8 @@ export const useHydratedReferences = (
           styleReferenceImage: metadata.styleReferenceImage,
           styleReferenceImageOriginal: metadata.styleReferenceImageOriginal,
           thumbnailUrl: metadata.thumbnailUrl || null,
-          createdAt: resource.created_at,
+          // Use pointer.createdAt (when added to project) for sorting, fall back to resource.created_at
+          createdAt: pointer.createdAt || resource.created_at,
           updatedAt: metadata.updatedAt,
           // Visibility and ownership settings
           isPublic: metadata.is_public ?? false,
