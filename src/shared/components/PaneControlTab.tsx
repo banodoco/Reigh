@@ -317,7 +317,7 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   // On mobile, left/right panes only show one button - make them taller for easier tapping
   const isMobileSidePane = !useDesktopBehavior && !isBottom && buttons.length === 1;
 
-  // Add safe area margin for iOS home indicator on mobile/tablet (use half the inset for subtler offset)
+  // Add safe area margin for iOS home indicator on mobile/tablet
   const mobileStyle = isMobile ? {
     ...dynamicStyle,
     marginBottom: 'calc(env(safe-area-inset-bottom, 0px) * 0.5)',

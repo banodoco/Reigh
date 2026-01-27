@@ -29,7 +29,6 @@ import { useShots } from '@/shared/contexts/ShotsContext';
 import { useProject } from '@/shared/contexts/ProjectContext';
 import { useShotCreation } from '@/shared/hooks/useShotCreation';
 import { toast } from 'sonner';
-import { useIOSBrowserChrome } from '@/shared/hooks/useIOSBrowserChrome';
 
 import { 
   Select,
@@ -90,8 +89,6 @@ const GenerationsPaneComponent: React.FC = () => {
   const GENERATIONS_PER_PAGE = paneLayout.itemsPerPage;
   const { currentShotId } = useCurrentShot();
 
-  // iOS browser chrome detection for bottom offset
-  const { bottomOffset } = useIOSBrowserChrome();
 
   // Media type filter state
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'image' | 'video'>('image');
@@ -471,8 +468,6 @@ const GenerationsPaneComponent: React.FC = () => {
           height: `${generationsPaneHeight}px`,
           left: isShotsPaneLocked ? `${shotsPaneWidth}px` : 0,
           right: isTasksPaneLocked ? `${tasksPaneWidth}px` : 0,
-          // Nudge up on iOS when browser chrome is hiding to prevent white line
-          bottom: bottomOffset > 0 ? `${bottomOffset}px` : 0,
         }}
         className={cn(
           `fixed bottom-0 bg-zinc-900/95 border-t border-zinc-700 shadow-xl z-[100] transform transition-all duration-300 ease-smooth flex flex-col pointer-events-auto`,

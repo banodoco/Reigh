@@ -1251,34 +1251,69 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     // Only preload if next segment has video and we haven't already preloaded it (or aren't currently preloading it)
     if (!nextSegment?.hasVideo || preloadedIndex === nextIndex || preloadingIndexRef.current === nextIndex) return;
 
-    // Get the inactive video element
-    const inactiveVideo = activeVideoSlot === 'A' ? previewVideoRefB.current : previewVideoRef.current;
-    if (!inactiveVideo) return;
+    // Track the video element and listener for cleanup
+    let preloadedVideo: HTMLVideoElement | null = null;
+    let canPlayHandler: (() => void) | null = null;
+    let retryInterval: NodeJS.Timeout | null = null;
 
-    // Mark that we're preloading this index
-    preloadingIndexRef.current = nextIndex;
+    // Function to attempt preloading
+    const attemptPreload = () => {
+      // Get the inactive video element
+      const inactiveVideo = activeVideoSlot === 'A' ? previewVideoRefB.current : previewVideoRef.current;
+      if (!inactiveVideo) return false; // Element not mounted yet
 
-    // Handler for when video is ready to play
-    const handleCanPlayThrough = () => {
-      // Only set preloadedIndex if this is still the index we're preloading
-      if (preloadingIndexRef.current === nextIndex) {
-        setPreloadedIndex(nextIndex);
-        preloadingIndexRef.current = null;
-        console.log('[SeamlessCut] Video ready to play:', { nextIndex });
-      }
-      inactiveVideo.removeEventListener('canplaythrough', handleCanPlayThrough);
+      preloadedVideo = inactiveVideo;
+
+      // Mark that we're preloading this index
+      preloadingIndexRef.current = nextIndex;
+
+      // Handler for when video is ready to play
+      canPlayHandler = () => {
+        // Only set preloadedIndex if this is still the index we're preloading
+        if (preloadingIndexRef.current === nextIndex) {
+          setPreloadedIndex(nextIndex);
+          preloadingIndexRef.current = null;
+          console.log('[SeamlessCut] Video ready to play:', { nextIndex });
+        }
+        if (preloadedVideo && canPlayHandler) {
+          preloadedVideo.removeEventListener('canplaythrough', canPlayHandler);
+        }
+      };
+
+      // Listen for video ready event before marking as preloaded
+      inactiveVideo.addEventListener('canplaythrough', canPlayHandler);
+
+      // Preload the next video
+      inactiveVideo.src = nextSegment.videoUrl!;
+      inactiveVideo.load();
+      console.log('[SeamlessCut] Preloading next video:', { nextIndex, url: nextSegment.videoUrl?.substring(0, 50) });
+
+      return true; // Successfully started preload
     };
 
-    // Listen for video ready event before marking as preloaded
-    inactiveVideo.addEventListener('canplaythrough', handleCanPlayThrough);
-
-    // Preload the next video
-    inactiveVideo.src = nextSegment.videoUrl!;
-    inactiveVideo.load();
-    console.log('[SeamlessCut] Preloading next video:', { nextIndex, url: nextSegment.videoUrl?.substring(0, 50) });
+    // Try immediately
+    if (!attemptPreload()) {
+      // If video element not available (Dialog portal not mounted yet), retry
+      // This is critical for the first preload when the dialog just opened
+      let retryCount = 0;
+      const maxRetries = 20; // More retries since preloading is important
+      retryInterval = setInterval(() => {
+        retryCount++;
+        if (attemptPreload() || retryCount >= maxRetries) {
+          if (retryInterval) clearInterval(retryInterval);
+          retryInterval = null;
+          if (retryCount >= maxRetries) {
+            console.warn('[SeamlessCut] Failed to preload - video element never became available');
+          }
+        }
+      }, 50);
+    }
 
     return () => {
-      inactiveVideo.removeEventListener('canplaythrough', handleCanPlayThrough);
+      if (retryInterval) clearInterval(retryInterval);
+      if (preloadedVideo && canPlayHandler) {
+        preloadedVideo.removeEventListener('canplaythrough', canPlayHandler);
+      }
     };
   }, [isPreviewTogetherOpen, currentPreviewIndex, previewableSegments, activeVideoSlot, preloadedIndex]);
 
