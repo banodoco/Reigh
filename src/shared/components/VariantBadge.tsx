@@ -1,6 +1,6 @@
 /**
  * VariantBadge - Shared component for displaying variant count and "new" indicators
- * 
+ *
  * Used across multiple components:
  * - MobileImageItem (batch view mobile)
  * - SortableImageItem (batch view desktop)
@@ -10,7 +10,8 @@
  * - ChildGenerationsView (segment cards)
  */
 
-import React from 'react';
+import React, { useState, useRef, useCallback } from 'react';
+import { X } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import {
   Tooltip,
@@ -26,7 +27,7 @@ export interface VariantBadgeProps {
   unviewedVariantCount?: number;
   /** Whether there are any unviewed variants */
   hasUnviewedVariants?: boolean;
-  /** 
+  /**
    * Display variant:
    * - "overlay": Absolute positioned badge for image overlays (uses title attr)
    * - "inline": Inline badge with Tooltip wrappers
@@ -51,6 +52,10 @@ export interface VariantBadgeProps {
   tooltipSide?: 'top' | 'right' | 'bottom' | 'left';
   /** Additional class names */
   className?: string;
+  /** Callback to mark all variants as viewed (enables hover-to-dismiss) */
+  onMarkAllViewed?: () => void;
+  /** Hover delay in ms before showing dismiss button (default: 1500) */
+  dismissHoverDelay?: number;
 }
 
 /**
@@ -69,9 +74,37 @@ export const VariantBadge: React.FC<VariantBadgeProps> = ({
   alwaysShowNew = false,
   tooltipSide = 'left',
   className,
+  onMarkAllViewed,
+  dismissHoverDelay = 1500,
 }) => {
+  const [showDismiss, setShowDismiss] = useState(false);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const hasNew = showNewBadge && hasUnviewedVariants && unviewedVariantCount && unviewedVariantCount > 0;
   const showCountBadge = derivedCount && derivedCount > 1;
+  const canDismiss = hasNew && onMarkAllViewed;
+
+  const handleMouseEnter = useCallback(() => {
+    if (!canDismiss) return;
+    hoverTimerRef.current = setTimeout(() => {
+      setShowDismiss(true);
+    }, dismissHoverDelay);
+  }, [canDismiss, dismissHoverDelay]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setShowDismiss(false);
+  }, []);
+
+  const handleDismissClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onMarkAllViewed?.();
+    setShowDismiss(false);
+  }, [onMarkAllViewed]);
 
   // Don't render if no variants/only 1, unless alwaysShowNew is set and there's something new
   if (!showCountBadge && !(alwaysShowNew && hasNew)) {
@@ -88,10 +121,23 @@ export const VariantBadge: React.FC<VariantBadgeProps> = ({
   // "New" badge component (shared between variants)
   const NewBadge = hasNew ? (
     <div
-      className="bg-yellow-500 text-black text-[7px] font-bold px-1 py-0.5 rounded"
-      title={variant === 'overlay' ? `${unviewedVariantCount} unviewed variant${unviewedVariantCount !== 1 ? 's' : ''}` : undefined}
+      className={cn(
+        'bg-yellow-500 text-black text-[7px] font-bold px-1 py-0.5 rounded flex items-center gap-0.5 transition-all',
+        canDismiss && 'cursor-pointer hover:bg-yellow-400'
+      )}
+      title={variant === 'overlay' && !showDismiss ? `${unviewedVariantCount} unviewed variant${unviewedVariantCount !== 1 ? 's' : ''}` : undefined}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onClick={showDismiss ? handleDismissClick : undefined}
     >
-      {unviewedVariantCount} new
+      {showDismiss ? (
+        <>
+          <X className="h-2.5 w-2.5" strokeWidth={3} />
+          <span>clear</span>
+        </>
+      ) : (
+        <>{unviewedVariantCount} new</>
+      )}
     </div>
   ) : null;
 
@@ -113,14 +159,16 @@ export const VariantBadge: React.FC<VariantBadgeProps> = ({
     return (
       <div
         className={cn(
-          'absolute flex items-center gap-0.5 pointer-events-none',
+          'absolute flex items-center gap-0.5',
+          // Only disable pointer events if there's no dismiss functionality
+          !canDismiss && 'pointer-events-none',
           position,
           className
         )}
         style={{ zIndex }}
       >
         {NewBadge}
-        {showCountBadge && CountBadge}
+        {showCountBadge && <div className="pointer-events-none">{CountBadge}</div>}
       </div>
     );
   }
@@ -132,12 +180,31 @@ export const VariantBadge: React.FC<VariantBadgeProps> = ({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="bg-yellow-500 text-black text-[8px] font-bold px-1 py-0.5 rounded cursor-help">
-                {unviewedVariantCount} new
+              <div
+                className={cn(
+                  'bg-yellow-500 text-black text-[8px] font-bold px-1 py-0.5 rounded flex items-center gap-0.5 transition-all',
+                  canDismiss ? 'cursor-pointer hover:bg-yellow-400' : 'cursor-help'
+                )}
+                onMouseEnter={handleMouseEnter}
+                onMouseLeave={handleMouseLeave}
+                onClick={showDismiss ? handleDismissClick : undefined}
+              >
+                {showDismiss ? (
+                  <>
+                    <X className="h-2.5 w-2.5" strokeWidth={3} />
+                    <span>clear</span>
+                  </>
+                ) : (
+                  <>{unviewedVariantCount} new</>
+                )}
               </div>
             </TooltipTrigger>
             <TooltipContent side={tooltipSide}>
-              <p>{unviewedVariantCount} unviewed variant{unviewedVariantCount !== 1 ? 's' : ''}</p>
+              <p>
+                {showDismiss
+                  ? 'Click to mark all as viewed'
+                  : `${unviewedVariantCount} unviewed variant${unviewedVariantCount !== 1 ? 's' : ''}`}
+              </p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

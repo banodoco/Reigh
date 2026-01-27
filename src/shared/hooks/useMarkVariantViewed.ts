@@ -8,8 +8,9 @@
  * before the database update completes.
  *
  * Usage:
- *   const { markViewed } = useMarkVariantViewed();
+ *   const { markViewed, markAllViewed } = useMarkVariantViewed();
  *   markViewed({ variantId, generationId }); // generationId enables optimistic update
+ *   markAllViewed(generationId); // marks all unviewed variants for a generation
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -19,6 +20,10 @@ import { DerivedCountsResult } from '@/shared/lib/generationTransformers';
 interface MarkViewedParams {
   variantId: string;
   generationId?: string; // Optional: enables optimistic badge update
+}
+
+interface MarkAllViewedParams {
+  generationId: string;
 }
 
 export function useMarkVariantViewed() {
@@ -89,9 +94,66 @@ export function useMarkVariantViewed() {
     },
   });
 
+  // Bulk mutation: mark ALL unviewed variants for a generation
+  const bulkMutation = useMutation({
+    mutationFn: async ({ generationId }: MarkAllViewedParams) => {
+      const { error } = await supabase
+        .from('generation_variants')
+        .update({ viewed_at: new Date().toISOString() })
+        .eq('generation_id', generationId)
+        .is('viewed_at', null);
+
+      if (error) {
+        console.error('[useMarkVariantViewed] Bulk error:', error);
+        throw error;
+      }
+
+      return { generationId };
+    },
+    onMutate: async ({ generationId }) => {
+      // Optimistic update: immediately set unviewed count to 0 for this generation
+      queryClient.setQueriesData(
+        { queryKey: ['variant-badges'], exact: false },
+        (oldData: DerivedCountsResult | undefined) => {
+          if (!oldData) return oldData;
+
+          return {
+            ...oldData,
+            hasUnviewedVariants: {
+              ...oldData.hasUnviewedVariants,
+              [generationId]: false,
+            },
+            unviewedVariantCounts: {
+              ...oldData.unviewedVariantCounts,
+              [generationId]: 0,
+            },
+          };
+        }
+      );
+    },
+    onSuccess: ({ generationId }) => {
+      console.log('[useMarkVariantViewed] Marked all viewed for:', generationId.substring(0, 8));
+
+      // Invalidate variant-level queries
+      queryClient.invalidateQueries({ queryKey: ['generation-variants'] });
+      queryClient.invalidateQueries({ queryKey: ['derived-items'] });
+
+      // Invalidate generation-level queries
+      queryClient.invalidateQueries({ queryKey: ['all-shot-generations'] });
+      queryClient.invalidateQueries({ queryKey: ['generations'] });
+      queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+      queryClient.invalidateQueries({ queryKey: ['shot-positions'] });
+    },
+    onError: (error) => {
+      console.error('[useMarkVariantViewed] Bulk failed:', error);
+    },
+  });
+
   return {
     markViewed: mutation.mutate,
+    markAllViewed: (generationId: string) => bulkMutation.mutate({ generationId }),
     isMarking: mutation.isPending,
+    isMarkingAll: bulkMutation.isPending,
   };
 }
 

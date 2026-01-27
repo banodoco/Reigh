@@ -15,6 +15,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { usePrefetchTaskData, usePrefetchTaskById } from '@/shared/hooks/useUnifiedGenerations';
+import { SharedTaskDetails } from '@/tools/travel-between-images/components/SharedTaskDetails';
 import type { VariantSelectorProps, GenerationVariant } from '../types';
 
 const ITEMS_PER_PAGE = 20;
@@ -551,104 +552,103 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                 <TooltipTrigger asChild>
                   {buttonContent}
                 </TooltipTrigger>
-                <TooltipContent side="top" className="z-[100001] max-w-xs">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{label}</p>
-                      <span className="text-[10px] text-muted-foreground">{getTimeAgo(variant.created_at)}</span>
+                <TooltipContent side="top" className="z-[100001] max-w-md p-0">
+                  <div className="p-2 space-y-2">
+                    {/* Header with label, time, delete button */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm">{label}</p>
+                        <span className="text-[10px] text-muted-foreground">{getTimeAgo(variant.created_at)}</span>
+                      </div>
+                      {/* Delete button - only for non-primary variants */}
+                      {onDeleteVariant && !isPrimary && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingVariantId(variant.id);
+                            onDeleteVariant(variant.id).finally(() => setDeletingVariantId(null));
+                          }}
+                          disabled={deletingVariantId === variant.id}
+                          className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                          title="Delete variant"
+                        >
+                          {deletingVariantId === variant.id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      )}
                     </div>
-                    {/* Delete button - only for non-primary variants */}
-                    {onDeleteVariant && !isPrimary && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeletingVariantId(variant.id);
-                          onDeleteVariant(variant.id).finally(() => setDeletingVariantId(null));
-                        }}
-                        disabled={deletingVariantId === variant.id}
-                        className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                        title="Delete variant"
-                      >
-                        {deletingVariantId === variant.id ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Trash2 className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-                    )}
-                  </div>
-                  {(variant.params as any)?.prompt && (
-                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                      {(variant.params as any).prompt}
-                    </p>
-                  )}
-                  {/* Variant settings details */}
-                  {(() => {
-                    const params = variant.params as any;
-                    const orchDetails = params?.orchestrator_details || {};
-                    const numFrames = params?.num_frames ?? orchDetails?.num_frames;
-                    const seed = params?.seed ?? orchDetails?.seed;
-                    const loras = params?.loras ?? params?.additional_loras ?? orchDetails?.loras ?? orchDetails?.additional_loras;
-                    const hasLoras = Array.isArray(loras) ? loras.length > 0 : (loras && typeof loras === 'object' && Object.keys(loras).length > 0);
-                    const loraCount = Array.isArray(loras) ? loras.length : (loras ? Object.keys(loras).length : 0);
 
-                    if (numFrames || seed || hasLoras) {
-                      return (
-                        <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1 text-[10px] text-muted-foreground">
-                          {numFrames && <span>Frames: {numFrames}</span>}
-                          {seed && <span>Seed: {seed}</span>}
-                          {hasLoras && <span>LoRAs: {loraCount}</span>}
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                  {parentVariant && (
-                    <div className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-border/50">
-                      <span className="text-xs text-muted-foreground">Based on:</span>
-                      <div className="w-8 h-5 rounded overflow-hidden bg-muted flex-shrink-0">
-                        <img
-                          src={parentVariant.thumbnail_url || parentVariant.location}
-                          alt="Parent variant"
-                          className="w-full h-full object-cover"
+                    {/* Status indicators */}
+                    <div className="flex flex-wrap gap-1.5 text-[10px]">
+                      {isPrimary && <span className="text-green-400">Primary version</span>}
+                      {isActive && !isPrimary && <span className="text-muted-foreground">Currently viewing</span>}
+                      {isParent && <span className="text-blue-400">Current is based on this</span>}
+                      {isChild && <span className="text-purple-400">Based on current</span>}
+                    </div>
+
+                    {/* Full task details using SharedTaskDetails */}
+                    {variant.params && (
+                      <div className="border-t border-border/50 pt-2">
+                        <SharedTaskDetails
+                          task={{
+                            taskType: (variant.params as any)?.task_type || 'video_generation',
+                            params: variant.params,
+                          }}
+                          inputImages={[]}
+                          variant="hover"
+                          isMobile={false}
                         />
                       </div>
-                    </div>
-                  )}
-                  {isPrimary && <p className="text-xs text-green-400 mt-1">Primary version</p>}
-                  {isActive && !isPrimary && <p className="text-xs text-muted-foreground mt-1">Currently viewing</p>}
-                  {isParent && <p className="text-xs text-blue-400 mt-1">Current is based on this</p>}
-                  {isChild && <p className="text-xs text-purple-400 mt-1">Based on current</p>}
-                  {/* Load Settings button */}
-                  {onLoadVariantSettings && variant.params && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log('[VariantSelector] Load settings clicked for variant:', variant.id);
-                        onLoadVariantSettings(variant.params as Record<string, any>);
-                        setLoadedSettingsVariantId(variant.id);
-                        setTimeout(() => setLoadedSettingsVariantId(null), 2000);
-                      }}
-                      className={cn(
-                        "w-full mt-2 h-6 text-xs gap-1",
-                        loadedSettingsVariantId === variant.id && "bg-green-500/20 border-green-500/50 text-green-400"
-                      )}
-                    >
-                      {loadedSettingsVariantId === variant.id ? (
-                        <>
-                          <Check className="w-3 h-3" />
-                          Loaded!
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-3 h-3" />
-                          Load Settings
-                        </>
-                      )}
-                    </Button>
-                  )}
+                    )}
+
+                    {/* Parent variant thumbnail */}
+                    {parentVariant && (
+                      <div className="flex items-center gap-1.5 pt-1.5 border-t border-border/50">
+                        <span className="text-xs text-muted-foreground">Based on:</span>
+                        <div className="w-8 h-5 rounded overflow-hidden bg-muted flex-shrink-0">
+                          <img
+                            src={parentVariant.thumbnail_url || parentVariant.location}
+                            alt="Parent variant"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Load Settings button */}
+                    {onLoadVariantSettings && variant.params && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log('[VariantSelector] Load settings clicked for variant:', variant.id);
+                          onLoadVariantSettings(variant.params as Record<string, any>);
+                          setLoadedSettingsVariantId(variant.id);
+                          setTimeout(() => setLoadedSettingsVariantId(null), 2000);
+                        }}
+                        className={cn(
+                          "w-full h-6 text-xs gap-1",
+                          loadedSettingsVariantId === variant.id && "bg-green-500/20 border-green-500/50 text-green-400"
+                        )}
+                      >
+                        {loadedSettingsVariantId === variant.id ? (
+                          <>
+                            <Check className="w-3 h-3" />
+                            Loaded!
+                          </>
+                        ) : (
+                          <>
+                            <Download className="w-3 h-3" />
+                            Load Settings
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 </TooltipContent>
               </Tooltip>
             );

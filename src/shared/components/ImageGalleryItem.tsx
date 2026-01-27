@@ -38,6 +38,7 @@ import { useShareGeneration } from "@/shared/hooks/useShareGeneration";
 import { deriveInputImages } from "./ImageGallery/utils";
 import { isImageEditTaskType } from "@/tools/travel-between-images/components/TaskDetails";
 import { VariantBadge } from "@/shared/components/VariantBadge";
+import { useMarkVariantViewed } from "@/shared/hooks/useMarkVariantViewed";
 
 interface ImageGalleryItemProps {
   image: GeneratedImageWithMetadata;
@@ -232,6 +233,15 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
   }, [isMobile, image.id]); // Only log when key props change
   const { toast } = useToast();
   const { selectedProjectId } = useProject();
+  const { markAllViewed } = useMarkVariantViewed();
+
+  // Callback to mark all variants for this generation as viewed
+  const handleMarkAllVariantsViewed = useCallback(() => {
+    if (actualGenerationId) {
+      markAllViewed(actualGenerationId);
+    }
+  }, [actualGenerationId, markAllViewed]);
+
   const addImageToShotMutation = useAddImageToShot();
   const { navigateToShot } = useShotNavigation();
   const { lastAffectedShotId, setLastAffectedShotId: updateLastAffectedShotId } = useLastAffectedShot();
@@ -1063,6 +1073,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                 hasUnviewedVariants={image.hasUnviewedVariants}
                 variant="inline"
                 size="md"
+                onMarkAllViewed={handleMarkAllVariantsViewed}
               />
 
               {/* Shot Navigation Button */}
@@ -1563,6 +1574,7 @@ export const ImageGalleryItem: React.FC<ImageGalleryItemProps> = ({
                     variant="inline"
                     size="md"
                     tooltipSide="right"
+                    onMarkAllViewed={handleMarkAllVariantsViewed}
                   />
                 )}
               </div>
