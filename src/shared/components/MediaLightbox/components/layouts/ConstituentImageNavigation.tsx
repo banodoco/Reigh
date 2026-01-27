@@ -11,7 +11,7 @@
 
 import React from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { ArrowDownLeft, MoveRight } from 'lucide-react';
+import { ArrowDownLeft } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
 interface ConstituentImageNavigationProps {
@@ -81,8 +81,6 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
             <span className="text-muted-foreground">Start</span>
           </button>
 
-          <MoveRight className="w-3 h-3 text-muted-foreground" />
-
           {/* End image button */}
           <button
             onClick={handleEndClick}
@@ -140,8 +138,6 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
             </div>
           )}
         </Button>
-
-        <MoveRight className="w-4 h-4 text-white/60 flex-shrink-0" />
 
         {/* End image button */}
         <Button
