@@ -876,9 +876,19 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                 <Label className="text-xs font-medium">Prompt:</Label>
                 {badgeType === 'enhanced' && (
                   <>
-                    <span className="text-[10px] bg-green-500/15 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded">
-                      Enhanced
-                    </span>
+                    {/* Enhanced badge with hover-to-clear */}
+                    <button
+                      type="button"
+                      onClick={() => onClearEnhancedPrompt?.()}
+                      className="group/enhanced text-[10px] bg-green-500/15 text-green-600 dark:text-green-400 hover:bg-red-500/15 hover:text-red-600 dark:hover:text-red-400 px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors cursor-pointer"
+                      title="Click to clear enhanced prompt"
+                    >
+                      <span className="group-hover/enhanced:hidden">Enhanced</span>
+                      <span className="hidden group-hover/enhanced:flex items-center gap-0.5">
+                        <X className="w-2.5 h-2.5" />
+                        clear
+                      </span>
+                    </button>
                     {/* Show Set as Default when enhanced prompt is showing */}
                     {onSaveFieldAsDefault && (
                       <button
