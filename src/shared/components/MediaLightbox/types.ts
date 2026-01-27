@@ -133,4 +133,7 @@ export interface SegmentSlotModeData {
   onUpdateSegmentStructureVideo?: (updates: Partial<StructureVideoConfigWithMetadata>) => void;
   /** Callback to remove this segment's structure video */
   onRemoveSegmentStructureVideo?: () => void;
+
+  /** Callback to navigate to a constituent image by shot_generation.id */
+  onNavigateToImage?: (shotGenerationId: string) => void;
 }

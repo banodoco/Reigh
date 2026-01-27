@@ -43,6 +43,10 @@ interface ShotImageManagerDesktopProps extends ShotImageManagerProps {
   onSegmentClick?: (slotIndex: number) => void;
   /** Check if a pair_shot_generation_id has a pending task */
   hasPendingTask?: (pairShotGenerationId: string | null | undefined) => boolean;
+  /** Request to open lightbox for specific image (from segment constituent navigation) */
+  pendingImageToOpen?: string | null;
+  /** Callback to clear the pending image request after handling */
+  onClearPendingImageToOpen?: () => void;
 }
 
 export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = ({
@@ -58,6 +62,8 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
   segmentSlots,
   onSegmentClick,
   hasPendingTask,
+  pendingImageToOpen,
+  onClearPendingImageToOpen,
   ...props
 }) => {
   // State for showing success tick after adding to shot (positioned)
@@ -155,6 +161,26 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
       prefetchTaskData(currentLightboxImageId);
     }
   }, [lightbox.lightboxIndex, lightbox.currentImages, currentLightboxImageId, prefetchTaskData]);
+
+  // Handle pending image to open (from constituent image navigation)
+  useEffect(() => {
+    if (!pendingImageToOpen || !lightbox.currentImages?.length) return;
+
+    // Find the image in the current images array
+    const index = lightbox.currentImages.findIndex(
+      (img: any) => img.id === pendingImageToOpen || img.shotImageEntryId === pendingImageToOpen
+    );
+
+    if (index !== -1) {
+      console.log('[ConstituentImageNav] Opening lightbox for image:', pendingImageToOpen.substring(0, 8), 'at index:', index);
+      lightbox.setLightboxIndex(index);
+    } else {
+      console.log('[ConstituentImageNav] Image not found in current images:', pendingImageToOpen.substring(0, 8));
+    }
+
+    // Clear the pending request
+    onClearPendingImageToOpen?.();
+  }, [pendingImageToOpen, lightbox.currentImages, lightbox.setLightboxIndex, onClearPendingImageToOpen]);
 
   // Build adjacent segments data for the current lightbox image
   // This enables navigation to videos that start/end with the current image

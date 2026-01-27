@@ -590,6 +590,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // When pairIndex is set, MediaLightbox opens showing form (no video) or video+form (has video)
   const [segmentSlotLightboxIndex, setSegmentSlotLightboxIndex] = useState<number | null>(null);
 
+  // Pending image to open in lightbox - used for navigation from segment back to constituent image
+  // When set, child components (ShotImageManagerDesktop/Timeline) will open the lightbox for this image
+  const [pendingImageToOpen, setPendingImageToOpen] = useState<string | null>(null);
 
   // Enhanced position management
   // Centralized position management - shared between Timeline and ShotImageManager
@@ -978,6 +981,15 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
         if (index >= 0) {
           propOnRemoveStructureVideo(index);
         }
+      },
+
+      // Navigate to constituent image - closes segment slot and opens image lightbox
+      onNavigateToImage: (shotGenerationId: string) => {
+        console.log('[ConstituentImageNav] Navigate to image:', shotGenerationId?.substring(0, 8));
+        // Close the segment slot lightbox
+        setSegmentSlotLightboxIndex(null);
+        // Request the image lightbox to open in the child component
+        setPendingImageToOpen(shotGenerationId);
       },
     };
   }, [
@@ -2260,6 +2272,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 // Segment slots for adjacent segment navigation in lightbox
                 segmentSlots={segmentSlots}
                 onOpenSegmentSlot={(pairIndex) => setSegmentSlotLightboxIndex(pairIndex)}
+                // Constituent image navigation support (from segment back to image)
+                pendingImageToOpen={pendingImageToOpen}
+                onClearPendingImageToOpen={() => setPendingImageToOpen(null)}
               />
               
               {/* Helper for un-positioned generations - in timeline mode, show after timeline */}
@@ -2413,6 +2428,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   onDragStateChange={handleDragStateChange}
                   // Segment slots for video display in batch mode
                   segmentSlots={segmentSlots}
+                  // Constituent image navigation support (from segment back to image)
+                  pendingImageToOpen={pendingImageToOpen}
+                  onClearPendingImageToOpen={() => setPendingImageToOpen(null)}
                 />
 
                 {/* Helper for un-positioned generations - in batch mode, show after input images */}

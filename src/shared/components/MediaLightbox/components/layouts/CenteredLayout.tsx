@@ -17,6 +17,7 @@ import type { CenteredLayoutProps } from './types';
 import { VariantOverlayBadge } from './VariantOverlayBadge';
 import { NewImageOverlayButton } from './NewImageOverlayButton';
 import { AdjacentSegmentNavigation } from './AdjacentSegmentNavigation';
+import { ConstituentImageNavigation } from './ConstituentImageNavigation';
 
 // Existing components
 import { FlexContainer } from './FlexContainer';
@@ -122,6 +123,9 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
 
     // Adjacent segment navigation
     adjacentSegments,
+
+    // Segment slot mode (for constituent image navigation)
+    segmentSlotMode,
   } = props;
 
   return (
@@ -415,6 +419,18 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
 
         {/* Bottom Right Controls - Star & Add to References */}
         <BottomRightControls {...buttonGroupProps.bottomRight} />
+
+        {/* Bottom Center - Constituent Image Navigation (when viewing segment video) */}
+        {segmentSlotMode?.onNavigateToImage && (
+          <ConstituentImageNavigation
+            startImageId={segmentSlotMode.pairData.startImage?.id}
+            endImageId={segmentSlotMode.pairData.endImage?.id}
+            startImageUrl={segmentSlotMode.pairData.startImage?.thumbUrl || segmentSlotMode.pairData.startImage?.url}
+            endImageUrl={segmentSlotMode.pairData.endImage?.thumbUrl || segmentSlotMode.pairData.endImage?.url}
+            onNavigateToImage={segmentSlotMode.onNavigateToImage}
+            variant="overlay"
+          />
+        )}
 
         {/* Bottom Workflow Controls */}
         <WorkflowControlsBar

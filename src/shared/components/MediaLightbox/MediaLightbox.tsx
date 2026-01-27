@@ -1732,6 +1732,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
     // Adjacent segment navigation
     adjacentSegments,
+
+    // Segment slot mode (for constituent image navigation)
+    segmentSlotMode: hasSegmentVideo ? segmentSlotMode : undefined,
   });
 
   return (

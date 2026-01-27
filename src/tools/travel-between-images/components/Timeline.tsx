@@ -189,6 +189,10 @@ export interface TimelineProps {
   segmentSlots?: SegmentSlot[];
   // Callback to open segment slot in unified lightbox
   onOpenSegmentSlot?: (pairIndex: number) => void;
+  // Request to open lightbox for specific image (from segment constituent navigation)
+  pendingImageToOpen?: string | null;
+  // Callback to clear the pending image request after handling
+  onClearPendingImageToOpen?: () => void;
 }
 
 // Stable empty object to avoid creating new references when enhancedPrompts is undefined
@@ -268,6 +272,9 @@ const Timeline: React.FC<TimelineProps> = ({
   // Segment slots for adjacent segment navigation
   segmentSlots,
   onOpenSegmentSlot,
+  // Constituent image navigation support
+  pendingImageToOpen,
+  onClearPendingImageToOpen,
 }) => {
   // [RefactorMetrics] Track render count for baseline measurements
   useRenderCount('Timeline');
@@ -547,7 +554,27 @@ const Timeline: React.FC<TimelineProps> = ({
     externalGens.setDerivedNavContext(null);
     hookCloseLightbox();
   }, [hookCloseLightbox, externalGens]);
-  
+
+  // Handle pending image to open (from constituent image navigation)
+  useEffect(() => {
+    if (!pendingImageToOpen || !currentImages?.length) return;
+
+    // Find the image in the current images array
+    const index = currentImages.findIndex(
+      (img: any) => img.id === pendingImageToOpen || img.shotImageEntryId === pendingImageToOpen
+    );
+
+    if (index !== -1) {
+      console.log('[ConstituentImageNav] Timeline opening lightbox for image:', pendingImageToOpen.substring(0, 8), 'at index:', index);
+      openLightbox(index);
+    } else {
+      console.log('[ConstituentImageNav] Image not found in Timeline images:', pendingImageToOpen.substring(0, 8));
+    }
+
+    // Clear the pending request
+    onClearPendingImageToOpen?.();
+  }, [pendingImageToOpen, currentImages, openLightbox, onClearPendingImageToOpen]);
+
   // Add derived navigation mode support (navigates only through "Based on this" items when active)
   const { wrappedGoNext, wrappedGoPrev, hasNext: derivedHasNext, hasPrevious: derivedHasPrevious } = useDerivedNavigation({
     derivedNavContext: externalGens.derivedNavContext,

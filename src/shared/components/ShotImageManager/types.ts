@@ -53,6 +53,10 @@ export interface ShotImageManagerProps {
   onClearEnhancedPrompt?: (pairIndex: number) => void;
   /** Per-pair parameter overrides for showing override icons */
   pairOverrides?: PairOverridesMap;
+  /** Request to open lightbox for specific image (from segment constituent navigation) */
+  pendingImageToOpen?: string | null;
+  /** Callback to clear the pending image request after handling */
+  onClearPendingImageToOpen?: () => void;
 }
 
 /** Props for segment video outputs in batch view */

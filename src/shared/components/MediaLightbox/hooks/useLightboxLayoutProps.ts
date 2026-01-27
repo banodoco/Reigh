@@ -227,6 +227,9 @@ export interface UseLightboxLayoutPropsInput {
 
   // Adjacent segment navigation
   adjacentSegments?: any;
+
+  // Segment slot mode (for constituent image navigation)
+  segmentSlotMode?: any;
 }
 
 export interface UseLightboxLayoutPropsReturn {
@@ -560,6 +563,8 @@ export function useLightboxLayoutProps(
     controlsPanelProps,
     // Adjacent segment navigation
     adjacentSegments: input.adjacentSegments,
+    // Segment slot mode (for constituent image navigation)
+    segmentSlotMode: input.segmentSlotMode,
   }), [
     input.onClose, input.readOnly, input.selectedProjectId, input.isMobile,
     input.actualGenerationId, input.media, input.isVideo, input.effectiveMediaUrl,
@@ -583,7 +588,7 @@ export function useLightboxLayoutProps(
     input.showNavigation, input.hasNext, input.hasPrevious, input.handleSlotNavNext,
     input.handleSlotNavPrev, input.swipeNavigation, input.effectiveTasksPaneOpen,
     input.effectiveTasksPaneWidth, input.buttonGroupProps, workflowBarProps,
-    floatingToolProps, controlsPanelProps, input.adjacentSegments,
+    floatingToolProps, controlsPanelProps, input.adjacentSegments, input.segmentSlotMode,
   ]);
 
   // Build centered layout props (simpler, no controls panel)
@@ -679,6 +684,8 @@ export function useLightboxLayoutProps(
     },
     // Adjacent segment navigation
     adjacentSegments: input.adjacentSegments,
+    // Segment slot mode (for constituent image navigation)
+    segmentSlotMode: input.segmentSlotMode,
   }), [
     input.onClose, input.readOnly, input.selectedProjectId, input.isMobile,
     input.actualGenerationId, input.media, input.isVideo, input.effectiveMediaUrl,
@@ -701,7 +708,7 @@ export function useLightboxLayoutProps(
     input.canvasRef, input.maskCanvasRef, input.isFlippedHorizontally, input.isSaving,
     input.showNavigation, input.hasNext, input.hasPrevious, input.handleSlotNavNext,
     input.handleSlotNavPrev, input.swipeNavigation, input.buttonGroupProps,
-    workflowBarProps, input.isDeleting, input.handleDelete, input.adjacentSegments,
+    workflowBarProps, input.isDeleting, input.handleDelete, input.adjacentSegments, input.segmentSlotMode,
   ]);
 
   return {
