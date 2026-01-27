@@ -226,6 +226,83 @@ const FieldDefaultControls: React.FC<{
 };
 
 // =============================================================================
+// ENHANCED PROMPT BADGE (matches VariantBadge style)
+// =============================================================================
+
+/**
+ * Shows "Enhanced" badge with hover-to-clear behavior (matching VariantBadge).
+ * After hovering for 1.5s, shows "X clear" which can be clicked to remove enhanced prompt.
+ */
+const EnhancedPromptBadge: React.FC<{
+  onClear: () => void;
+  onSetAsDefault?: () => void;
+  isSaving?: boolean;
+}> = ({ onClear, onSetAsDefault, isSaving }) => {
+  const [showDismiss, setShowDismiss] = useState(false);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    hoverTimerRef.current = setTimeout(() => {
+      setShowDismiss(true);
+    }, 1500); // Same delay as VariantBadge
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setShowDismiss(false);
+  }, []);
+
+  const handleDismissClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onClear();
+    setShowDismiss(false);
+  }, [onClear]);
+
+  return (
+    <div className="flex items-center gap-1">
+      {/* Enhanced badge - matches VariantBadge "new" style */}
+      <div
+        className="bg-green-500 text-white text-[8px] font-bold px-1 py-0.5 rounded flex items-center gap-0.5 transition-all cursor-pointer hover:bg-green-400"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onClick={showDismiss ? handleDismissClick : undefined}
+        title={showDismiss ? 'Click to clear enhanced prompt' : 'AI-enhanced prompt (hover to clear)'}
+      >
+        {showDismiss ? (
+          <>
+            <X className="h-2.5 w-2.5" strokeWidth={3} />
+            <span>clear</span>
+          </>
+        ) : (
+          <>Enhanced</>
+        )}
+      </div>
+      {/* Set as Default button */}
+      {onSetAsDefault && (
+        <button
+          type="button"
+          onClick={onSetAsDefault}
+          disabled={isSaving}
+          className="text-[10px] bg-muted hover:bg-primary/15 text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors disabled:opacity-50"
+          title="Set this enhanced prompt as the shot default"
+        >
+          {isSaving ? (
+            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+          ) : (
+            <Save className="w-2.5 h-2.5" />
+          )}
+          Set as Default
+        </button>
+      )}
+    </div>
+  );
+};
+
+// =============================================================================
 // STRUCTURE VIDEO PREVIEW (3 frames: start, middle, end)
 // =============================================================================
 
@@ -875,38 +952,11 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               <div className="flex items-center gap-2">
                 <Label className="text-xs font-medium">Prompt:</Label>
                 {badgeType === 'enhanced' && (
-                  <>
-                    {/* Enhanced badge with hover-to-clear */}
-                    <button
-                      type="button"
-                      onClick={() => onClearEnhancedPrompt?.()}
-                      className="group/enhanced text-[10px] bg-green-500/15 text-green-600 dark:text-green-400 hover:bg-red-500/15 hover:text-red-600 dark:hover:text-red-400 px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors cursor-pointer"
-                      title="Click to clear enhanced prompt"
-                    >
-                      <span className="group-hover/enhanced:hidden">Enhanced</span>
-                      <span className="hidden group-hover/enhanced:flex items-center gap-0.5">
-                        <X className="w-2.5 h-2.5" />
-                        clear
-                      </span>
-                    </button>
-                    {/* Show Set as Default when enhanced prompt is showing */}
-                    {onSaveFieldAsDefault && (
-                      <button
-                        type="button"
-                        onClick={() => handleSaveFieldAsDefault('prompt', promptDisplayValue)}
-                        disabled={savingField === 'prompt'}
-                        className="text-[10px] bg-muted hover:bg-primary/15 text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors disabled:opacity-50"
-                        title="Set this enhanced prompt as the shot default"
-                      >
-                        {savingField === 'prompt' ? (
-                          <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                        ) : (
-                          <Save className="w-2.5 h-2.5" />
-                        )}
-                        Set as Default
-                      </button>
-                    )}
-                  </>
+                  <EnhancedPromptBadge
+                    onClear={() => onClearEnhancedPrompt?.()}
+                    onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('prompt', promptDisplayValue) : undefined}
+                    isSaving={savingField === 'prompt'}
+                  />
                 )}
                 {badgeType === 'default' && (
                   <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">

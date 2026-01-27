@@ -10,7 +10,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { ChevronLeft, ChevronRight, Film, ImageIcon } from 'lucide-react';
+import { ArrowUpLeft, MoveRight } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import type { AdjacentSegmentsData } from '../../types';
 
@@ -59,21 +59,16 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
             onMouseLeave={() => setHoveredSide(null)}
             disabled={!prev}
             className={cn(
-              'bg-black/70 hover:bg-black/90 text-white border-none shadow-lg transition-all',
+              'bg-black/70 hover:bg-black/90 text-white border-none shadow-lg transition-all px-3',
               !prev && 'opacity-30 cursor-not-allowed'
             )}
           >
-            <ChevronLeft className="w-4 h-4 mr-1" />
-            {prev?.hasVideo ? (
-              <Film className="w-4 h-4" />
-            ) : (
-              <ImageIcon className="w-4 h-4" />
-            )}
+            <ArrowUpLeft className="w-5 h-5" strokeWidth={2.5} />
           </Button>
 
           {/* Hover preview for prev */}
           {hoveredSide === 'prev' && prev && (
-            <div className="absolute top-full left-0 mt-2 p-2 bg-popover rounded-lg shadow-xl border border-border z-[70] min-w-[180px]">
+            <div className="absolute top-full left-0 mt-2 p-2 bg-popover rounded-lg shadow-xl border border-border z-[100] min-w-[180px]">
               <div className="text-xs text-muted-foreground mb-1.5 text-center">
                 {prev.hasVideo ? 'Video ending here' : 'Segment ending here'}
               </div>
@@ -87,7 +82,7 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
                     />
                   </div>
                 )}
-                <ChevronRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                <MoveRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                 {prev.endImageUrl && (
                   <div className="w-16 h-10 rounded overflow-hidden bg-muted flex-shrink-0 ring-2 ring-orange-500">
                     <img
@@ -115,21 +110,16 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
             onMouseLeave={() => setHoveredSide(null)}
             disabled={!next}
             className={cn(
-              'bg-black/70 hover:bg-black/90 text-white border-none shadow-lg transition-all',
+              'bg-black/70 hover:bg-black/90 text-white border-none shadow-lg transition-all px-3',
               !next && 'opacity-30 cursor-not-allowed'
             )}
           >
-            {next?.hasVideo ? (
-              <Film className="w-4 h-4" />
-            ) : (
-              <ImageIcon className="w-4 h-4" />
-            )}
-            <ChevronRight className="w-4 h-4 ml-1" />
+            <ArrowUpLeft className="w-5 h-5 -scale-x-100" strokeWidth={2.5} />
           </Button>
 
           {/* Hover preview for next */}
           {hoveredSide === 'next' && next && (
-            <div className="absolute top-full right-0 mt-2 p-2 bg-popover rounded-lg shadow-xl border border-border z-[70] min-w-[180px]">
+            <div className="absolute top-full right-0 mt-2 p-2 bg-popover rounded-lg shadow-xl border border-border z-[100] min-w-[180px]">
               <div className="text-xs text-muted-foreground mb-1.5 text-center">
                 {next.hasVideo ? 'Video starting here' : 'Segment starting here'}
               </div>
@@ -143,7 +133,7 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
                     />
                   </div>
                 )}
-                <ChevronRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                <MoveRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                 {next.endImageUrl && (
                   <div className="w-16 h-10 rounded overflow-hidden bg-muted flex-shrink-0">
                     <img
