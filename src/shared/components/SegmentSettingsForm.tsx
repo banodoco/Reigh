@@ -622,6 +622,10 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
     try {
       const success = await onSaveFieldAsDefault(field, value);
       if (success) {
+        // Wait for React to process the refetched shotDefaults before clearing local override
+        // Without this, we'd clear the local value while shotDefaults is still stale,
+        // causing the display to show empty instead of the new shot default
+        await new Promise(resolve => setTimeout(resolve, 0));
         // Clear the segment override so this field now uses the (updated) shot default
         // This makes the UI immediately show "Default" badge
         onChange({ [field]: undefined } as Partial<SegmentSettings>);
@@ -880,7 +884,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                   <FieldDefaultControls
                     isUsingDefault={false}
                     onUseDefault={() => onChange({ prompt: undefined })}
-                    onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('prompt', settings.prompt ?? '') : undefined}
+                    onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('prompt', promptDisplayValue) : undefined}
                     isSaving={savingField === 'prompt'}
                   />
                 )}
@@ -954,7 +958,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
           <div className={`space-y-3 bg-muted/30 border-y border-border/50 ${edgeExtendAmount === 6 ? 'px-6 py-3' : 'p-3'}`}>
             {/* Before/After Each Prompt - only show if shot has defaults */}
             {(shotDefaults?.textBeforePrompts !== undefined || shotDefaults?.textAfterPrompts !== undefined) && (
-              <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-2">
                 <DefaultableTextarea
                   label="Before:"
                   value={settings.textBeforePrompts}
@@ -965,7 +969,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                   onUseDefault={() => onChange({ textBeforePrompts: undefined })}
                   onSetAsDefault={onSaveFieldAsDefault ? (displayValue) => handleSaveFieldAsDefault('textBeforePrompts', displayValue) : undefined}
                   isSavingDefault={savingField === 'textBeforePrompts'}
-                  className="h-14 text-xs resize-none"
+                  className="min-h-0 h-8 text-xs resize-none py-1.5"
                   placeholder="Text to prepend..."
                 />
                 <DefaultableTextarea
@@ -978,7 +982,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                   onUseDefault={() => onChange({ textAfterPrompts: undefined })}
                   onSetAsDefault={onSaveFieldAsDefault ? (displayValue) => handleSaveFieldAsDefault('textAfterPrompts', displayValue) : undefined}
                   isSavingDefault={savingField === 'textAfterPrompts'}
-                  className="h-14 text-xs resize-none"
+                  className="min-h-0 h-8 text-xs resize-none py-1.5"
                   placeholder="Text to append..."
                 />
               </div>
@@ -993,7 +997,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               onChange={(value) => onChange({ negativePrompt: value })}
               onClear={() => onChange({ negativePrompt: '' })}
               onUseDefault={() => onChange({ negativePrompt: undefined })}
-              onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('negativePrompt', settings.negativePrompt ?? shotDefaults?.negativePrompt ?? '') : undefined}
+              onSetAsDefault={onSaveFieldAsDefault ? (displayValue) => handleSaveFieldAsDefault('negativePrompt', displayValue) : undefined}
               isSavingDefault={savingField === 'negativePrompt'}
               className="h-16 text-xs resize-none"
               placeholder="Things to avoid..."
@@ -1057,12 +1061,18 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                         <div className="absolute -top-1 -right-1 z-10">
                           <FieldDefaultControls
                             isUsingDefault={isUsingLorasDefault}
-                            onUseDefault={() => onChange({ loras: undefined })}
-                            onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault(
-                              'loras',
-                              effectiveLoras
-                            ) : undefined}
-                            isSaving={savingField === 'loras'}
+                            onUseDefault={() => onChange({
+                              loras: undefined,
+                              motionMode: undefined,
+                              phaseConfig: undefined,
+                              selectedPhasePresetId: undefined,
+                            })}
+                            onSetAsDefault={onSaveFieldAsDefault ? async () => {
+                              // Save loras and also set motion mode to basic
+                              await handleSaveFieldAsDefault('loras', effectiveLoras);
+                              await handleSaveFieldAsDefault('motionMode', 'basic');
+                            } : undefined}
+                            isSaving={savingField === 'loras' || savingField === 'motionMode'}
                           />
                         </div>
                       </div>

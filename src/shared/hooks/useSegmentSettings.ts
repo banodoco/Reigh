@@ -314,32 +314,6 @@ export function useSegmentSettings({
     return formSettings;
   }, [pairMetadata, defaults]);
 
-  // Compute which fields have pair-level overrides (vs using shot defaults)
-  // This tells the form whether to show the value as actual content or as placeholder
-  // Returns undefined during loading so form knows to show merged settings (not empty)
-  const hasOverride = useMemo((): FieldOverrides | undefined => {
-    // Return undefined while loading - form will show merged settings
-    if (isLoadingPair) return undefined;
-
-    // Use migration utility to read pair overrides from either old or new format
-    const pairOverrides = readSegmentOverrides(pairMetadata as Record<string, any> | null);
-    return {
-      // Check for field existence (not truthiness) so empty strings/arrays are recognized as overrides
-      prompt: pairOverrides.prompt !== undefined,
-      negativePrompt: pairOverrides.negativePrompt !== undefined,
-      textBeforePrompts: pairOverrides.textBeforePrompts !== undefined,
-      textAfterPrompts: pairOverrides.textAfterPrompts !== undefined,
-      motionMode: pairOverrides.motionMode !== undefined,
-      amountOfMotion: pairOverrides.amountOfMotion !== undefined,
-      phaseConfig: pairOverrides.phaseConfig !== undefined,
-      loras: pairOverrides.loras !== undefined,
-      selectedPhasePresetId: pairOverrides.selectedPhasePresetId !== undefined,
-      structureMotionStrength: pairOverrides.structureMotionStrength !== undefined,
-      structureTreatment: pairOverrides.structureTreatment !== undefined,
-      structureUni3cEndPercent: pairOverrides.structureUni3cEndPercent !== undefined,
-    };
-  }, [pairMetadata, isLoadingPair]);
-
   // Shot-level defaults (for showing as placeholder/fallback when no pair override)
   const shotDefaultsValue = useMemo((): ShotDefaults => {
     const defaults = {
@@ -390,6 +364,51 @@ export function useSegmentSettings({
   // Local state for user edits
   const [localSettings, setLocalSettings] = useState<SegmentSettings | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+
+  // Compute which fields have pair-level overrides (vs using shot defaults)
+  // This tells the form whether to show the value as actual content or as placeholder
+  // Returns undefined during loading so form knows to show merged settings (not empty)
+  //
+  // IMPORTANT: This considers BOTH local state AND DB state.
+  // - If localSettings exists and field is explicitly undefined → no override (user cleared it)
+  // - If localSettings exists and field has a value → has override
+  // - If localSettings is null → check DB state (pairOverrides)
+  // This ensures UI updates immediately when user clicks "Set as Default" (which clears local override)
+  const hasOverride = useMemo((): FieldOverrides | undefined => {
+    // Return undefined while loading - form will show merged settings
+    if (isLoadingPair) return undefined;
+
+    // Use migration utility to read pair overrides from either old or new format
+    const pairOverrides = readSegmentOverrides(pairMetadata as Record<string, any> | null);
+
+    // Helper: check if field has override considering local state
+    // - If we have local settings and field is explicitly in it, use local state
+    // - Otherwise, fall back to DB state
+    const hasFieldOverride = (field: keyof typeof pairOverrides): boolean => {
+      if (localSettings !== null && field in localSettings) {
+        // Local state exists for this field - use it
+        // undefined means "no override", any other value means "has override"
+        return (localSettings as any)[field] !== undefined;
+      }
+      // No local state - check DB
+      return pairOverrides[field] !== undefined;
+    };
+
+    return {
+      prompt: hasFieldOverride('prompt'),
+      negativePrompt: hasFieldOverride('negativePrompt'),
+      textBeforePrompts: hasFieldOverride('textBeforePrompts'),
+      textAfterPrompts: hasFieldOverride('textAfterPrompts'),
+      motionMode: hasFieldOverride('motionMode'),
+      amountOfMotion: hasFieldOverride('amountOfMotion'),
+      phaseConfig: hasFieldOverride('phaseConfig'),
+      loras: hasFieldOverride('loras'),
+      selectedPhasePresetId: hasFieldOverride('selectedPhasePresetId'),
+      structureMotionStrength: hasFieldOverride('structureMotionStrength'),
+      structureTreatment: hasFieldOverride('structureTreatment'),
+      structureUni3cEndPercent: hasFieldOverride('structureUni3cEndPercent'),
+    };
+  }, [pairMetadata, isLoadingPair, localSettings]);
 
   // Refs for auto-save (defined before use)
   const prevPairIdRef = useRef(pairShotGenerationId);

@@ -57,7 +57,7 @@ const FieldBadge: React.FC<{
   type: BadgeType;
   label?: string;
   onUseDefault?: () => void;
-  onSetAsDefault?: () => void;
+  onSetAsDefault?: (displayValue: string) => void;
   isSaving?: boolean;
   displayValue?: string;
 }> = ({ type, label, onUseDefault, onSetAsDefault, isSaving, displayValue }) => {

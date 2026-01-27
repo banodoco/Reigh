@@ -72,7 +72,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
           {...props}
         />
         {showButtons && (
-          <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
+          <div className="absolute top-1/2 -translate-y-1/2 right-2 flex items-center gap-1 z-10">
             {showVoice && (
               <AIInputButton
                 onResult={onVoiceResult}
