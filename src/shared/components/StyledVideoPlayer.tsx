@@ -264,13 +264,15 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
 
   return (
     // Outer container: fills parent and centers the inner content
+    // pointer-events-none allows clicks to pass through to parent's close handler
     <div
-      className={cn("flex items-center justify-center w-full h-full", className)}
+      className="flex items-center justify-center w-full h-full pointer-events-none"
       style={wrapperStyle}
     >
       {/* Inner container: shrink-wraps to video so controls align with video edges */}
+      {/* className prop applied here so border/shadow wraps the video */}
       <div
-        className="relative inline-flex max-w-full max-h-full"
+        className={cn("relative inline-flex max-w-full max-h-full pointer-events-auto", className)}
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
         onClick={handleContainerClick}
