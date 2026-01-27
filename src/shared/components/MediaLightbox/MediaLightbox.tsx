@@ -1729,10 +1729,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       <DialogPrimitive.Root
         open={true}
         // Modal mode blocks body scroll and traps focus
-        // On tablet/desktop, always disable modal to allow TasksPane scrolling
-        // (changing modal dynamically causes the dialog to flash/remount)
-        // On mobile, keep modal=true for proper scroll locking
-        modal={isMobile}
+        // On tablet/desktop, disable modal to allow pane controls interaction
+        // On phones only, keep modal=true for proper scroll locking
+        modal={isMobile && !isTabletOrLarger}
         onOpenChange={() => {
           // Prevent automatic closing - we handle all closing manually
         }}
@@ -1748,7 +1747,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
             onPointerDown={(e) => {
               // Track where the pointer down started
               pointerDownTargetRef.current = e.target;
-              
+
               // Check if a higher z-index dialog is open - if so, don't block events
               const dialogOverlays = document.querySelectorAll('[data-radix-dialog-overlay]');
               const hasHigherZIndexDialog = Array.from(dialogOverlays).some((overlay) => {
@@ -1756,11 +1755,22 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 // MediaLightbox uses z-[100000], check if any higher z-index dialogs are open
                 return zIndex > 100000;
               });
-              
+
               if (hasHigherZIndexDialog) {
                 return; // Let the higher dialog handle the event
               }
-              
+
+              // Check if click target is on an element with higher z-index (e.g., pane controls)
+              // Walk up the DOM tree to check
+              let target = e.target as HTMLElement | null;
+              while (target && target !== document.body) {
+                const zIndex = parseInt(window.getComputedStyle(target).zIndex || '0', 10);
+                if (zIndex > 100000) {
+                  return; // Let the higher z-index element handle the event
+                }
+                target = target.parentElement;
+              }
+
               // Completely block all pointer events from reaching underlying elements
               e.preventDefault();
               e.stopPropagation();
@@ -1775,11 +1785,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
                 return zIndex > 100000;
               });
-              
+
               if (hasHigherZIndexDialog) {
                 return; // Let the higher dialog handle the event
               }
-              
+
+              // Check if click target is on an element with higher z-index (e.g., pane controls)
+              let target = e.target as HTMLElement | null;
+              while (target && target !== document.body) {
+                const zIndex = parseInt(window.getComputedStyle(target).zIndex || '0', 10);
+                if (zIndex > 100000) {
+                  return; // Let the higher z-index element handle the event
+                }
+                target = target.parentElement;
+              }
+
               // Block pointer up events to prevent accidental interactions
               e.preventDefault();
               e.stopPropagation();
@@ -1797,6 +1817,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
               if (hasHigherZIndexDialog) {
                 return; // Let the higher dialog handle the event
+              }
+
+              // Check if click target is on an element with higher z-index (e.g., pane controls)
+              let target = e.target as HTMLElement | null;
+              while (target && target !== document.body) {
+                const zIndex = parseInt(window.getComputedStyle(target).zIndex || '0', 10);
+                if (zIndex > 100000) {
+                  return; // Let the higher z-index element handle the event
+                }
+                target = target.parentElement;
               }
 
               // Prevent closing when in inpaint mode to avoid accidental data loss
@@ -1823,11 +1853,21 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 const zIndex = parseInt(window.getComputedStyle(overlay as Element).zIndex || '0', 10);
                 return zIndex > 100000;
               });
-              
+
               if (hasHigherZIndexDialog) {
                 return; // Let the higher dialog handle the event
               }
-              
+
+              // Check if click target is on an element with higher z-index (e.g., pane controls)
+              let target = e.target as HTMLElement | null;
+              while (target && target !== document.body) {
+                const zIndex = parseInt(window.getComputedStyle(target).zIndex || '0', 10);
+                if (zIndex > 100000) {
+                  return; // Let the higher z-index element handle the event
+                }
+                target = target.parentElement;
+              }
+
               // Prevent closing when in inpaint mode to avoid accidental data loss
               if (isInpaintMode) {
                 return;

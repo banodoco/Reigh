@@ -121,6 +121,8 @@ export interface UseSegmentSettingsReturn {
   resetSettings: () => void;
   /** Save current settings as shot-level defaults */
   saveAsShotDefaults: () => Promise<boolean>;
+  /** Save a single field's current value as shot default */
+  saveFieldAsDefault: (field: keyof SegmentSettings, value: any) => Promise<boolean>;
   /** Whether data is still loading */
   isLoading: boolean;
   /** Whether user has made local edits */
@@ -750,6 +752,45 @@ export function useSegmentSettings({
     }
   }, [shotId, settings, shotDefaultsValue, instanceId, queryClient, onUpdateStructureVideoDefaults, structureVideoDefaults]);
 
+  // Save a single field's current value as shot default
+  const saveFieldAsDefault = useCallback(async (field: keyof SegmentSettings, value: any): Promise<boolean> => {
+    if (!shotId) {
+      console.warn('[useSegmentSettings] ⚠️ Cannot save field as shot default - no shotId');
+      return false;
+    }
+
+    console.log(`[useSegmentSettings:${instanceId}] 💾 Saving field as shot default:`, {
+      shotId: shotId.substring(0, 8),
+      field,
+      value: typeof value === 'string' ? value.substring(0, 50) : value,
+    });
+
+    try {
+      // Build a patch with just this field
+      const shotPatch: Record<string, any> = {
+        [field]: value,
+      };
+
+      // Use the proper settings update function
+      await updateToolSettingsSupabase({
+        scope: 'shot',
+        id: shotId,
+        toolId: 'travel-between-images',
+        patch: shotPatch,
+      }, undefined, 'immediate');
+
+      // Refetch query caches so changes are visible everywhere
+      await queryClient.refetchQueries({ queryKey: ['shot-batch-settings', shotId] });
+      await queryClient.refetchQueries({ queryKey: ['toolSettings', 'travel-between-images'] });
+
+      console.log(`[useSegmentSettings:${instanceId}] ✅ Field saved as shot default:`, field);
+      return true;
+    } catch (error) {
+      console.error('[useSegmentSettings] Exception saving field as shot default:', error);
+      return false;
+    }
+  }, [shotId, instanceId, queryClient]);
+
   // Get effective settings for task creation (merges segment overrides with shot defaults)
   // This is what should be passed to buildTaskParams() when generating
   const getSettingsForTaskCreation = useCallback((): SegmentSettings => {
@@ -985,6 +1026,7 @@ export function useSegmentSettings({
     saveSettings,
     resetSettings,
     saveAsShotDefaults,
+    saveFieldAsDefault,
     getSettingsForTaskCreation,
     isLoading: isLoadingPair || isLoadingBatch,
     isDirty,

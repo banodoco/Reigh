@@ -92,6 +92,8 @@ export interface SegmentSettingsFormProps {
   onRestoreDefaults?: () => void;
   /** Callback to save current settings as shot defaults */
   onSaveAsShotDefaults?: () => Promise<boolean>;
+  /** Callback to save a single field's current value as shot default */
+  onSaveFieldAsDefault?: (field: keyof SegmentSettings, value: any) => Promise<boolean>;
   /** Which fields have pair-level overrides (vs using shot defaults) */
   hasOverride?: {
     prompt: boolean;
@@ -168,6 +170,60 @@ export interface SegmentSettingsFormProps {
   /** Callback to remove this segment's structure video */
   onRemoveSegmentStructureVideo?: () => void;
 }
+
+// =============================================================================
+// DEFAULT BADGE / FIELD ACTION BUTTONS
+// =============================================================================
+
+/**
+ * Shows either a "Default" badge (when using shot defaults) or two action buttons
+ * (when overridden): "Reset" to clear override, "Set as Default" to save as new default.
+ */
+const FieldDefaultControls: React.FC<{
+  isUsingDefault: boolean;
+  onUseDefault: () => void;
+  onSetAsDefault?: () => void;
+  isSaving?: boolean;
+  className?: string;
+}> = ({ isUsingDefault, onUseDefault, onSetAsDefault, isSaving, className = '' }) => {
+  if (isUsingDefault) {
+    return (
+      <span className={`text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded ${className}`}>
+        Default
+      </span>
+    );
+  }
+  return (
+    <div className={`flex items-center gap-1 ${className}`}>
+      <button
+        type="button"
+        onClick={onUseDefault}
+        disabled={isSaving}
+        className="text-[10px] bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors disabled:opacity-50"
+        title="Use the shot default value"
+      >
+        <RotateCcw className="w-2.5 h-2.5" />
+        Use Default
+      </button>
+      {onSetAsDefault && (
+        <button
+          type="button"
+          onClick={onSetAsDefault}
+          disabled={isSaving}
+          className="text-[10px] bg-muted hover:bg-primary/15 text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors disabled:opacity-50"
+          title="Set this value as the shot default"
+        >
+          {isSaving ? (
+            <Loader2 className="w-2.5 h-2.5 animate-spin" />
+          ) : (
+            <Save className="w-2.5 h-2.5" />
+          )}
+          Set as Default
+        </button>
+      )}
+    </div>
+  );
+};
 
 // =============================================================================
 // STRUCTURE VIDEO PREVIEW (3 frames: start, middle, end)
@@ -369,6 +425,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   onFrameCountChange,
   onRestoreDefaults,
   onSaveAsShotDefaults,
+  onSaveFieldAsDefault,
   hasOverride,
   shotDefaults,
   isDirty,
@@ -393,6 +450,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [isSavingDefaults, setIsSavingDefaults] = useState(false);
   const [saveDefaultsSuccess, setSaveDefaultsSuccess] = useState(false);
+  const [savingField, setSavingField] = useState<string | null>(null); // Track which field is being saved
   const [showVideoBrowser, setShowVideoBrowser] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -556,6 +614,22 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
       setIsSavingDefaults(false);
     }
   }, [onSaveAsShotDefaults]);
+
+  // Save a single field as shot default, then clear the segment override so UI shows "Default"
+  const handleSaveFieldAsDefault = useCallback(async (field: keyof SegmentSettings, value: any) => {
+    if (!onSaveFieldAsDefault) return;
+    setSavingField(field);
+    try {
+      const success = await onSaveFieldAsDefault(field, value);
+      if (success) {
+        // Clear the segment override so this field now uses the (updated) shot default
+        // This makes the UI immediately show "Default" badge
+        onChange({ [field]: undefined } as Partial<SegmentSettings>);
+      }
+    } finally {
+      setSavingField(null);
+    }
+  }, [onSaveFieldAsDefault, onChange]);
 
   // ==========================================================================
   // STRUCTURE VIDEO UPLOAD HANDLERS (Timeline Mode Only)
@@ -802,6 +876,14 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                     Default
                   </span>
                 )}
+                {badgeType === null && userHasSetPrompt && (
+                  <FieldDefaultControls
+                    isUsingDefault={false}
+                    onUseDefault={() => onChange({ prompt: undefined })}
+                    onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('prompt', settings.prompt ?? '') : undefined}
+                    isSaving={savingField === 'prompt'}
+                  />
+                )}
               </div>
               <Textarea
                 value={promptDisplayValue}
@@ -880,6 +962,9 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                   hasDbOverride={hasOverride?.textBeforePrompts}
                   onChange={(value) => onChange({ textBeforePrompts: value })}
                   onClear={() => onChange({ textBeforePrompts: '' })}
+                  onUseDefault={() => onChange({ textBeforePrompts: undefined })}
+                  onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('textBeforePrompts', settings.textBeforePrompts ?? shotDefaults?.textBeforePrompts ?? '') : undefined}
+                  isSavingDefault={savingField === 'textBeforePrompts'}
                   className="h-14 text-xs resize-none"
                   placeholder="Text to prepend..."
                 />
@@ -890,6 +975,9 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                   hasDbOverride={hasOverride?.textAfterPrompts}
                   onChange={(value) => onChange({ textAfterPrompts: value })}
                   onClear={() => onChange({ textAfterPrompts: '' })}
+                  onUseDefault={() => onChange({ textAfterPrompts: undefined })}
+                  onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('textAfterPrompts', settings.textAfterPrompts ?? shotDefaults?.textAfterPrompts ?? '') : undefined}
+                  isSavingDefault={savingField === 'textAfterPrompts'}
                   className="h-14 text-xs resize-none"
                   placeholder="Text to append..."
                 />
@@ -904,6 +992,9 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               hasDbOverride={hasOverride?.negativePrompt}
               onChange={(value) => onChange({ negativePrompt: value })}
               onClear={() => onChange({ negativePrompt: '' })}
+              onUseDefault={() => onChange({ negativePrompt: undefined })}
+              onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('negativePrompt', settings.negativePrompt ?? shotDefaults?.negativePrompt ?? '') : undefined}
+              isSavingDefault={savingField === 'negativePrompt'}
               className="h-16 text-xs resize-none"
               placeholder="Things to avoid..."
               voiceInput
@@ -922,7 +1013,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               // For loras: show "Default" badge only if settings.loras is undefined AND shot has default loras
               // settings.loras !== undefined means user has explicitly set loras (even if empty)
               const isUsingLorasDefault = settings.loras === undefined && (shotDefaults?.loras?.length ?? 0) > 0;
-              const isUsingMotionDefaults = isUsingMotionModeDefault || isUsingPhaseConfigDefault;
+              const isUsingMotionDefaults = isUsingMotionModeDefault && isUsingPhaseConfigDefault;
 
               return (
                 <MotionPresetSelector
@@ -940,11 +1031,19 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                   randomSeed={settings.randomSeed}
                   onRandomSeedChange={handleRandomSeedChange}
                   queryKeyPrefix={queryKeyPrefix}
-                  labelSuffix={isUsingMotionDefaults ? (
-                    <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">
-                      Default
-                    </span>
-                  ) : undefined}
+                  labelSuffix={
+                    <FieldDefaultControls
+                      isUsingDefault={isUsingMotionDefaults}
+                      onUseDefault={() => onChange({ motionMode: undefined, phaseConfig: undefined, selectedPhasePresetId: undefined })}
+                      onSetAsDefault={onSaveFieldAsDefault ? async () => {
+                        // Save both motion mode and phase config as defaults
+                        await handleSaveFieldAsDefault('motionMode', settings.motionMode ?? shotDefaults?.motionMode ?? 'basic');
+                        await handleSaveFieldAsDefault('phaseConfig', settings.phaseConfig ?? shotDefaults?.phaseConfig);
+                        await handleSaveFieldAsDefault('selectedPhasePresetId', settings.selectedPhasePresetId ?? shotDefaults?.selectedPhasePresetId ?? null);
+                      } : undefined}
+                      isSaving={savingField === 'motionMode' || savingField === 'phaseConfig' || savingField === 'selectedPhasePresetId'}
+                    />
+                  }
                   renderBasicModeContent={() => (
                     <div className="space-y-3">
                       <div className="relative">
@@ -954,12 +1053,18 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                           onLoraStrengthChange={handleLoraStrengthChange}
                           availableLoras={availableLoras}
                         />
-                        {/* Default badge for LoRAs */}
-                        {isUsingLorasDefault && (
-                          <span className="absolute -top-1 -right-1 text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded z-10 pointer-events-none">
-                            Default
-                          </span>
-                        )}
+                        {/* Default/Reset controls for LoRAs */}
+                        <div className="absolute -top-1 -right-1 z-10">
+                          <FieldDefaultControls
+                            isUsingDefault={isUsingLorasDefault}
+                            onUseDefault={() => onChange({ loras: undefined })}
+                            onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault(
+                              'loras',
+                              effectiveLoras
+                            ) : undefined}
+                            isSaving={savingField === 'loras'}
+                          />
+                        </div>
                       </div>
                       <button
                         onClick={handleAddLoraClick}
@@ -1222,11 +1327,15 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Label className="text-xs font-medium">Strength:</Label>
-                      {settings.structureMotionStrength === undefined && (
-                        <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">
-                          Default
-                        </span>
-                      )}
+                      <FieldDefaultControls
+                        isUsingDefault={settings.structureMotionStrength === undefined}
+                        onUseDefault={() => onChange({ structureMotionStrength: undefined })}
+                        onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault(
+                          'structureMotionStrength',
+                          settings.structureMotionStrength ?? structureVideoDefaults?.motionStrength ?? 1.2
+                        ) : undefined}
+                        isSaving={savingField === 'structureMotionStrength'}
+                      />
                     </div>
                     <span className="text-xs font-medium">
                       {(settings.structureMotionStrength ?? structureVideoDefaults?.motionStrength ?? 1.2).toFixed(1)}x
@@ -1253,11 +1362,15 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Label className="text-xs font-medium">End Percent:</Label>
-                        {settings.structureUni3cEndPercent === undefined && (
-                          <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">
-                            Default
-                          </span>
-                        )}
+                        <FieldDefaultControls
+                          isUsingDefault={settings.structureUni3cEndPercent === undefined}
+                          onUseDefault={() => onChange({ structureUni3cEndPercent: undefined })}
+                          onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault(
+                            'structureUni3cEndPercent',
+                            settings.structureUni3cEndPercent ?? structureVideoDefaults?.uni3cEndPercent ?? 0.1
+                          ) : undefined}
+                          isSaving={savingField === 'structureUni3cEndPercent'}
+                        />
                       </div>
                       <span className="text-xs font-medium">
                         {((settings.structureUni3cEndPercent ?? structureVideoDefaults?.uni3cEndPercent ?? 0.1) * 100).toFixed(0)}%

@@ -154,6 +154,7 @@ export function useSegmentSettingsForm(
     saveSettings,
     resetSettings,
     saveAsShotDefaults,
+    saveFieldAsDefault,
     getSettingsForTaskCreation,
     isLoading,
     isDirty,
@@ -183,6 +184,7 @@ export function useSegmentSettingsForm(
     // Actions
     onRestoreDefaults: resetSettings,
     onSaveAsShotDefaults: saveAsShotDefaults,
+    onSaveFieldAsDefault: saveFieldAsDefault,
 
     // Enhanced prompt (AI-generated, stored separately)
     enhancedPrompt,
@@ -219,6 +221,7 @@ export function useSegmentSettingsForm(
     isDirty,
     resetSettings,
     saveAsShotDefaults,
+    saveFieldAsDefault,
     enhancedPrompt,
     clearEnhancedPrompt,
     segmentIndex,

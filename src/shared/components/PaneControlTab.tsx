@@ -295,10 +295,16 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   if (buttons.length === 0) return null;
 
   // Container styling
-  const mobileZIndex = side === 'bottom' ? 'z-[50]' : PANE_CONFIG.zIndex.CONTROL_UNLOCKED;
-  const zIndex = isLocked || (isOpen && !isLocked)
-    ? PANE_CONFIG.zIndex.CONTROL_LOCKED
-    : (useDesktopBehavior ? PANE_CONFIG.zIndex.CONTROL_UNLOCKED : mobileZIndex);
+  // Only TasksPane (right side) should appear above MediaLightbox (z-[100000])
+  // Other panes use normal z-index to stay behind the lightbox
+  const isTasksPane = side === 'right';
+  const aboveLightboxZIndex = 'z-[100001]';
+  const normalLockedZIndex = PANE_CONFIG.zIndex.CONTROL_LOCKED;
+  const normalUnlockedZIndex = PANE_CONFIG.zIndex.CONTROL_UNLOCKED;
+
+  const zIndex = isTasksPane
+    ? aboveLightboxZIndex  // TasksPane always above lightbox
+    : (isLocked || (isOpen && !isLocked) ? normalLockedZIndex : normalUnlockedZIndex);
 
   const bgOpacity = isLocked || (isOpen && !isLocked) ? 'bg-zinc-800/90' : 'bg-zinc-800/80';
   const transition = isLocked || (isOpen && !isLocked)
