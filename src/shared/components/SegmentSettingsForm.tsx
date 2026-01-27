@@ -906,10 +906,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                 {badgeType === null && userHasSetPrompt && (
                   <FieldDefaultControls
                     isUsingDefault={false}
-                    onUseDefault={() => {
-                      onChange({ prompt: undefined });
-                      // Don't clear enhanced - let it show again if it exists
-                    }}
+                    onUseDefault={handleClear} // Use Default = go back to shot defaults (clear both user edit and enhanced)
                     onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('prompt', promptDisplayValue) : undefined}
                     isSaving={savingField === 'prompt'}
                   />
