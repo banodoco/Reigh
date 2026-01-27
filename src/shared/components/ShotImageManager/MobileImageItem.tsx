@@ -29,6 +29,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
   projectAspectRatio,
   frameNumber,
   readOnly = false,
+  onMarkAllViewed,
 }) => {
   // Progressive loading setup
   const progressiveEnabled = isProgressiveLoadingEnabled();
@@ -133,6 +134,7 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
           hasUnviewedVariants={(image as any).hasUnviewedVariants}
           variant="overlay"
           size="sm"
+          onMarkAllViewed={onMarkAllViewed}
         />
 
         {/* Center lightbox button - shows when selected */}

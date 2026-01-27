@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useCallback } from "react";
 import { GenerationRow } from "@/types/shots";
 import { getDisplayUrl, cn } from "@/shared/lib/utils";
 import { Button } from "@/shared/components/ui/button";
@@ -9,6 +9,7 @@ import { useDoubleTapWithSelection } from "@/shared/hooks/useDoubleTapWithSelect
 import { framesToSeconds } from "./utils/time-utils";
 import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_IMAGE_HALF_WIDTH, TIMELINE_PADDING_OFFSET } from "./constants";
 import { VariantBadge } from "@/shared/components/VariantBadge";
+import { useMarkVariantViewed } from "@/shared/hooks/useMarkVariantViewed";
 
 // Props for individual timeline items
 interface TimelineItemProps {
@@ -92,6 +93,16 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
   
   // Track hover state
   const [isHovered, setIsHovered] = useState(false);
+
+  // Hook for marking variants as viewed
+  const { markAllViewed } = useMarkVariantViewed();
+
+  // Callback to mark all variants for this generation as viewed
+  const handleMarkAllVariantsViewed = useCallback(() => {
+    if (image.generation_id) {
+      markAllViewed(image.generation_id);
+    }
+  }, [image.generation_id, markAllViewed]);
   
   // Track "just dropped" visual effect - auto-clears after animation
   const [showDropEffect, setShowDropEffect] = useState(false);
@@ -496,6 +507,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                 variant="overlay"
                 size="sm"
                 zIndex={20}
+                onMarkAllViewed={handleMarkAllVariantsViewed}
               />
               
               <Button

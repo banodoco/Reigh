@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GenerationRow } from '@/types/shots';
@@ -10,6 +10,7 @@ import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
 import { framesToSeconds } from './Timeline/utils/time-utils';
 import { VariantBadge } from '@/shared/components/VariantBadge';
+import { useMarkVariantViewed } from '@/shared/hooks/useMarkVariantViewed';
 
 interface SortableImageItemProps {
   image: GenerationRow;
@@ -51,6 +52,16 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
   shouldLoad = true,
   projectAspectRatio,
 }) => {
+  // Hook for marking variants as viewed
+  const { markAllViewed } = useMarkVariantViewed();
+
+  // Callback to mark all variants for this generation as viewed
+  const handleMarkAllVariantsViewed = useCallback(() => {
+    if (image.generation_id) {
+      markAllViewed(image.generation_id);
+    }
+  }, [image.generation_id, markAllViewed]);
+
   // Progressive loading for sortable image item
   const progressiveEnabled = isProgressiveLoadingEnabled();
   const { src: progressiveSrc, phase, isThumbShowing, isFullLoaded, ref: progressiveRef } = useProgressiveImage(
@@ -282,6 +293,7 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
             hasUnviewedVariants={(image as any).hasUnviewedVariants}
             variant="overlay"
             size="md"
+            onMarkAllViewed={handleMarkAllVariantsViewed}
           />
               
               <Button

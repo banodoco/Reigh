@@ -124,4 +124,6 @@ export interface MobileImageItemProps {
   projectAspectRatio?: string;
   frameNumber?: number;
   readOnly?: boolean;
+  /** Callback to mark all variants for this generation as viewed */
+  onMarkAllViewed?: () => void;
 }

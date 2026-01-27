@@ -16,6 +16,7 @@ import { MobileImageItem } from './MobileImageItem';
 import { BaseShotImageManagerProps } from './types';
 import { PairPromptIndicator } from './components/PairPromptIndicator';
 import { InlineSegmentVideo } from '@/tools/travel-between-images/components/Timeline/InlineSegmentVideo';
+import { useMarkVariantViewed } from '@/shared/hooks/useMarkVariantViewed';
 
 export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   images,
@@ -62,6 +63,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
   
   const isMobile = useIsMobile();
   const { value: imageDeletionSettings } = useUserUIState('imageDeletion', { skipConfirmation: false });
+  const { markAllViewed } = useMarkVariantViewed();
   const { 
     isShotsPaneLocked, 
     isTasksPaneLocked, 
@@ -464,6 +466,7 @@ export const ShotImageManagerMobile: React.FC<BaseShotImageManagerProps> = ({
                   projectAspectRatio={projectAspectRatio}
                   frameNumber={frameNumber}
                   readOnly={readOnly}
+                  onMarkAllViewed={(image as any).generation_id ? () => markAllViewed((image as any).generation_id) : undefined}
                 />
                 
                 {/* Move button on left side of each non-selected item (hidden in readOnly) */}

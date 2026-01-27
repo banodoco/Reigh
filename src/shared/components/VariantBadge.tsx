@@ -154,21 +154,64 @@ export const VariantBadge: React.FC<VariantBadgeProps> = ({
     </div>
   );
 
-  // Overlay variant: absolute positioned, uses title attributes
+  // Overlay variant: absolute positioned, with Tooltip wrappers
   if (variant === 'overlay') {
     return (
       <div
         className={cn(
           'absolute flex items-center gap-0.5',
-          // Only disable pointer events if there's no dismiss functionality
-          !canDismiss && 'pointer-events-none',
           position,
           className
         )}
         style={{ zIndex }}
       >
-        {NewBadge}
-        {showCountBadge && <div className="pointer-events-none">{CountBadge}</div>}
+        {hasNew && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className="bg-yellow-500 text-black text-[7px] font-bold px-1 py-0.5 rounded cursor-help"
+                >
+                  {unviewedVariantCount} new
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="flex flex-col gap-1">
+                <p>{unviewedVariantCount} unviewed variant{unviewedVariantCount !== 1 ? 's' : ''}</p>
+                {onMarkAllViewed && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onMarkAllViewed();
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground underline"
+                  >
+                    Mark all as viewed
+                  </button>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+        {showCountBadge && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className={cn(
+                    'rounded-full bg-black/60 text-white font-medium flex items-center justify-center backdrop-blur-sm cursor-help',
+                    sizeClasses
+                  )}
+                >
+                  {derivedCount}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>{derivedCount} variant{derivedCount !== 1 ? 's' : ''}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
     );
   }

@@ -13,6 +13,7 @@ import { SegmentSlot } from '../../hooks/useSegmentOutputsForShot';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
 import { VariantBadge } from '@/shared/components/VariantBadge';
+import { useMarkVariantViewed } from '@/shared/hooks/useMarkVariantViewed';
 import { cn } from '@/shared/lib/utils';
 
 interface InlineSegmentVideoProps {
@@ -96,6 +97,16 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
     !!generationId
   );
   const badgeData = generationId ? getBadgeData(generationId) : null;
+
+  // Hook for marking variants as viewed
+  const { markAllViewed } = useMarkVariantViewed();
+
+  // Callback to mark all variants for this generation as viewed
+  const handleMarkAllVariantsViewed = useCallback(() => {
+    if (generationId) {
+      markAllViewed(generationId);
+    }
+  }, [generationId, markAllViewed]);
 
   // Check if recently created (show NEW for segments created in last 10 minutes)
   const isRecentlyCreated = useMemo(() => {
@@ -376,6 +387,7 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
             variant="overlay"
             size="lg"
             position={layout === 'flow' && compact ? "top-1.5 left-1.5" : "top-2 left-2"}
+            onMarkAllViewed={handleMarkAllVariantsViewed}
           />
         )}
         
@@ -506,6 +518,7 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
                     variant="inline"
                     size="md"
                     tooltipSide="top"
+                    onMarkAllViewed={handleMarkAllVariantsViewed}
                   />
                 )}
               </div>
