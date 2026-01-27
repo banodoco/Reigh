@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { GenerationRow } from "@/types/shots";
 import { Card, CardHeader, CardTitle, CardContent } from "@/shared/components/ui/card";
 import { SegmentedControl, SegmentedControlItem } from "@/shared/components/ui/segmented-control";
@@ -230,6 +231,10 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   selectedOutputId,
   onSelectedOutputChange,
 }) => {
+  // Navigation for deep-linking to segment slots from TasksPane
+  const location = useLocation();
+  const navigate = useNavigate();
+
   // Convert aspect ratio (e.g. "4:3") to concrete resolution string (e.g. "768x576").
   // IMPORTANT: Segment regeneration expects WxH; passing the aspect ratio string would
   // incorrectly store parsed_resolution_wh as "4:3".
@@ -832,6 +837,39 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     }
     return dataMap;
   }, [shotGenerations, effectiveGenerationMode, batchVideoFrames]);
+
+  // Handle deep-linking to segment slot from TasksPane navigation
+  // When navigating from a segment video task, openSegmentSlot contains the pair_shot_generation_id
+  useEffect(() => {
+    const state = location.state as { openSegmentSlot?: string; fromShotClick?: boolean } | null;
+    if (!state?.openSegmentSlot || pairDataByIndex.size === 0) return;
+
+    // Find the pair where startImage.id matches the openSegmentSlot
+    let targetPairIndex: number | null = null;
+    for (const [pairIndex, pairData] of pairDataByIndex.entries()) {
+      if (pairData.startImage.id === state.openSegmentSlot) {
+        targetPairIndex = pairIndex;
+        break;
+      }
+    }
+
+    if (targetPairIndex !== null) {
+      console.log('[SegmentSlotNav] Opening segment slot from navigation state:', {
+        openSegmentSlot: state.openSegmentSlot,
+        targetPairIndex,
+      });
+      setSegmentSlotLightboxIndex(targetPairIndex);
+
+      // Clear the navigation state so it doesn't re-trigger
+      navigate(location.pathname + location.hash, { replace: true, state: { fromShotClick: state.fromShotClick } });
+    } else {
+      console.log('[SegmentSlotNav] Could not find pair for openSegmentSlot:', {
+        openSegmentSlot: state.openSegmentSlot,
+        pairDataKeys: [...pairDataByIndex.keys()],
+        pairDataStartIds: [...pairDataByIndex.values()].map(p => p.startImage.id?.substring(0, 8)),
+      });
+    }
+  }, [location.state, pairDataByIndex, navigate, location.pathname, location.hash]);
 
   // Debounce ref for frame count changes (declared before segmentSlotModeData memo that uses it)
   const frameCountDebounceRef = useRef<NodeJS.Timeout | null>(null);

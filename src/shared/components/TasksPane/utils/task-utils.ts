@@ -98,5 +98,28 @@ export const extractTaskParentGenerationId = (params: Record<string, any>): stri
   );
 };
 
+/**
+ * Extract pair_shot_generation_id from task params for segment videos.
+ * This identifies which timeline pair the segment belongs to.
+ */
+export const extractPairShotGenerationId = (task: Task): string | null => {
+  const params = task.params as Record<string, any>;
+
+  return (
+    params?.pair_shot_generation_id ||
+    params?.individual_segment_params?.pair_shot_generation_id ||
+    params?.orchestrator_details?.pair_shot_generation_ids?.[params?.segment_index ?? 0] ||
+    null
+  );
+};
+
+/**
+ * Check if a task is a segment video (individual_travel_segment)
+ * These should open in shot context for proper timeline integration.
+ */
+export const isSegmentVideoTask = (task: Task): boolean => {
+  return task.task_type === 'individual_travel_segment';
+};
+
 
 

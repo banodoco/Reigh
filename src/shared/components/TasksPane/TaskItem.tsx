@@ -19,7 +19,7 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useTaskType } from '@/shared/hooks/useTaskType';
 
 // Import from new modules
-import { parseTaskParamsForDisplay, getAbbreviatedTaskName, extractShotId } from './utils/task-utils';
+import { parseTaskParamsForDisplay, getAbbreviatedTaskName, extractShotId, extractPairShotGenerationId, isSegmentVideoTask } from './utils/task-utils';
 import { useTaskContentType } from './hooks/useTaskContentType';
 import { useVideoGenerations } from './hooks/useVideoGenerations';
 import { useImageGeneration } from './hooks/useImageGeneration';
@@ -272,7 +272,27 @@ const TaskItem: React.FC<TaskItemProps> = ({
       videoOutputsLength: videoOutputs?.length || 0,
       isCompletedVideoTask: taskInfo.isCompletedVideoTask,
       isVideoTask: taskInfo.isVideoTask,
+      isSegmentVideo: isSegmentVideoTask(task),
+      shotId: shotId?.substring(0, 8),
     });
+
+    // For segment videos, open in shot context for full timeline integration
+    // This ensures correct start/end images and navigation between pairs
+    if (isSegmentVideoTask(task) && shotId) {
+      const pairShotGenerationId = extractPairShotGenerationId(task);
+      console.log('[VideoQueryDebug] Segment video - navigating to shot context:', {
+        shotId: shotId.substring(0, 8),
+        pairShotGenerationId: pairShotGenerationId?.substring(0, 8),
+      });
+      setCurrentShotId(shotId);
+      navigate(`/tools/travel-between-images#${shotId}`, {
+        state: {
+          fromShotClick: true,
+          openSegmentSlot: pairShotGenerationId, // ShotImagesEditor will use this to open the segment slot
+        }
+      });
+      return;
+    }
 
     if (onOpenVideoLightbox && videoOutputs && videoOutputs.length > 0) {
       console.log('[VideoQueryDebug] Opening lightbox with existing videoOutputs');
