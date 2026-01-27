@@ -314,17 +314,28 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
     }
   })();
 
+  // On mobile, left/right panes only show one button - make them taller for easier tapping
+  const isMobileSidePane = !useDesktopBehavior && !isBottom && buttons.length === 1;
+
+  // Add safe area margin for iOS home indicator on mobile/tablet (use half the inset for subtler offset)
+  const mobileStyle = isMobile ? {
+    ...dynamicStyle,
+    marginBottom: 'calc(env(safe-area-inset-bottom, 0px) * 0.5)',
+  } : dynamicStyle;
+
   const content = (
     <div
       data-pane-control
       data-tour={dataTour}
-      style={dynamicStyle}
+      style={mobileStyle}
       className={cn(
         `fixed ${zIndex} flex items-center p-1 backdrop-blur-sm border border-zinc-700 rounded-md gap-1 duration-${PANE_CONFIG.timing.ANIMATION_DURATION} ${PANE_CONFIG.transition.EASING}`,
         bgOpacity,
         transition,
         positionClasses,
-        'opacity-100 touch-none'
+        'opacity-100 touch-none',
+        // Taller touch target for mobile side panes with single button
+        isMobileSidePane && 'min-h-[72px] justify-center'
       )}
       onMouseEnter={useDesktopBehavior && isOpen && !isLocked ? handlePaneEnter : undefined}
       onMouseLeave={useDesktopBehavior && isOpen && !isLocked ? handlePaneLeave : undefined}
