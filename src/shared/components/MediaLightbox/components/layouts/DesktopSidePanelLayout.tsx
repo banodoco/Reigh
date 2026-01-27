@@ -133,7 +133,7 @@ export const DesktopSidePanelLayout: React.FC<SidePanelLayoutProps> = (props) =>
     >
       {/* Media section - Left side (60% width) */}
       <div
-        className="flex-1 flex items-center justify-center relative"
+        className="flex-1 flex items-center justify-center relative overflow-hidden"
         style={{ width: '60%' }}
         onClick={(e) => {
           e.stopPropagation();

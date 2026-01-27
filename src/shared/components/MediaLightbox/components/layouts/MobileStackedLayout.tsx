@@ -119,7 +119,7 @@ export const MobileStackedLayout: React.FC<SidePanelLayoutProps> = (props) => {
     <div className="w-full h-full flex flex-col bg-black/90">
       {/* Media section - Top (50% height) with swipe navigation */}
       <div
-        className="flex-none flex items-center justify-center relative touch-pan-y z-10"
+        className="flex-none flex items-center justify-center relative touch-pan-y z-10 overflow-hidden"
         style={{
           height: '50%',
           transform: swipeNavigation.isSwiping ? `translateX(${swipeNavigation.swipeOffset}px)` : undefined,

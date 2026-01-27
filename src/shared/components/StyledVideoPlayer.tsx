@@ -258,13 +258,8 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
 
   // The wrapper should shrink to fit the video content so controls overlay the video correctly
   // Using inline-flex makes the container shrink-wrap the video element
-  // Apply aspectRatio from videoDimensions to prevent poster sizing issues on mobile
   const wrapperStyle: React.CSSProperties = {
     ...style,
-    // Set aspect ratio before video metadata loads to prevent poster "zoom to top" issue
-    aspectRatio: videoDimensions
-      ? `${videoDimensions.width} / ${videoDimensions.height}`
-      : undefined,
   };
 
   return (
@@ -293,12 +288,14 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
       </video>
 
       {/* Thumbnail overlay while video is loading */}
+      {/* Uses aspectRatio on img to help with initial sizing for tall videos on mobile */}
       {poster && !isVideoReady && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
           <img
             src={getDisplayUrl(poster)}
             alt=""
             className="max-w-full max-h-full object-contain rounded-lg"
+            style={videoDimensions ? { aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}` } : undefined}
           />
           {/* Loading spinner overlay */}
           <div className="absolute inset-0 flex items-center justify-center">
