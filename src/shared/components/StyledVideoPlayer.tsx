@@ -264,7 +264,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
 
   return (
     <div
-      className={cn("relative inline-flex items-center justify-center max-w-full max-h-full", className)}
+      className={cn("relative flex items-center justify-center w-full h-full", className)}
       style={wrapperStyle}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
