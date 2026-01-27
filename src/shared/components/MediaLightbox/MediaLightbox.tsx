@@ -2036,7 +2036,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 e.nativeEvent.stopImmediatePropagation();
               }
             }}
-            style={{ 
+            style={{
               // Ensure the overlay captures all pointer events
               pointerEvents: 'all',
               touchAction: 'none',
@@ -2045,13 +2045,15 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               cursor: 'pointer',
               // Make sure overlay is above everything else
               zIndex: 10000,
-              // Ensure full coverage
+              // Ensure full coverage - use 100dvh for iPad compatibility
               position: 'fixed',
               top: 0,
               left: 0,
               // Adjust for tasks pane on tablet/desktop (use isTabletOrLarger, not !isMobile, for iPad support)
               right: effectiveTasksPaneOpen && isTabletOrLarger ? `${effectiveTasksPaneWidth}px` : 0,
               bottom: 0,
+              // Explicit height for iPad - bottom:0 alone can be inconsistent
+              height: '100dvh',
               // Smooth transition when tasks pane opens/closes
               transition: 'right 300ms cubic-bezier(0.22, 1, 0.36, 1), width 300ms cubic-bezier(0.22, 1, 0.36, 1)',
               // Adjust width for tasks pane on tablet/desktop
@@ -2266,9 +2268,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
               transition: 'width 300ms cubic-bezier(0.22, 1, 0.36, 1)',
               // Use unified needsTasksPaneOffset for consistent tasks pane handling
               ...(needsTasksPaneOffset ? {
-                width: `calc(100vw - ${effectiveTasksPaneWidth}px)`
+                width: `calc(100vw - ${effectiveTasksPaneWidth}px)`,
+                // Explicit height for iPad - h-full (100%) can be inconsistent
+                height: '100dvh',
               } : needsFullscreenLayout ? {
-                width: '100vw'
+                width: '100vw',
+                // Explicit height for iPad - h-full (100%) can be inconsistent
+                height: '100dvh',
               } : {})
             }}
             onPointerDownOutside={(event) => {
