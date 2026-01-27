@@ -15,6 +15,8 @@ import { cn } from '@/shared/lib/utils';
 
 import { TaskDetailsPanelWrapper } from './TaskDetailsPanelWrapper';
 import { VariantSelector } from '@/tools/travel-between-images/components/VideoGallery/components/VideoTrimEditor/components/VariantSelector';
+import { usePendingVariantTasks } from '@/shared/hooks/usePendingVariantTasks';
+import { useProject } from '@/shared/contexts/ProjectContext';
 import type { GenerationVariant } from '@/shared/hooks/useVariants';
 import type { GenerationRow } from '@/types/shots';
 
@@ -108,9 +110,16 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   const isMobile = variant === 'mobile';
   const hasVariants = variants && variants.length >= 1;
   const [idCopied, setIdCopied] = useState(false);
-  
+
   // Get task ID for copy functionality
   const taskId = taskDetailsData?.taskId;
+
+  // Get project ID and pending variant tasks
+  const { selectedProjectId } = useProject();
+  const { pendingCount: pendingVariantCount } = usePendingVariantTasks(
+    currentMediaId || null,
+    selectedProjectId
+  );
 
   // Responsive styles
   const variantsMaxHeight = isMobile ? 'max-h-[120px]' : 'max-h-[200px]';
@@ -210,7 +219,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
                   onClick={() => variantsSectionRef?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
                 >
-                  <span>variants ({variants.length})</span>
+                  <span>variants ({variants.length}{pendingVariantCount > 0 ? `, ${pendingVariantCount} pending` : ''})</span>
                   <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                   </svg>
