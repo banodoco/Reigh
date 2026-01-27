@@ -321,6 +321,7 @@ export const MediaDisplayWithCanvas: React.FC<MediaDisplayWithCanvasProps> = ({
           preload="auto"
           className={`max-w-full max-h-full shadow-wes border border-border/20 ${variant === 'regular-centered' ? 'rounded' : ''}`}
           style={mediaStyle}
+          videoDimensions={imageDimensions ?? undefined}
           onLoadedMetadata={onVideoLoadedMetadata}
           playbackStart={playbackStart}
           playbackEnd={playbackEnd}

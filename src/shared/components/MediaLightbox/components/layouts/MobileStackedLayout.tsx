@@ -169,6 +169,7 @@ export const MobileStackedLayout: React.FC<SidePanelLayoutProps> = (props) => {
               playsInline
               preload="auto"
               className="max-w-full max-h-full shadow-wes border border-border/20"
+              videoDimensions={effectiveImageDimensions}
               onLoadedMetadata={(e) => {
                 const video = e.currentTarget;
                 if (Number.isFinite(video.duration) && video.duration > 0) {

@@ -191,6 +191,7 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
               playsInline
               preload="auto"
               className="max-w-full max-h-full object-contain shadow-wes border border-border/20 rounded"
+              videoDimensions={effectiveImageDimensions ?? undefined}
               onLoadedMetadata={(e) => {
                 const video = e.currentTarget;
                 if (Number.isFinite(video.duration) && video.duration > 0) {

@@ -180,6 +180,7 @@ export const MediaContentDisplay: React.FC<MediaContentDisplayProps> = ({
         playsInline
         preload="auto"
         className={`max-w-full max-h-full shadow-wes border border-border/20 ${variant === 'regular-centered' ? 'rounded' : ''}`}
+        videoDimensions={imageDimensions ?? undefined}
         onLoadedMetadata={(e) => {
           const video = e.currentTarget;
           if (Number.isFinite(video.duration) && video.duration > 0) {

@@ -21,6 +21,11 @@ interface StyledVideoPlayerProps {
   playbackStart?: number;
   /** Optional playback end time in seconds (for trim preview) */
   playbackEnd?: number;
+  /**
+   * Video dimensions for aspect ratio preservation before metadata loads.
+   * Prevents poster "zoom to top" issue on mobile for tall videos.
+   */
+  videoDimensions?: { width: number; height: number };
 }
 
 export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
@@ -36,6 +41,7 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
   onLoadedMetadata,
   playbackStart,
   playbackEnd,
+  videoDimensions,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const isMobile = useIsMobile();
@@ -252,10 +258,19 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
 
   // The wrapper should shrink to fit the video content so controls overlay the video correctly
   // Using inline-flex makes the container shrink-wrap the video element
+  // Apply aspectRatio from videoDimensions to prevent poster sizing issues on mobile
+  const wrapperStyle: React.CSSProperties = {
+    ...style,
+    // Set aspect ratio before video metadata loads to prevent poster "zoom to top" issue
+    aspectRatio: videoDimensions
+      ? `${videoDimensions.width} / ${videoDimensions.height}`
+      : undefined,
+  };
+
   return (
     <div
       className={cn("relative inline-flex items-center justify-center max-w-full max-h-full", className)}
-      style={style}
+      style={wrapperStyle}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
       onClick={handleContainerClick}
