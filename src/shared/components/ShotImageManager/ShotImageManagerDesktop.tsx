@@ -196,53 +196,21 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
     const currentImage = lightbox.currentImages[lightbox.lightboxIndex];
     if (!currentImage) return undefined;
 
-    // Get the current image's shot_generation.id
-    const currentShotGenId = currentImage.id || (currentImage as any).shotImageEntryId;
-    if (!currentShotGenId) return undefined;
-
-    // Find the position of this image in the timeline
-    // segmentSlots[i].pairShotGenerationId is the start image of pair i
-    // So if currentShotGenId === pairShotGenerationId[i], the current image is at position i
-    // The "prev" segment ends at this image (pair index i-1 if it exists)
-    // The "next" segment starts at this image (pair index i if it exists)
-
-    let currentPosition = -1;
-    for (let i = 0; i < segmentSlots.length; i++) {
-      if (segmentSlots[i].pairShotGenerationId === currentShotGenId) {
-        currentPosition = i;
-        break;
-      }
-    }
-
-    // Also check if this is the END image of the last segment (position = segmentSlots.length)
-    // The last segment's end image would be at position segmentSlots.length
-    // We can detect this by checking if the image is NOT a start image of any segment
-    // and checking the order of images in lightbox.currentImages
-    if (currentPosition === -1) {
-      // Check if this could be the last image (end of last segment)
-      // The last image in the timeline would be after all segment starts
-      const imageIndex = lightbox.lightboxIndex;
-      // In batch mode, images are ordered by timeline position
-      // If we're viewing the last image, it's the end of the last segment
-      if (imageIndex === lightbox.currentImages.length - 1 && segmentSlots.length > 0) {
-        currentPosition = segmentSlots.length; // One past the last start position
-      }
-    }
-
-    if (currentPosition === -1) return undefined;
+    // Use position-based matching instead of ID-based matching
+    // The image's position in the timeline is its index in the images array
+    // lightbox.lightboxIndex is the index into currentImages (which may include external gens)
+    // For batch mode, images are ordered by timeline position
+    const imagePosition = lightbox.lightboxIndex;
 
     // Build prev segment info (ends with current image)
-    // prev segment is at index (currentPosition - 1)
+    // prev segment is at index (imagePosition - 1)
     let prev: AdjacentSegmentsData['prev'] = undefined;
-    if (currentPosition > 0) {
-      const prevSlot = segmentSlots[currentPosition - 1];
+    if (imagePosition > 0 && imagePosition - 1 < segmentSlots.length) {
+      const prevSlot = segmentSlots[imagePosition - 1];
       if (prevSlot) {
-        // Find start and end image URLs for this segment
-        const startImageIndex = lightbox.currentImages.findIndex(
-          (img: any) => img.id === prevSlot.pairShotGenerationId || img.shotImageEntryId === prevSlot.pairShotGenerationId
-        );
-        const startImage = startImageIndex !== -1 ? lightbox.currentImages[startImageIndex] : null;
-        const endImage = currentImage; // Current image IS the end of prev segment
+        // Get start image (previous image in the array)
+        const startImage = lightbox.currentImages[imagePosition - 1];
+        const endImage = currentImage;
 
         prev = {
           pairIndex: prevSlot.index,
@@ -254,16 +222,13 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
     }
 
     // Build next segment info (starts with current image)
-    // next segment is at index currentPosition (if it exists)
+    // next segment is at index imagePosition (if it exists)
     let next: AdjacentSegmentsData['next'] = undefined;
-    if (currentPosition < segmentSlots.length) {
-      const nextSlot = segmentSlots[currentPosition];
+    if (imagePosition < segmentSlots.length) {
+      const nextSlot = segmentSlots[imagePosition];
       if (nextSlot) {
-        // Find end image (the next image in the timeline)
-        const endImageIndex = lightbox.currentImages.findIndex(
-          (img: any, idx: number) => idx > lightbox.lightboxIndex
-        );
-        const endImage = endImageIndex !== -1 ? lightbox.currentImages[endImageIndex] : null;
+        // Get end image (next image in the array)
+        const endImage = lightbox.currentImages[imagePosition + 1];
 
         next = {
           pairIndex: nextSlot.index,
@@ -274,18 +239,35 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
       }
     }
 
+    // [SegmentNavDebug] Log for debugging
+    console.log('[SegmentNavDebug] ShotImageManager position-based matching:', {
+      imagePosition,
+      totalImages: lightbox.currentImages.length,
+      totalSegmentSlots: segmentSlots.length,
+      hasPrev: !!prev,
+      hasNext: !!next,
+      prevHasVideo: prev?.hasVideo,
+      nextHasVideo: next?.hasVideo,
+    });
+
     if (!prev && !next) return undefined;
 
     return {
       prev,
       next,
       onNavigateToSegment: (pairIndex: number) => {
-        // Synchronously add class - CSS will show overlay and disable animations
-        document.body.classList.add('lightbox-transitioning');
+        console.log('[LightboxTransition] ShotImageManager onNavigateToSegment: Showing overlay');
+        // Show overlay via parent callback (handles both ref and body class)
         onStartLightboxTransition?.();
-        // Close the old lightbox and open the new one synchronously
-        lightbox.setLightboxIndex(null);
-        props.onPairClick!(pairIndex);
+
+        // Use double-rAF to ensure overlay is painted before state changes
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            console.log('[LightboxTransition] Overlay painted, now triggering state changes');
+            lightbox.setLightboxIndex(null);
+            props.onPairClick!(pairIndex);
+          });
+        });
       },
     };
   }, [segmentSlots, props.onPairClick, lightbox.lightboxIndex, lightbox.currentImages, lightbox.setLightboxIndex, onStartLightboxTransition]);

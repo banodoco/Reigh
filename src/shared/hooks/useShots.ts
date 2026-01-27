@@ -100,19 +100,26 @@ export const mapShotGenerationToRow = (sg: any): GenerationRow | null => {
   const gen = sg.generations || sg.generation; // Handle both 'generations' and 'generation' aliases
   if (!gen) return null;
 
+  // CRITICAL: Use primary variant's location/thumbnail if available
+  // The primary variant is what should be displayed in galleries and used for task submission
+  // Falls back to generation.location if no primary variant exists (legacy data)
+  const primaryVariant = gen.primary_variant;
+  const effectiveLocation = primaryVariant?.location || gen.location;
+  const effectiveThumbnail = primaryVariant?.thumbnail_url || gen.thumbnail_url || effectiveLocation;
+
   return {
     // PRIMARY ID FIELDS:
     id: sg.id, // shot_generations.id - unique per entry in shot
     generation_id: gen.id, // generations.id - the actual generation
-    
+
     // DEPRECATED (kept for backwards compat during transition):
     shotImageEntryId: sg.id,
     shot_generation_id: sg.id,
-    
-    // Generation data:
-    location: gen.location,
-    imageUrl: gen.location,
-    thumbUrl: gen.thumbnail_url || gen.location,
+
+    // Generation data - uses primary variant URLs for display/submission
+    location: effectiveLocation,
+    imageUrl: effectiveLocation,
+    thumbUrl: effectiveThumbnail,
     type: gen.type || 'image',
     created_at: gen.created_at,
     createdAt: gen.created_at,
@@ -120,11 +127,11 @@ export const mapShotGenerationToRow = (sg: any): GenerationRow | null => {
     name: gen.name,
     based_on: gen.based_on,
     params: gen.params || {},
-    
+
     // From shot_generations table:
     timeline_frame: sg.timeline_frame,
     metadata: sg.metadata || {},
-    
+
     // Legacy support:
     position: sg.timeline_frame != null ? Math.floor(sg.timeline_frame / 50) : undefined,
   } as GenerationRow;
@@ -615,6 +622,7 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
         const batchResults = await Promise.all(
           batch.map(async (shot) => {
           // Build query for this shot's images
+          // Fetch with primary variant for correct display URLs
           let query = supabase
             .from('shot_generations')
             .select(`
@@ -631,7 +639,12 @@ export const useListShots = (projectId?: string | null, options: { maxImagesPerS
                 starred,
                 name,
                 based_on,
-                params
+                params,
+                primary_variant_id,
+                primary_variant:generation_variants!generations_primary_variant_id_fkey (
+                  location,
+                  thumbnail_url
+                )
               )
             `)
             .eq('shot_id', shot.id)

@@ -297,11 +297,33 @@ export function useVideoRegenerateMode({
     const orchestratorDetails = (taskParams.orchestrator_details || {}) as Record<string, unknown>;
 
     // Extract segment images
+    // CRITICAL: In segment slot mode, ALWAYS use pairData from timeline (fresh data).
+    // Task params are stale and may have different images from when the video was generated.
     const segmentIndex = (taskParams.segment_index as number) ?? 0;
-    let segmentImageInfo = extractSegmentImages(taskParams, segmentIndex);
+    let segmentImageInfo: {
+      startUrl?: string;
+      endUrl?: string;
+      startGenId?: string;
+      endGenId?: string;
+      hasImages: boolean;
+    };
 
-    // Priority 1: Use currentSegmentImages prop (fresh timeline data)
-    if (currentSegmentImages && (currentSegmentImages.startUrl || currentSegmentImages.endUrl)) {
+    if (segmentSlotMode?.pairData) {
+      // Segment slot mode: Use timeline pairData (source of truth for current pair)
+      segmentImageInfo = {
+        startUrl: segmentSlotMode.pairData.startImage?.url,
+        endUrl: segmentSlotMode.pairData.endImage?.url,
+        startGenId: segmentSlotMode.pairData.startImage?.generationId,
+        endGenId: segmentSlotMode.pairData.endImage?.generationId,
+        hasImages: !!(segmentSlotMode.pairData.startImage?.url || segmentSlotMode.pairData.endImage?.url),
+      };
+      console.log('[SegmentImageFix] Using pairData from timeline:', {
+        pairIndex: segmentSlotMode.pairData.index,
+        startUrl: segmentImageInfo.startUrl?.substring(segmentImageInfo.startUrl.lastIndexOf('/') + 1),
+        endUrl: segmentImageInfo.endUrl?.substring(segmentImageInfo.endUrl.lastIndexOf('/') + 1),
+      });
+    } else if (currentSegmentImages && (currentSegmentImages.startUrl || currentSegmentImages.endUrl)) {
+      // Non-slot mode with currentSegmentImages prop (fresh timeline data)
       segmentImageInfo = {
         startUrl: currentSegmentImages.startUrl,
         endUrl: currentSegmentImages.endUrl,
@@ -309,17 +331,21 @@ export function useVideoRegenerateMode({
         endGenId: currentSegmentImages.endGenerationId,
         hasImages: !!(currentSegmentImages.startUrl || currentSegmentImages.endUrl),
       };
-    }
-    // Priority 2: Fall back to inputImages from task details
-    else if (!segmentImageInfo.hasImages && adjustedTaskDetailsData?.inputImages?.length) {
-      const passedImages = adjustedTaskDetailsData.inputImages;
-      segmentImageInfo = {
-        startUrl: passedImages[0],
-        endUrl: passedImages.length > 1 ? passedImages[passedImages.length - 1] : passedImages[0],
-        startGenId: undefined,
-        endGenId: undefined,
-        hasImages: passedImages.length > 0,
-      };
+    } else {
+      // Fallback: Extract from task params (only when not in segment slot mode)
+      segmentImageInfo = extractSegmentImages(taskParams, segmentIndex);
+
+      // Last resort: Fall back to inputImages from task details
+      if (!segmentImageInfo.hasImages && adjustedTaskDetailsData?.inputImages?.length) {
+        const passedImages = adjustedTaskDetailsData.inputImages;
+        segmentImageInfo = {
+          startUrl: passedImages[0],
+          endUrl: passedImages.length > 1 ? passedImages[passedImages.length - 1] : passedImages[0],
+          startGenId: undefined,
+          endGenId: undefined,
+          hasImages: passedImages.length > 0,
+        };
+      }
     }
 
     // Extract pair_shot_generation_id

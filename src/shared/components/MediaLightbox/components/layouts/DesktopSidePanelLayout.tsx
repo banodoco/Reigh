@@ -342,16 +342,29 @@ export const DesktopSidePanelLayout: React.FC<SidePanelLayoutProps> = (props) =>
         <TopRightControls {...buttonGroupProps.topRight} />
 
         {/* Bottom Center - Constituent Image Navigation (when viewing segment video) */}
-        {segmentSlotMode?.onNavigateToImage && (
-          <ConstituentImageNavigation
-            startImageId={segmentSlotMode.pairData.startImage?.id}
-            endImageId={segmentSlotMode.pairData.endImage?.id}
-            startImageUrl={segmentSlotMode.pairData.startImage?.thumbUrl || segmentSlotMode.pairData.startImage?.url}
-            endImageUrl={segmentSlotMode.pairData.endImage?.thumbUrl || segmentSlotMode.pairData.endImage?.url}
-            onNavigateToImage={segmentSlotMode.onNavigateToImage}
-            variant="overlay"
-          />
-        )}
+        {segmentSlotMode?.onNavigateToImage && (() => {
+          const startUrl = segmentSlotMode.pairData.startImage?.thumbUrl || segmentSlotMode.pairData.startImage?.url;
+          const endUrl = segmentSlotMode.pairData.endImage?.thumbUrl || segmentSlotMode.pairData.endImage?.url;
+          console.log('[SegmentNavDebug] ConstituentImageNavigation props:', {
+            hasOnNavigateToImage: !!segmentSlotMode.onNavigateToImage,
+            startImageId: segmentSlotMode.pairData.startImage?.id?.substring(0, 8),
+            endImageId: segmentSlotMode.pairData.endImage?.id?.substring(0, 8),
+            startUrl: startUrl?.substring(0, 50),
+            endUrl: endUrl?.substring(0, 50),
+            startImageKeys: segmentSlotMode.pairData.startImage ? Object.keys(segmentSlotMode.pairData.startImage) : [],
+            endImageKeys: segmentSlotMode.pairData.endImage ? Object.keys(segmentSlotMode.pairData.endImage) : [],
+          });
+          return (
+            <ConstituentImageNavigation
+              startImageId={segmentSlotMode.pairData.startImage?.id}
+              endImageId={segmentSlotMode.pairData.endImage?.id}
+              startImageUrl={startUrl}
+              endImageUrl={endUrl}
+              onNavigateToImage={segmentSlotMode.onNavigateToImage}
+              variant="overlay"
+            />
+          );
+        })()}
 
         {/* Bottom Workflow Controls */}
         <WorkflowControlsBar

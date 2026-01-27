@@ -2997,13 +2997,13 @@
 /* Note: mobile tap "flash" is handled in React to avoid sticky :hover */
 
 /* Lightbox transition overlay - prevents flash when navigating between image/segment lightboxes */
-/* Uses CSS pseudo-element so it appears INSTANTLY when class is added (no React render wait) */
+/* z-index 99999 = BELOW lightboxes (100000) so new lightbox appears on top immediately */
 body.lightbox-transitioning::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.8);
-  z-index: 100001;
+  background: rgba(0, 0, 0, 1);
+  z-index: 99999;
   pointer-events: none;
 }
 

@@ -26,11 +26,18 @@ export const useShotGenerations = (
     queryFn: async ({ pageParam, signal }: { pageParam: number; signal?: AbortSignal }) => {
       // Don't throw immediately on abort - let the fetch fail naturally
 
+      // Fetch with primary variant for correct display URLs
       const { data, error } = await supabase
         .from('shot_generations')
         .select(`
           *,
-          generation:generations!shot_generations_generation_id_generations_id_fk(*)
+          generation:generations!shot_generations_generation_id_generations_id_fk(
+            *,
+            primary_variant:generation_variants!generations_primary_variant_id_fkey (
+              location,
+              thumbnail_url
+            )
+          )
         `)
         .eq('shot_id', shotId!)
         .order('timeline_frame', { ascending: true })
@@ -184,9 +191,11 @@ export const useAllShotGenerations = (
         timestamp: startTime
       });
 
-      // Query shot_generations with embedded generations data
+      // Query shot_generations with embedded generations data + primary variant
       // NOTE: Must specify FK explicitly to avoid ambiguous relationship error (PGRST201)
       // since there are two FKs between shot_generations and generations
+      // We also fetch the primary_variant using the generations.primary_variant_id FK
+      // to get the correct display URL (primary variant may differ from generation.location)
       const response = await supabase
         .from('shot_generations')
         .select(`
@@ -203,7 +212,12 @@ export const useAllShotGenerations = (
             starred,
             name,
             based_on,
-            params
+            params,
+            primary_variant_id,
+            primary_variant:generation_variants!generations_primary_variant_id_fkey (
+              location,
+              thumbnail_url
+            )
           )
         `)
         .eq('shot_id', stableShotId!)

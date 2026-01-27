@@ -597,37 +597,70 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // Track lightbox transitions to keep overlay visible during navigation between image/segment lightboxes
   const [isLightboxTransitioning, setIsLightboxTransitioning] = useState(false);
 
+  // Ref for synchronous overlay control (React state updates are async, causing flash)
+  const transitionOverlayRef = useRef<HTMLDivElement>(null);
+
+  // Show/hide overlay synchronously via ref (bypasses React's async state batching)
+  const showTransitionOverlay = useCallback(() => {
+    if (transitionOverlayRef.current) {
+      transitionOverlayRef.current.style.display = 'block';
+      transitionOverlayRef.current.style.opacity = '1';
+      console.log('[LightboxTransition] Overlay shown via ref (sync)');
+    }
+    setIsLightboxTransitioning(true);
+  }, []);
+
+  const hideTransitionOverlay = useCallback(() => {
+    if (transitionOverlayRef.current) {
+      // Fade out smoothly over 150ms
+      transitionOverlayRef.current.style.transition = 'opacity 150ms ease-out';
+      transitionOverlayRef.current.style.opacity = '0';
+      // Hide after fade completes
+      setTimeout(() => {
+        if (transitionOverlayRef.current) {
+          transitionOverlayRef.current.style.display = 'none';
+          transitionOverlayRef.current.style.transition = '';
+        }
+      }, 150);
+      console.log('[LightboxTransition] Overlay fading out');
+    }
+    setIsLightboxTransitioning(false);
+  }, []);
+
   // Clear transition state when segment slot lightbox opens
   // (Image lightbox clearing is handled in Timeline/ShotImageManager via their useEffect)
   useEffect(() => {
     if (segmentSlotLightboxIndex !== null && isLightboxTransitioning) {
-      // Small delay to ensure the new lightbox has rendered
+      console.log('[LightboxTransition] Segment lightbox opened, clearing transition after 200ms');
+      // Delay to ensure the new lightbox has fully rendered and painted
       const timer = setTimeout(() => {
-        setIsLightboxTransitioning(false);
+        console.log('[LightboxTransition] Hiding overlay (segment lightbox render complete)');
+        hideTransitionOverlay();
         document.body.classList.remove('lightbox-transitioning');
-      }, 50);
+      }, 200);
       return () => clearTimeout(timer);
     }
-  }, [segmentSlotLightboxIndex, isLightboxTransitioning]);
+  }, [segmentSlotLightboxIndex, isLightboxTransitioning, hideTransitionOverlay]);
 
   // Safety cleanup: always remove the class when transition state is cleared
-  // This prevents the class from getting stuck if something goes wrong
   useEffect(() => {
     if (!isLightboxTransitioning) {
       document.body.classList.remove('lightbox-transitioning');
     }
   }, [isLightboxTransitioning]);
 
-  // Safety timeout: remove the class after 500ms max to prevent it getting stuck
+  // Safety timeout: remove overlay after 500ms max to prevent it getting stuck
   useEffect(() => {
     if (isLightboxTransitioning) {
+      console.log('[LightboxTransition] Safety timer started (500ms)');
       const safetyTimer = setTimeout(() => {
-        setIsLightboxTransitioning(false);
+        console.log('[LightboxTransition] Safety timeout fired! Hiding overlay');
+        hideTransitionOverlay();
         document.body.classList.remove('lightbox-transitioning');
       }, 500);
       return () => clearTimeout(safetyTimer);
     }
-  }, [isLightboxTransitioning]);
+  }, [isLightboxTransitioning, hideTransitionOverlay]);
 
   // Safety: ensure body scroll is restored after lightbox transition ends
   // This fixes a race condition where two MediaLightbox instances' scroll lock effects interfere
@@ -1041,13 +1074,19 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
 
       // Navigate to constituent image - closes segment slot and opens image lightbox
       onNavigateToImage: (shotGenerationId: string) => {
-        console.log('[ConstituentImageNav] Navigate to image:', shotGenerationId?.substring(0, 8));
-        // Synchronously add class - CSS will show overlay and disable animations
+        console.log('[LightboxTransition] onNavigateToImage: Showing overlay');
+        // Show overlay synchronously via ref (bypasses React's async state)
+        showTransitionOverlay();
         document.body.classList.add('lightbox-transitioning');
-        setIsLightboxTransitioning(true);
-        // Close the segment slot lightbox and request image lightbox to open
-        setSegmentSlotLightboxIndex(null);
-        setPendingImageToOpen(shotGenerationId);
+
+        // Use double-rAF to ensure overlay is painted before state changes
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            console.log('[LightboxTransition] Overlay painted, now triggering state changes');
+            setSegmentSlotLightboxIndex(null);
+            setPendingImageToOpen(shotGenerationId);
+          });
+        });
       },
     };
   }, [
@@ -2333,17 +2372,23 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 // Constituent image navigation support (from segment back to image)
                 pendingImageToOpen={pendingImageToOpen}
                 onClearPendingImageToOpen={() => {
+                  console.log('[LightboxTransition] onClearPendingImageToOpen called (Timeline), clearing in 200ms');
                   setPendingImageToOpen(null);
                   // Also clear transition state when image lightbox opens
                   setTimeout(() => {
-                    setIsLightboxTransitioning(false);
+                    console.log('[LightboxTransition] Hiding overlay (image lightbox opened via Timeline)');
+                    hideTransitionOverlay();
                     document.body.classList.remove('lightbox-transitioning');
-                  }, 50);
+                  }, 200);
                 }}
                 // Lightbox transition support (keeps overlay visible during navigation)
-                onStartLightboxTransition={() => setIsLightboxTransitioning(true)}
+                onStartLightboxTransition={() => {
+                  console.log('[LightboxTransition] onStartLightboxTransition called (Timeline)');
+                  showTransitionOverlay();
+                  document.body.classList.add('lightbox-transitioning');
+                }}
               />
-              
+
               {/* Helper for un-positioned generations - in timeline mode, show after timeline */}
               <div className="mt-4" style={{ minHeight: unpositionedGenerationsCount > 0 ? '40px' : '0px' }}>
                 {unpositionedGenerationsCount > 0 && (
@@ -2498,15 +2543,21 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   // Constituent image navigation support (from segment back to image)
                   pendingImageToOpen={pendingImageToOpen}
                   onClearPendingImageToOpen={() => {
-                  setPendingImageToOpen(null);
-                  // Also clear transition state when image lightbox opens
-                  setTimeout(() => {
-                    setIsLightboxTransitioning(false);
-                    document.body.classList.remove('lightbox-transitioning');
-                  }, 50);
-                }}
+                    console.log('[LightboxTransition] onClearPendingImageToOpen called (ShotImageManager), clearing in 200ms');
+                    setPendingImageToOpen(null);
+                    // Also clear transition state when image lightbox opens
+                    setTimeout(() => {
+                      console.log('[LightboxTransition] Hiding overlay (image lightbox opened via ShotImageManager)');
+                      hideTransitionOverlay();
+                      document.body.classList.remove('lightbox-transitioning');
+                    }, 200);
+                  }}
                   // Lightbox transition support (keeps overlay visible during navigation)
-                  onStartLightboxTransition={() => setIsLightboxTransitioning(true)}
+                  onStartLightboxTransition={() => {
+                    console.log('[LightboxTransition] onStartLightboxTransition called (ShotImageManager)');
+                    showTransitionOverlay();
+                    document.body.classList.add('lightbox-transitioning');
+                  }}
                 />
 
                 {/* Helper for un-positioned generations - in batch mode, show after input images */}
@@ -2601,13 +2652,14 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       </CardContent>
 
       {/* Persistent overlay during lightbox transitions - keeps screen dark while switching between lightboxes */}
-      {/* z-index must be higher than MediaLightbox (z-[100000]) to cover its fade-out animation */}
-      {isLightboxTransitioning && (
-        <div
-          className="fixed inset-0 z-[100001] bg-black/80 pointer-events-none"
-          aria-hidden="true"
-        />
-      )}
+      {/* z-index 99999 = BELOW lightboxes (100000) so new lightbox appears on top immediately */}
+      {/* ALWAYS in DOM, visibility controlled via ref for synchronous updates (React state is async) */}
+      <div
+        ref={transitionOverlayRef}
+        className="fixed inset-0 z-[99999] bg-black pointer-events-none"
+        aria-hidden="true"
+        style={{ opacity: 0, display: 'none' }}
+      />
 
       {/* Segment Slot Lightbox - Unified segment editor (handles both video and no-video cases) */}
       {segmentSlotModeData && (

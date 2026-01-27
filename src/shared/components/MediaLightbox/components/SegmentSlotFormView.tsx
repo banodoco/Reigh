@@ -50,6 +50,17 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
   const startImageUrl = segmentSlotMode.pairData.startImage?.url ?? segmentSlotMode.pairData.startImage?.thumbUrl;
   const endImageUrl = segmentSlotMode.pairData.endImage?.url ?? segmentSlotMode.pairData.endImage?.thumbUrl;
 
+  // [SegmentNavDebug] Log what we're getting for constituent image navigation
+  console.log('[SegmentNavDebug] SegmentSlotFormView image data:', {
+    hasOnNavigateToImage: !!segmentSlotMode.onNavigateToImage,
+    startImageId: pairShotGenerationId?.substring(0, 8),
+    endImageId: segmentSlotMode.pairData.endImage?.id?.substring(0, 8),
+    startImageUrl: startImageUrl?.substring(0, 50),
+    endImageUrl: endImageUrl?.substring(0, 50),
+    startImageKeys: segmentSlotMode.pairData.startImage ? Object.keys(segmentSlotMode.pairData.startImage) : [],
+    endImageKeys: segmentSlotMode.pairData.endImage ? Object.keys(segmentSlotMode.pairData.endImage) : [],
+  });
+
   // Use the combined hook for form props
   const { formProps, getSettingsForTaskCreation, saveSettings } = useSegmentSettingsForm({
     pairShotGenerationId,

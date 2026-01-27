@@ -607,78 +607,75 @@ const Timeline: React.FC<TimelineProps> = ({
       return undefined;
     }
 
-    // Current image's shot_generations.id
-    const currentShotGenId = currentImage.id;
+    // Find the position of the current image in the images array
+    // lightboxIndex is into currentImages which is [...images, ...externalGens...]
+    // If lightboxIndex >= images.length, it's an external gen and shouldn't have adjacent segments
+    if (lightboxIndex >= images.length) {
+      return undefined;
+    }
 
-    // Find which pair position this image is at
-    // An image can be the START of one segment and the END of the previous segment
+    // The image's position in the timeline is its index in the images array
+    const imagePosition = lightboxIndex;
+
+    // Helper to get image URL from images array by position
+    const getImageUrl = (position: number): string | undefined => {
+      const img = images[position] as any;
+      return img?.thumbUrl || img?.imageUrl || img?.url || img?.location;
+    };
+
     let prevSegment: { pairIndex: number; hasVideo: boolean; startImageUrl?: string; endImageUrl?: string } | undefined;
     let nextSegment: { pairIndex: number; hasVideo: boolean; startImageUrl?: string; endImageUrl?: string } | undefined;
 
-    // Check each segment slot to find where this image appears
-    for (const slot of segmentSlots) {
-      const pairShotGenId = slot.pairShotGenerationId;
+    // Slot at position P starts at image P and ends at image P+1
+    // If current image is at position P:
+    // - nextSegment: slot at index P (segment starting at this image), if P < segmentSlots.length
+    // - prevSegment: slot at index P-1 (segment ending at this image), if P > 0
 
-      // If this image is the START of a segment (pairShotGenerationId matches)
-      if (pairShotGenId === currentShotGenId) {
-        // This segment STARTS with the current image
+    // Check if there's a segment starting at this image (nextSegment)
+    // Segment at position P goes from image P to image P+1
+    if (imagePosition < segmentSlots.length) {
+      const slot = segmentSlots[imagePosition];
+      if (slot) {
         const hasVideo = slot.type === 'child' && !!slot.child.location;
-
-        // Get start/end image URLs for preview
-        let startUrl: string | undefined;
-        let endUrl: string | undefined;
-
-        if (slot.type === 'child') {
-          // Try to get URLs from child params or metadata
-          const params = (slot.child as any).params;
-          startUrl = params?.individual_segment_params?.start_image_url || params?.start_image_url;
-          endUrl = params?.individual_segment_params?.end_image_url || params?.end_image_url;
-        } else {
-          // Placeholder slot
-          startUrl = slot.startImage;
-          endUrl = slot.endImage;
-        }
-
         nextSegment = {
           pairIndex: slot.index,
           hasVideo,
-          startImageUrl: startUrl,
-          endImageUrl: endUrl,
+          startImageUrl: getImageUrl(imagePosition),      // Start image is current image
+          endImageUrl: getImageUrl(imagePosition + 1),    // End image is next image
         };
       }
+    }
 
-      // Check if current image is the END of this segment
-      // The end image is the start image of the NEXT segment
-      // So find the segment where the next slot's pairShotGenerationId would be current
-      const slotIndex = segmentSlots.indexOf(slot);
-      if (slotIndex > 0) {
-        const prevSlot = segmentSlots[slotIndex - 1];
-        // If the previous slot's pair leads to this current image
-        if (slot.pairShotGenerationId === currentShotGenId && prevSlot) {
-          // The current image is where this segment would start, meaning the previous segment ENDS here
-          const hasVideo = prevSlot.type === 'child' && !!prevSlot.child.location;
-
-          let startUrl: string | undefined;
-          let endUrl: string | undefined;
-
-          if (prevSlot.type === 'child') {
-            const params = (prevSlot.child as any).params;
-            startUrl = params?.individual_segment_params?.start_image_url || params?.start_image_url;
-            endUrl = params?.individual_segment_params?.end_image_url || params?.end_image_url;
-          } else {
-            startUrl = prevSlot.startImage;
-            endUrl = prevSlot.endImage;
-          }
-
-          prevSegment = {
-            pairIndex: prevSlot.index,
-            hasVideo,
-            startImageUrl: startUrl,
-            endImageUrl: endUrl,
-          };
-        }
+    // Check if there's a segment ending at this image (prevSegment)
+    // Segment at position P-1 goes from image P-1 to image P (current)
+    if (imagePosition > 0 && imagePosition - 1 < segmentSlots.length) {
+      const slot = segmentSlots[imagePosition - 1];
+      if (slot) {
+        const hasVideo = slot.type === 'child' && !!slot.child.location;
+        prevSegment = {
+          pairIndex: slot.index,
+          hasVideo,
+          startImageUrl: getImageUrl(imagePosition - 1),  // Start image is previous image
+          endImageUrl: getImageUrl(imagePosition),        // End image is current image
+        };
       }
     }
+
+    // [SegmentNavDebug] Log for debugging
+    console.log('[SegmentNavDebug] Timeline position-based matching:', {
+      lightboxIndex,
+      imagePosition,
+      totalImages: images.length,
+      totalSegmentSlots: segmentSlots.length,
+      hasPrev: !!prevSegment,
+      hasNext: !!nextSegment,
+      prevHasVideo: prevSegment?.hasVideo,
+      nextHasVideo: nextSegment?.hasVideo,
+      prevStartUrl: prevSegment?.startImageUrl?.substring(0, 50),
+      prevEndUrl: prevSegment?.endImageUrl?.substring(0, 50),
+      nextStartUrl: nextSegment?.startImageUrl?.substring(0, 50),
+      nextEndUrl: nextSegment?.endImageUrl?.substring(0, 50),
+    });
 
     // If neither prev nor next segment found, no navigation available
     if (!prevSegment && !nextSegment) {
@@ -689,13 +686,18 @@ const Timeline: React.FC<TimelineProps> = ({
       prev: prevSegment,
       next: nextSegment,
       onNavigateToSegment: (pairIndex: number) => {
-        // Synchronously add class - CSS will show overlay and disable animations
-        document.body.classList.add('lightbox-transitioning');
+        console.log('[LightboxTransition] onNavigateToSegment: Showing overlay');
+        // Show overlay via parent callback (handles both ref and body class)
         onStartLightboxTransition?.();
-        // Close the old lightbox and open the new one synchronously
-        // The CSS overlay covers any flash
-        closeLightbox();
-        onOpenSegmentSlot(pairIndex);
+
+        // Use double-rAF to ensure overlay is painted before state changes
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            console.log('[LightboxTransition] Overlay painted, now triggering state changes');
+            closeLightbox();
+            onOpenSegmentSlot(pairIndex);
+          });
+        });
       },
     };
   }, [segmentSlots, onOpenSegmentSlot, lightboxIndex, currentImages, closeLightbox, onStartLightboxTransition]);
