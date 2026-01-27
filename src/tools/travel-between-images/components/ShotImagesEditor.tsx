@@ -2257,6 +2257,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 onSelectedOutputChange={onSelectedOutputChange}
                 // Instant timeline updates from MediaLightbox
                 onSegmentFrameCountChange={handleSegmentFrameCountChange}
+                // Segment slots for adjacent segment navigation in lightbox
+                segmentSlots={segmentSlots}
+                onOpenSegmentSlot={(pairIndex) => setSegmentSlotLightboxIndex(pairIndex)}
               />
               
               {/* Helper for un-positioned generations - in timeline mode, show after timeline */}
