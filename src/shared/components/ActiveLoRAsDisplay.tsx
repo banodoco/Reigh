@@ -5,6 +5,7 @@ import { SliderWithValue } from "@/shared/components/ui/slider-with-value";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/components/ui/tooltip";
 import HoverScrubVideo from "@/shared/components/HoverScrubVideo";
 import { X, Plus } from "lucide-react";
+import { getDisplayNameFromUrl } from "@/tools/travel-between-images/utils/loraDisplayUtils";
 
 export interface ActiveLora {
   id: string;
@@ -60,6 +61,9 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
             availableLoras.find(l => l["Model ID"] === lora.id)?.Images?.some(img => img.type?.startsWith('video'))
           );
 
+          // Get clean display name - prefer predefined/database names, fall back to stored name
+          const displayName = getDisplayNameFromUrl(lora.path, availableLoras, lora.name);
+
           return (
             <div key={lora.id} className="p-3 border rounded-md shadow-sm bg-slate-50/50 dark:bg-slate-800/30">
               <div className="flex items-start gap-3 mb-3">
@@ -75,9 +79,9 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
                         muted
                       />
                     ) : (
-                      <img 
-                        src={lora.previewImageUrl} 
-                        alt={`Preview for ${lora.name}`} 
+                      <img
+                        src={lora.previewImageUrl}
+                        alt={`Preview for ${displayName}`}
                         className="h-16 w-16 object-cover rounded-md border"
                       />
                     )}
@@ -87,7 +91,7 @@ const ActiveLoRAsDisplayComponent: React.FC<ActiveLoRAsDisplayProps> = ({
                   <div className="flex justify-between items-start mb-1">
                     <div className="flex-grow min-w-0">
                       <Label htmlFor={`lora-strength-${lora.id}`} className="text-sm font-light truncate pr-2 block preserve-case">
-                        {lora.name}
+                        {displayName}
                       </Label>
                       {(() => {
                         // Get trigger word from lora object or from availableLoras

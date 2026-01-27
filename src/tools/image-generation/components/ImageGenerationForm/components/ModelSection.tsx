@@ -16,6 +16,7 @@ import { ActiveLora } from "@/shared/components/ActiveLoRAsDisplay";
 import { LoraModel } from "@/shared/components/LoraSelectorModal";
 import { SegmentedControl, SegmentedControlItem } from "@/shared/components/ui/segmented-control";
 import HoverScrubVideo from "@/shared/components/HoverScrubVideo";
+import { getDisplayNameFromUrl } from "@/tools/travel-between-images/utils/loraDisplayUtils";
 
 // Reusable LoRA Grid component (no pagination)
 interface LoraGridProps {
@@ -99,8 +100,8 @@ const LoraGrid: React.FC<LoraGridProps> = ({
 
                 {/* Name and strength */}
                 <div className="p-2 space-y-2">
-                  <p className="text-xs font-medium truncate preserve-case" title={lora.name}>
-                    {lora.name}
+                  <p className="text-xs font-medium truncate preserve-case" title={getDisplayNameFromUrl(lora.path, undefined, lora.name)}>
+                    {getDisplayNameFromUrl(lora.path, undefined, lora.name)}
                   </p>
                   <SliderWithValue
                     label="Strength"

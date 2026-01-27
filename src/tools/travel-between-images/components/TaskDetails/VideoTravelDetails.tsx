@@ -280,7 +280,7 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
                 <div className="space-y-1 ml-2">
                   {phase.loras.map((lora: any, idx: number) => (
                     <div key={idx} className={`flex justify-between items-center gap-2 p-1.5 bg-background/50 rounded border ${config.textSize} min-w-0`}>
-                      <span className={`${config.fontWeight} truncate min-w-0 flex-1`}>{getDisplayNameFromUrl(lora.url, availableLoras)}</span>
+                      <span className={`${config.fontWeight} truncate min-w-0 flex-1`}>{getDisplayNameFromUrl(lora.url, availableLoras, lora.name)}</span>
                       <span className="text-muted-foreground shrink-0">{lora.multiplier}</span>
                     </div>
                   ))}
@@ -328,7 +328,7 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
                   <div className="space-y-1 ml-2">
                     {phase.loras.map((lora: any, idx: number) => (
                       <div key={idx} className={`flex justify-between items-center gap-2 p-1.5 bg-background/50 rounded border ${config.textSize} min-w-0`}>
-                        <span className={`${config.fontWeight} truncate min-w-0 flex-1`}>{getDisplayNameFromUrl(lora.url, availableLoras)}</span>
+                        <span className={`${config.fontWeight} truncate min-w-0 flex-1`}>{getDisplayNameFromUrl(lora.url, availableLoras, lora.name)}</span>
                         <span className="text-muted-foreground shrink-0">{lora.multiplier}</span>
                       </div>
                     ))}

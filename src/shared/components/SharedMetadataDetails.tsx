@@ -2,6 +2,7 @@ import React from 'react';
 import { Check, X } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { DisplayableMetadata, MetadataLora } from './ImageGallery';
+import { getDisplayNameFromUrl } from '@/tools/travel-between-images/utils/loraDisplayUtils';
 
 // Helper function to map model names to display names
 const getModelDisplayName = (modelName: string | undefined): string => {
@@ -99,22 +100,17 @@ export const SharedMetadataDetails: React.FC<SharedMetadataDetailsProps> = ({
   const additionalLoras = (metadata as any).originalParams?.orchestrator_details?.additional_loras;
   const activeLoras = metadata.activeLoras;
 
-  // Determine which LoRAs to display
-  const lorasToDisplay = activeLoras && activeLoras.length > 0 
+  // Determine which LoRAs to display - use getDisplayNameFromUrl for consistent naming
+  const lorasToDisplay = activeLoras && activeLoras.length > 0
     ? activeLoras.map(lora => ({
-        name: lora.name || lora.id || 'Unknown',
+        name: getDisplayNameFromUrl((lora as any).path, undefined, lora.name || lora.id) || 'Unknown',
         strength: `${lora.strength}%`
       }))
     : additionalLoras && Object.keys(additionalLoras).length > 0
-    ? Object.entries(additionalLoras).map(([url, strength]) => {
-        const urlParts = url.split('/');
-        const filename = urlParts[urlParts.length - 1] || url;
-        const displayName = filename.replace(/\.(safetensors|ckpt|pt).*$/i, '').replace(/_/g, ' ');
-        return {
-          name: displayName,
-          strength: `${((strength as number) * 100).toFixed(0)}%`
-        };
-      })
+    ? Object.entries(additionalLoras).map(([url, strength]) => ({
+        name: getDisplayNameFromUrl(url) || 'Unknown',
+        strength: `${((strength as number) * 100).toFixed(0)}%`
+      }))
     : [];
 
   // Additional settings

@@ -95,26 +95,59 @@ export const PREDEFINED_LORAS = [
 ];
 
 /**
- * Get display name from LoRA URL
- * Checks predefined LoRAs first, then availableLoras, then falls back to filename
+ * Clean up a filename to be more human-readable
+ * Removes extension, replaces underscores/hyphens with spaces
  */
-export function getDisplayNameFromUrl(url: string, availableLoras?: LoraModel[]): string {
-  if (!url) return '';
-  
+function cleanFilename(filename: string): string {
+  if (!filename) return '';
+  return filename
+    .replace(/\.safetensors$/i, '')
+    .replace(/\.ckpt$/i, '')
+    .replace(/\.pt$/i, '')
+    .replace(/_/g, ' ')
+    .replace(/-/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Get display name from LoRA URL
+ * Checks predefined LoRAs first, then availableLoras, then falls back to cleaned filename
+ * @param url - The LoRA URL/path
+ * @param availableLoras - Optional array of available LoRAs to check against
+ * @param fallbackName - Optional name to use if URL doesn't match anything
+ */
+export function getDisplayNameFromUrl(url: string, availableLoras?: LoraModel[], fallbackName?: string): string {
   // Check if this is a predefined LoRA
-  const predefinedLora = PREDEFINED_LORAS.find(lora => lora.url === url);
-  if (predefinedLora?.displayName) {
-    return predefinedLora.displayName;
+  if (url) {
+    const predefinedLora = PREDEFINED_LORAS.find(lora => lora.url === url);
+    if (predefinedLora?.displayName) {
+      return predefinedLora.displayName;
+    }
   }
-  
+
   // Check if this is a lora from the search/database
-  const availableLora = availableLoras?.find(lora => lora.huggingface_url === url);
-  if (availableLora?.Name && availableLora.Name !== "N/A") {
-    return availableLora.Name;
+  if (url && availableLoras) {
+    const availableLora = availableLoras.find(lora => lora.huggingface_url === url);
+    if (availableLora?.Name && availableLora.Name !== "N/A") {
+      return availableLora.Name;
+    }
   }
-  
-  // Otherwise, extract filename from URL
-  const parts = url.split('/');
-  return parts[parts.length - 1] || url;
+
+  // Use fallback name if provided and not empty
+  if (fallbackName && fallbackName.trim()) {
+    return fallbackName;
+  }
+
+  // Otherwise, extract and clean filename from URL
+  if (url) {
+    const parts = url.split('/');
+    const filename = parts[parts.length - 1];
+    if (filename) {
+      return cleanFilename(filename);
+    }
+  }
+
+  return '';
 }
 
