@@ -618,35 +618,60 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                       </div>
                     )}
 
-                    {/* Load Settings button */}
-                    {onLoadVariantSettings && variant.params && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          console.log('[VariantSelector] Load settings clicked for variant:', variant.id);
-                          onLoadVariantSettings(variant.params as Record<string, any>);
-                          setLoadedSettingsVariantId(variant.id);
-                          setTimeout(() => setLoadedSettingsVariantId(null), 2000);
-                        }}
-                        className={cn(
-                          "w-full h-6 text-xs gap-1",
-                          loadedSettingsVariantId === variant.id && "bg-green-500/20 border-green-500/50 text-green-400"
+                    {/* Action buttons row - Make Primary and/or Load Settings */}
+                    {((!isPrimary && onMakePrimary) || (onLoadVariantSettings && variant.params)) && (
+                      <div className="flex gap-1.5">
+                        {/* Make Primary button - only for non-primary variants */}
+                        {!isPrimary && onMakePrimary && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onVariantSelect(variant.id);
+                              setTimeout(() => onMakePrimary(variant.id), 50);
+                            }}
+                            className={cn(
+                              "h-6 text-xs gap-1",
+                              onLoadVariantSettings && variant.params ? "flex-1" : "w-full"
+                            )}
+                          >
+                            <Star className="w-3 h-3" />
+                            Make Primary
+                          </Button>
                         )}
-                      >
-                        {loadedSettingsVariantId === variant.id ? (
-                          <>
-                            <Check className="w-3 h-3" />
-                            Loaded!
-                          </>
-                        ) : (
-                          <>
-                            <Download className="w-3 h-3" />
-                            Load Settings
-                          </>
+                        {/* Load Settings button */}
+                        {onLoadVariantSettings && variant.params && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              console.log('[VariantSelector] Load settings clicked for variant:', variant.id);
+                              onLoadVariantSettings(variant.params as Record<string, any>);
+                              setLoadedSettingsVariantId(variant.id);
+                              setTimeout(() => setLoadedSettingsVariantId(null), 2000);
+                            }}
+                            className={cn(
+                              "h-6 text-xs gap-1",
+                              !isPrimary && onMakePrimary ? "flex-1" : "w-full",
+                              loadedSettingsVariantId === variant.id && "bg-green-500/20 border-green-500/50 text-green-400"
+                            )}
+                          >
+                            {loadedSettingsVariantId === variant.id ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                Loaded!
+                              </>
+                            ) : (
+                              <>
+                                <Download className="w-3 h-3" />
+                                Load Settings
+                              </>
+                            )}
+                          </Button>
                         )}
-                      </Button>
+                      </div>
                     )}
                   </div>
                 </TooltipContent>
