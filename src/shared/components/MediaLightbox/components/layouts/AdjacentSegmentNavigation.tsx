@@ -43,9 +43,15 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
     }
   };
 
+  // Container gets higher z-index when hovering to ensure popover shows above VariantOverlayBadge (z-[60])
+  const isHovering = hoveredSide !== null;
+
   return (
     <div
-      className="absolute top-2 md:top-4 left-1/2 transform -translate-x-1/2 z-[60] select-none"
+      className={cn(
+        "absolute top-2 md:top-4 left-1/2 transform -translate-x-1/2 select-none",
+        isHovering ? "z-[70]" : "z-[55]"
+      )}
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-2">

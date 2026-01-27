@@ -53,6 +53,8 @@ import { isVideoGeneration } from "@/shared/lib/typeGuards";
 import { useTaskFromUnifiedCache } from "@/shared/hooks/useUnifiedGenerations";
 import { useGetTask } from "@/shared/hooks/useTasks";
 import { deriveInputImages } from "@/shared/components/ImageGallery/utils";
+import type { SegmentSlot } from "../hooks/useSegmentOutputsForShot";
+import type { AdjacentSegmentsData } from "@/shared/components/MediaLightbox/types";
 
 // Clear legacy timeline cache on import
 import "@/utils/clearTimelineCache";
@@ -183,6 +185,10 @@ export interface TimelineProps {
   onSelectedOutputChange?: (id: string | null) => void;
   // Callback when segment frame count changes (for instant timeline updates)
   onSegmentFrameCountChange?: (pairShotGenerationId: string, frameCount: number) => void;
+  // Segment slots for adjacent segment navigation in lightbox
+  segmentSlots?: SegmentSlot[];
+  // Callback to open segment slot in unified lightbox
+  onOpenSegmentSlot?: (pairIndex: number) => void;
 }
 
 // Stable empty object to avoid creating new references when enhancedPrompts is undefined
@@ -259,6 +265,9 @@ const Timeline: React.FC<TimelineProps> = ({
   onSelectedOutputChange,
   // Instant timeline updates from MediaLightbox
   onSegmentFrameCountChange,
+  // Segment slots for adjacent segment navigation
+  segmentSlots,
+  onOpenSegmentSlot,
 }) => {
   // [RefactorMetrics] Track render count for baseline measurements
   useRenderCount('Timeline');
@@ -554,7 +563,108 @@ const Timeline: React.FC<TimelineProps> = ({
   const currentLightboxImage = lightboxIndex !== null ? currentImages[lightboxIndex] : null;
   const hasNext = derivedHasNext;
   const hasPrevious = derivedHasPrevious;
-  
+
+  // Compute adjacent segments data for lightbox navigation
+  // This enables navigation between the current image and videos that start/end with it
+  const adjacentSegmentsData: AdjacentSegmentsData | undefined = useMemo(() => {
+    if (!segmentSlots || segmentSlots.length === 0 || !onOpenSegmentSlot || lightboxIndex === null) {
+      return undefined;
+    }
+
+    const currentImage = currentImages[lightboxIndex];
+    if (!currentImage) {
+      return undefined;
+    }
+
+    // Current image's shot_generations.id
+    const currentShotGenId = currentImage.id;
+
+    // Find which pair position this image is at
+    // An image can be the START of one segment and the END of the previous segment
+    let prevSegment: { pairIndex: number; hasVideo: boolean; startImageUrl?: string; endImageUrl?: string } | undefined;
+    let nextSegment: { pairIndex: number; hasVideo: boolean; startImageUrl?: string; endImageUrl?: string } | undefined;
+
+    // Check each segment slot to find where this image appears
+    for (const slot of segmentSlots) {
+      const pairShotGenId = slot.pairShotGenerationId;
+
+      // If this image is the START of a segment (pairShotGenerationId matches)
+      if (pairShotGenId === currentShotGenId) {
+        // This segment STARTS with the current image
+        const hasVideo = slot.type === 'child' && !!slot.child.location;
+
+        // Get start/end image URLs for preview
+        let startUrl: string | undefined;
+        let endUrl: string | undefined;
+
+        if (slot.type === 'child') {
+          // Try to get URLs from child params or metadata
+          const params = (slot.child as any).params;
+          startUrl = params?.individual_segment_params?.start_image_url || params?.start_image_url;
+          endUrl = params?.individual_segment_params?.end_image_url || params?.end_image_url;
+        } else {
+          // Placeholder slot
+          startUrl = slot.startImage;
+          endUrl = slot.endImage;
+        }
+
+        nextSegment = {
+          pairIndex: slot.index,
+          hasVideo,
+          startImageUrl: startUrl,
+          endImageUrl: endUrl,
+        };
+      }
+
+      // Check if current image is the END of this segment
+      // The end image is the start image of the NEXT segment
+      // So find the segment where the next slot's pairShotGenerationId would be current
+      const slotIndex = segmentSlots.indexOf(slot);
+      if (slotIndex > 0) {
+        const prevSlot = segmentSlots[slotIndex - 1];
+        // If the previous slot's pair leads to this current image
+        if (slot.pairShotGenerationId === currentShotGenId && prevSlot) {
+          // The current image is where this segment would start, meaning the previous segment ENDS here
+          const hasVideo = prevSlot.type === 'child' && !!prevSlot.child.location;
+
+          let startUrl: string | undefined;
+          let endUrl: string | undefined;
+
+          if (prevSlot.type === 'child') {
+            const params = (prevSlot.child as any).params;
+            startUrl = params?.individual_segment_params?.start_image_url || params?.start_image_url;
+            endUrl = params?.individual_segment_params?.end_image_url || params?.end_image_url;
+          } else {
+            startUrl = prevSlot.startImage;
+            endUrl = prevSlot.endImage;
+          }
+
+          prevSegment = {
+            pairIndex: prevSlot.index,
+            hasVideo,
+            startImageUrl: startUrl,
+            endImageUrl: endUrl,
+          };
+        }
+      }
+    }
+
+    // If neither prev nor next segment found, no navigation available
+    if (!prevSegment && !nextSegment) {
+      return undefined;
+    }
+
+    return {
+      prev: prevSegment,
+      next: nextSegment,
+      onNavigateToSegment: (pairIndex: number) => {
+        // Close the current lightbox and open the segment slot lightbox
+        closeLightbox();
+        onOpenSegmentSlot(pairIndex);
+      },
+    };
+  }, [segmentSlots, onOpenSegmentSlot, lightboxIndex, currentImages, closeLightbox]);
+
   // Adapter functions for onAddToShot that use the target shot ID from the callback
   // CRITICAL FIX: Now receives targetShotId from the callback, not from local state!
   // This ensures the image is added to the shot the user SELECTED in the dropdown
@@ -1046,6 +1156,8 @@ const Timeline: React.FC<TimelineProps> = ({
             onCreateShot={onCreateShot}
             positionedInSelectedShot={positionedInSelectedShot}
             associatedWithoutPositionInSelectedShot={associatedWithoutPositionInSelectedShot}
+            // Adjacent segment navigation - allows jumping to videos that start/end with this image
+            adjacentSegments={!isExternalGen ? adjacentSegmentsData : undefined}
           />
         );
       })()}

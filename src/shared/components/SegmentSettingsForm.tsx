@@ -46,6 +46,7 @@ import type { ActiveLora } from '@/shared/hooks/useLoraManager';
 import type { SegmentSettings } from './segmentSettingsUtils';
 import type { StructureVideoConfigWithMetadata } from '@/shared/lib/tasks/travelBetweenImages';
 import { stripModeFromPhaseConfig } from './segmentSettingsUtils';
+import { usePromptFieldState } from '@/shared/hooks/usePromptFieldState';
 
 // =============================================================================
 // PROPS
@@ -578,6 +579,15 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
     return shotDefaults?.loras ?? [];
   }, [settings.loras, shotDefaults?.loras]);
 
+  // Prompt field state - handles priority logic and actions
+  const promptField = usePromptFieldState({
+    settingsPrompt: settings.prompt,
+    enhancedPrompt,
+    defaultPrompt: shotDefaults?.prompt,
+    onSettingsChange: (value) => onChange({ prompt: value }),
+    onClearEnhancedPrompt,
+  });
+
   // ==========================================================================
   // HANDLERS
   // ==========================================================================
@@ -910,116 +920,72 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
         </div>
       )}
 
-      {/* Prompt */}
-      {(() => {
-        // Priority: settings.prompt > enhancedPrompt > shotDefaults.prompt
-        // User edits take precedence. Enhanced prompt shown when no user edit.
-        // Clear button removes both enhanced and user prompt (falls back to defaults).
-        const hasEnhancedPrompt = !!enhancedPrompt?.trim();
-        const userHasSetPrompt = settings.prompt !== undefined;
-        const hasDefaultPrompt = shotDefaults?.prompt !== undefined;
-
-        // Determine what to display and which badge
-        let promptDisplayValue: string;
-        let badgeType: 'enhanced' | 'default' | null = null;
-
-        if (userHasSetPrompt) {
-          // User has explicitly set a prompt (their edits take priority)
-          promptDisplayValue = settings.prompt;
-          badgeType = null;
-        } else if (hasEnhancedPrompt) {
-          // AI-enhanced prompt shown when no user edit
-          promptDisplayValue = enhancedPrompt!;
-          badgeType = 'enhanced';
-        } else if (hasDefaultPrompt) {
-          // Fall back to shot defaults
-          promptDisplayValue = shotDefaults!.prompt;
-          badgeType = 'default';
-        } else {
-          promptDisplayValue = '';
-          badgeType = null;
-        }
-
-        // Handle clear: removes both enhanced prompt and user edits (falls back to defaults)
-        const handleClear = () => {
-          onChange({ prompt: undefined }); // undefined = use defaults
-          onClearEnhancedPrompt?.(); // also clear enhanced prompt
-        };
-
-        return (
-          <div className="space-y-2">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Label className="text-xs font-medium">Prompt:</Label>
-                {badgeType === 'enhanced' && (
-                  <EnhancedPromptBadge
-                    onClear={() => onClearEnhancedPrompt?.()}
-                    onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('prompt', promptDisplayValue) : undefined}
-                    isSaving={savingField === 'prompt'}
-                  />
-                )}
-                {badgeType === 'default' && (
-                  <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">
-                    Default
-                  </span>
-                )}
-                {badgeType === null && userHasSetPrompt && (
-                  <FieldDefaultControls
-                    isUsingDefault={false}
-                    onUseDefault={handleClear} // Use Default = go back to shot defaults (clear both user edit and enhanced)
-                    onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('prompt', promptDisplayValue) : undefined}
-                    isSaving={savingField === 'prompt'}
-                  />
-                )}
-              </div>
-              <Textarea
-                value={promptDisplayValue}
-                onChange={(e) => {
-                  // Just save the user's edit - this takes priority over enhanced prompt
-                  onChange({ prompt: e.target.value });
-                }}
-                className="h-20 text-sm resize-none"
-                placeholder="Describe this segment..."
-                clearable
-                onClear={handleClear}
-                voiceInput
-                voiceContext="This is a prompt for a video segment. Describe the motion, action, or visual content you want in this part of the video."
-                onVoiceResult={(result) => {
-                  // Voice input becomes user's edit
-                  onChange({ prompt: result.prompt || result.transcription });
-                }}
+      {/* Prompt - uses usePromptFieldState hook for clean priority logic */}
+      <div className="space-y-2">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <Label className="text-xs font-medium">Prompt:</Label>
+            {promptField.badgeType === 'enhanced' && (
+              <EnhancedPromptBadge
+                onClear={promptField.handleClearEnhanced}
+                onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('prompt', promptField.displayValue) : undefined}
+                isSaving={savingField === 'prompt'}
               />
-            </div>
-
-            {/* Enhance Prompt Toggle & Make Primary Variant */}
-            <div className="flex gap-2">
-              {onEnhancePromptChange && (
-                <div className="flex items-center space-x-2 p-2 bg-muted/30 rounded-lg border flex-1">
-                  <Switch
-                    id="enhance-prompt-segment"
-                    checked={enhancePromptEnabled ?? !hasEnhancedPrompt}
-                    onCheckedChange={onEnhancePromptChange}
-                  />
-                  <Label htmlFor="enhance-prompt-segment" className="text-sm font-medium cursor-pointer flex-1">
-                    Enhance Prompt
-                  </Label>
-                </div>
-              )}
-              <div className="flex items-center space-x-2 p-2 bg-muted/30 rounded-lg border flex-1">
-                <Switch
-                  id="make-primary-segment"
-                  checked={isRegeneration ? settings.makePrimaryVariant : true}
-                  onCheckedChange={isRegeneration ? (value) => onChange({ makePrimaryVariant: value }) : undefined}
-                  disabled={!isRegeneration}
-                />
-                <Label htmlFor="make-primary-segment" className="text-sm font-medium cursor-pointer flex-1">
-                  Make Primary
-                </Label>
-              </div>
-            </div>
+            )}
+            {promptField.badgeType === 'default' && (
+              <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">
+                Default
+              </span>
+            )}
+            {promptField.badgeType === null && promptField.userHasSetPrompt && (
+              <FieldDefaultControls
+                isUsingDefault={false}
+                onUseDefault={promptField.handleClearAll}
+                onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('prompt', promptField.displayValue) : undefined}
+                isSaving={savingField === 'prompt'}
+              />
+            )}
           </div>
-        );
-      })()}
+          <Textarea
+            value={promptField.displayValue}
+            onChange={(e) => promptField.handleChange(e.target.value)}
+            className="h-20 text-sm resize-none"
+            placeholder="Describe this segment..."
+            clearable
+            onClear={promptField.handleClearAll}
+            voiceInput
+            voiceContext="This is a prompt for a video segment. Describe the motion, action, or visual content you want in this part of the video."
+            onVoiceResult={promptField.handleVoiceResult}
+          />
+        </div>
+
+        {/* Enhance Prompt Toggle & Make Primary Variant */}
+        <div className="flex gap-2">
+          {onEnhancePromptChange && (
+            <div className="flex items-center space-x-2 p-2 bg-muted/30 rounded-lg border flex-1">
+              <Switch
+                id="enhance-prompt-segment"
+                checked={enhancePromptEnabled ?? !promptField.hasEnhancedPrompt}
+                onCheckedChange={onEnhancePromptChange}
+              />
+              <Label htmlFor="enhance-prompt-segment" className="text-sm font-medium cursor-pointer flex-1">
+                Enhance Prompt
+              </Label>
+            </div>
+          )}
+          <div className="flex items-center space-x-2 p-2 bg-muted/30 rounded-lg border flex-1">
+            <Switch
+              id="make-primary-segment"
+              checked={isRegeneration ? settings.makePrimaryVariant : true}
+              onCheckedChange={isRegeneration ? (value) => onChange({ makePrimaryVariant: value }) : undefined}
+              disabled={!isRegeneration}
+            />
+            <Label htmlFor="make-primary-segment" className="text-sm font-medium cursor-pointer flex-1">
+              Make Primary
+            </Label>
+          </div>
+        </div>
+      </div>
 
       {/* Advanced Settings */}
       <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
