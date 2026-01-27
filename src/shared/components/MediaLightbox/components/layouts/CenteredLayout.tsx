@@ -288,21 +288,23 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
           );
         })()}
 
-        {/* Top Center - Adjacent Segment Navigation (only for images with adjacent segments) */}
-        {adjacentSegments && !isVideo && (
-          <AdjacentSegmentNavigation adjacentSegments={adjacentSegments} />
-        )}
+        {/* Top Center - Combined container for segment nav and variant badge */}
+        <div className="absolute top-8 md:top-16 left-1/2 transform -translate-x-1/2 z-[60] flex flex-col items-center gap-2">
+          {/* Adjacent Segment Navigation (only for images with adjacent segments) */}
+          {adjacentSegments && !isVideo && (
+            <AdjacentSegmentNavigation adjacentSegments={adjacentSegments} />
+          )}
 
-        {/* Top Center - Main Variant Badge/Button */}
-        <VariantOverlayBadge
-          activeVariant={activeVariant}
-          variants={variants}
-          readOnly={readOnly}
-          isMakingMainVariant={isMakingMainVariant}
-          canMakeMainVariant={canMakeMainVariant}
-          onMakeMainVariant={handleMakeMainVariant}
-          hasSegmentNavAbove={!!(adjacentSegments && !isVideo)}
-        />
+          {/* Main Variant Badge/Button */}
+          <VariantOverlayBadge
+            activeVariant={activeVariant}
+            variants={variants}
+            readOnly={readOnly}
+            isMakingMainVariant={isMakingMainVariant}
+            canMakeMainVariant={canMakeMainVariant}
+            onMakeMainVariant={handleMakeMainVariant}
+          />
+        </div>
 
         {/* Top Left - New image button */}
         <NewImageOverlayButton

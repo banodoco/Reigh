@@ -43,10 +43,9 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
 
   return (
     <div
-      className="absolute top-2 md:top-4 left-1/2 transform -translate-x-1/2 z-[55] select-none"
+      className="flex items-center gap-3 select-none"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center gap-3">
         {/* Previous segment button (ends with current image) */}
         <button
           onClick={handlePrevClick}
@@ -126,7 +125,6 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
             </div>
           )}
         </button>
-      </div>
     </div>
   );
 };
