@@ -6,6 +6,7 @@ export { MediaContentDisplay } from './MediaContentDisplay';
 export { VariantOverlayBadge } from './VariantOverlayBadge';
 export { NewImageOverlayButton } from './NewImageOverlayButton';
 export { AnnotationOverlayControls } from './AnnotationOverlayControls';
+export { AdjacentSegmentNavigation } from './AdjacentSegmentNavigation';
 
 // Layout components
 export { DesktopSidePanelLayout } from './DesktopSidePanelLayout';

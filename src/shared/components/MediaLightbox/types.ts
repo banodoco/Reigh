@@ -1,6 +1,33 @@
 import type { GenerationRow } from '@/types/shots';
 import type { StructureVideoConfigWithMetadata } from '@/shared/lib/tasks/travelBetweenImages';
 
+/**
+ * Information about an adjacent segment (video) for navigation.
+ * Used to show "jump to video" buttons when viewing an image in the lightbox.
+ */
+export interface AdjacentSegmentInfo {
+  /** Pair index to navigate to */
+  pairIndex: number;
+  /** Whether this segment has a generated video */
+  hasVideo: boolean;
+  /** Start image URL (thumbnail preferred) */
+  startImageUrl?: string;
+  /** End image URL (thumbnail preferred) */
+  endImageUrl?: string;
+}
+
+/**
+ * Adjacent segments data for the current image.
+ * - prev: The segment that ENDS with this image (before this image in timeline)
+ * - next: The segment that STARTS with this image (after this image in timeline)
+ */
+export interface AdjacentSegmentsData {
+  prev?: AdjacentSegmentInfo;
+  next?: AdjacentSegmentInfo;
+  /** Callback to navigate to a segment by pair index */
+  onNavigateToSegment: (pairIndex: number) => void;
+}
+
 export interface BrushStroke {
   id: string;
   points: Array<{ x: number; y: number }>;

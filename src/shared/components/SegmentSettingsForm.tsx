@@ -835,9 +835,9 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
 
       {/* Prompt */}
       {(() => {
-        // Priority: enhancedPrompt > settings.prompt > shotDefaults.prompt
-        // Enhanced prompt (AI-generated) takes precedence when it exists.
-        // If user wants to override, they edit the field which clears enhanced prompt.
+        // Priority: settings.prompt > enhancedPrompt > shotDefaults.prompt
+        // User edits take precedence. Enhanced prompt shown when no user edit.
+        // Clear button removes both enhanced and user prompt (falls back to defaults).
         const hasEnhancedPrompt = !!enhancedPrompt?.trim();
         const userHasSetPrompt = settings.prompt !== undefined;
         const hasDefaultPrompt = shotDefaults?.prompt !== undefined;
@@ -846,14 +846,14 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
         let promptDisplayValue: string;
         let badgeType: 'enhanced' | 'default' | null = null;
 
-        if (hasEnhancedPrompt) {
-          // AI-enhanced prompt takes priority
-          promptDisplayValue = enhancedPrompt!;
-          badgeType = 'enhanced';
-        } else if (userHasSetPrompt) {
-          // User has explicitly set a prompt (even if empty)
+        if (userHasSetPrompt) {
+          // User has explicitly set a prompt (their edits take priority)
           promptDisplayValue = settings.prompt;
           badgeType = null;
+        } else if (hasEnhancedPrompt) {
+          // AI-enhanced prompt shown when no user edit
+          promptDisplayValue = enhancedPrompt!;
+          badgeType = 'enhanced';
         } else if (hasDefaultPrompt) {
           // Fall back to shot defaults
           promptDisplayValue = shotDefaults!.prompt;
@@ -863,15 +863,40 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
           badgeType = null;
         }
 
+        // Handle clear: removes both enhanced prompt and user edits (falls back to defaults)
+        const handleClear = () => {
+          onChange({ prompt: undefined }); // undefined = use defaults
+          onClearEnhancedPrompt?.(); // also clear enhanced prompt
+        };
+
         return (
           <div className="space-y-2">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <Label className="text-xs font-medium">Prompt:</Label>
                 {badgeType === 'enhanced' && (
-                  <span className="text-[10px] bg-green-500/15 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded">
-                    Enhanced
-                  </span>
+                  <>
+                    <span className="text-[10px] bg-green-500/15 text-green-600 dark:text-green-400 px-1.5 py-0.5 rounded">
+                      Enhanced
+                    </span>
+                    {/* Show Set as Default when enhanced prompt is showing */}
+                    {onSaveFieldAsDefault && (
+                      <button
+                        type="button"
+                        onClick={() => handleSaveFieldAsDefault('prompt', promptDisplayValue)}
+                        disabled={savingField === 'prompt'}
+                        className="text-[10px] bg-muted hover:bg-primary/15 text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors disabled:opacity-50"
+                        title="Set this enhanced prompt as the shot default"
+                      >
+                        {savingField === 'prompt' ? (
+                          <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                        ) : (
+                          <Save className="w-2.5 h-2.5" />
+                        )}
+                        Set as Default
+                      </button>
+                    )}
+                  </>
                 )}
                 {badgeType === 'default' && (
                   <span className="text-[10px] bg-primary/15 text-primary px-1.5 py-0.5 rounded">
@@ -881,7 +906,10 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                 {badgeType === null && userHasSetPrompt && (
                   <FieldDefaultControls
                     isUsingDefault={false}
-                    onUseDefault={() => onChange({ prompt: undefined })}
+                    onUseDefault={() => {
+                      onChange({ prompt: undefined });
+                      // Don't clear enhanced - let it show again if it exists
+                    }}
                     onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('prompt', promptDisplayValue) : undefined}
                     isSaving={savingField === 'prompt'}
                   />
@@ -890,27 +918,17 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               <Textarea
                 value={promptDisplayValue}
                 onChange={(e) => {
-                  // If editing while enhanced prompt is showing, clear it since user is overriding
-                  if (hasEnhancedPrompt) {
-                    onClearEnhancedPrompt?.();
-                  }
+                  // Just save the user's edit - this takes priority over enhanced prompt
                   onChange({ prompt: e.target.value });
                 }}
                 className="h-20 text-sm resize-none"
                 placeholder="Describe this segment..."
                 clearable
-                onClear={() => {
-                  onChange({ prompt: '' });
-                  // Also clear enhanced prompt when clearing the field
-                  onClearEnhancedPrompt?.();
-                }}
+                onClear={handleClear}
                 voiceInput
                 voiceContext="This is a prompt for a video segment. Describe the motion, action, or visual content you want in this part of the video."
                 onVoiceResult={(result) => {
-                  // If using voice while enhanced is showing, clear it
-                  if (hasEnhancedPrompt) {
-                    onClearEnhancedPrompt?.();
-                  }
+                  // Voice input becomes user's edit
                   onChange({ prompt: result.prompt || result.transcription });
                 }}
               />

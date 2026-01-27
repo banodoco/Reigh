@@ -16,6 +16,7 @@ import type { CenteredLayoutProps } from './types';
 // Sub-components
 import { VariantOverlayBadge } from './VariantOverlayBadge';
 import { NewImageOverlayButton } from './NewImageOverlayButton';
+import { AdjacentSegmentNavigation } from './AdjacentSegmentNavigation';
 
 // Existing components
 import { FlexContainer } from './FlexContainer';
@@ -118,6 +119,9 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
 
     // Workflow controls (below media)
     workflowControlsProps,
+
+    // Adjacent segment navigation
+    adjacentSegments,
   } = props;
 
   return (
@@ -279,6 +283,11 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
             </div>
           );
         })()}
+
+        {/* Top Center - Adjacent Segment Navigation (only for images with adjacent segments) */}
+        {adjacentSegments && !isVideo && (
+          <AdjacentSegmentNavigation adjacentSegments={adjacentSegments} />
+        )}
 
         {/* Top Center - Main Variant Badge/Button */}
         <VariantOverlayBadge

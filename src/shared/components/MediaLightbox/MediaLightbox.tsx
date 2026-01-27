@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { GenerationRow, Shot } from '@/types/shots';
 import { isVideoAny } from '@/shared/lib/typeGuards';
-import type { SegmentSlotModeData } from './types';
+import type { SegmentSlotModeData, AdjacentSegmentsData } from './types';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Button } from '@/shared/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
@@ -219,6 +219,11 @@ interface MediaLightboxProps {
    * Used to initialize the frame count slider in regenerate form.
    */
   currentFrameCount?: number;
+  /**
+   * Adjacent segment data for navigation from images to videos.
+   * When provided, shows buttons to jump to videos that start/end with this image.
+   */
+  adjacentSegments?: AdjacentSegmentsData;
 }
 
 const MediaLightbox: React.FC<MediaLightboxProps> = ({
@@ -295,6 +300,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   onSegmentFrameCountChange,
   // Current frame count from timeline positions (source of truth)
   currentFrameCount,
+  // Adjacent segment navigation
+  adjacentSegments,
 }) => {
   // ========================================
   // SEGMENT SLOT MODE - Unified segment editor
@@ -1722,6 +1729,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     handleReplaceInShot,
     isDeleting,
     handleDelete,
+
+    // Adjacent segment navigation
+    adjacentSegments,
   });
 
   return (

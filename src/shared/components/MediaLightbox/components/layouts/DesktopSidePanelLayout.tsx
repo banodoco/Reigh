@@ -14,6 +14,7 @@ import type { SidePanelLayoutProps } from './types';
 // Sub-components
 import { VariantOverlayBadge } from './VariantOverlayBadge';
 import { NewImageOverlayButton } from './NewImageOverlayButton';
+import { AdjacentSegmentNavigation } from './AdjacentSegmentNavigation';
 
 // Existing components
 import { NavigationArrows } from '../NavigationArrows';
@@ -118,6 +119,9 @@ export const DesktopSidePanelLayout: React.FC<SidePanelLayoutProps> = (props) =>
 
     // Controls panel
     controlsPanelProps,
+
+    // Adjacent segment navigation
+    adjacentSegments,
   } = props;
 
   return (
@@ -264,6 +268,11 @@ export const DesktopSidePanelLayout: React.FC<SidePanelLayoutProps> = (props) =>
             </div>
           );
         })()}
+
+        {/* Top Center - Adjacent Segment Navigation (only for images with adjacent segments) */}
+        {adjacentSegments && !isVideo && (
+          <AdjacentSegmentNavigation adjacentSegments={adjacentSegments} />
+        )}
 
         {/* Top Center - Main Variant Badge/Button */}
         <VariantOverlayBadge

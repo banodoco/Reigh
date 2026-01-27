@@ -17,6 +17,7 @@ import { DeleteConfirmationDialog } from './components/DeleteConfirmationDialog'
 import { MultiImagePreview, SingleImagePreview } from '../ImageDragPreview';
 import BatchDropZone from '../BatchDropZone';
 import MediaLightbox from '../MediaLightbox';
+import type { AdjacentSegmentsData } from '../MediaLightbox/types';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import { useState, useEffect, useCallback } from 'react';
@@ -154,6 +155,108 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
       prefetchTaskData(currentLightboxImageId);
     }
   }, [lightbox.lightboxIndex, lightbox.currentImages, currentLightboxImageId, prefetchTaskData]);
+
+  // Build adjacent segments data for the current lightbox image
+  // This enables navigation to videos that start/end with the current image
+  const adjacentSegmentsData: AdjacentSegmentsData | undefined = useMemo(() => {
+    // Only available when viewing images in batch mode with segment slots
+    if (!segmentSlots || segmentSlots.length === 0 || !props.onPairClick || lightbox.lightboxIndex === null) {
+      return undefined;
+    }
+
+    const currentImage = lightbox.currentImages[lightbox.lightboxIndex];
+    if (!currentImage) return undefined;
+
+    // Get the current image's shot_generation.id
+    const currentShotGenId = currentImage.id || (currentImage as any).shotImageEntryId;
+    if (!currentShotGenId) return undefined;
+
+    // Find the position of this image in the timeline
+    // segmentSlots[i].pairShotGenerationId is the start image of pair i
+    // So if currentShotGenId === pairShotGenerationId[i], the current image is at position i
+    // The "prev" segment ends at this image (pair index i-1 if it exists)
+    // The "next" segment starts at this image (pair index i if it exists)
+
+    let currentPosition = -1;
+    for (let i = 0; i < segmentSlots.length; i++) {
+      if (segmentSlots[i].pairShotGenerationId === currentShotGenId) {
+        currentPosition = i;
+        break;
+      }
+    }
+
+    // Also check if this is the END image of the last segment (position = segmentSlots.length)
+    // The last segment's end image would be at position segmentSlots.length
+    // We can detect this by checking if the image is NOT a start image of any segment
+    // and checking the order of images in lightbox.currentImages
+    if (currentPosition === -1) {
+      // Check if this could be the last image (end of last segment)
+      // The last image in the timeline would be after all segment starts
+      const imageIndex = lightbox.lightboxIndex;
+      // In batch mode, images are ordered by timeline position
+      // If we're viewing the last image, it's the end of the last segment
+      if (imageIndex === lightbox.currentImages.length - 1 && segmentSlots.length > 0) {
+        currentPosition = segmentSlots.length; // One past the last start position
+      }
+    }
+
+    if (currentPosition === -1) return undefined;
+
+    // Build prev segment info (ends with current image)
+    // prev segment is at index (currentPosition - 1)
+    let prev: AdjacentSegmentsData['prev'] = undefined;
+    if (currentPosition > 0) {
+      const prevSlot = segmentSlots[currentPosition - 1];
+      if (prevSlot) {
+        // Find start and end image URLs for this segment
+        const startImageIndex = lightbox.currentImages.findIndex(
+          (img: any) => img.id === prevSlot.pairShotGenerationId || img.shotImageEntryId === prevSlot.pairShotGenerationId
+        );
+        const startImage = startImageIndex !== -1 ? lightbox.currentImages[startImageIndex] : null;
+        const endImage = currentImage; // Current image IS the end of prev segment
+
+        prev = {
+          pairIndex: prevSlot.index,
+          hasVideo: prevSlot.type === 'child' && !!prevSlot.child?.location,
+          startImageUrl: getDisplayUrl((startImage as any)?.thumbUrl || (startImage as any)?.imageUrl),
+          endImageUrl: getDisplayUrl((endImage as any)?.thumbUrl || (endImage as any)?.imageUrl),
+        };
+      }
+    }
+
+    // Build next segment info (starts with current image)
+    // next segment is at index currentPosition (if it exists)
+    let next: AdjacentSegmentsData['next'] = undefined;
+    if (currentPosition < segmentSlots.length) {
+      const nextSlot = segmentSlots[currentPosition];
+      if (nextSlot) {
+        // Find end image (the next image in the timeline)
+        const endImageIndex = lightbox.currentImages.findIndex(
+          (img: any, idx: number) => idx > lightbox.lightboxIndex
+        );
+        const endImage = endImageIndex !== -1 ? lightbox.currentImages[endImageIndex] : null;
+
+        next = {
+          pairIndex: nextSlot.index,
+          hasVideo: nextSlot.type === 'child' && !!nextSlot.child?.location,
+          startImageUrl: getDisplayUrl((currentImage as any)?.thumbUrl || (currentImage as any)?.imageUrl),
+          endImageUrl: endImage ? getDisplayUrl((endImage as any)?.thumbUrl || (endImage as any)?.imageUrl) : undefined,
+        };
+      }
+    }
+
+    if (!prev && !next) return undefined;
+
+    return {
+      prev,
+      next,
+      onNavigateToSegment: (pairIndex: number) => {
+        // Close the current lightbox and open the segment slot lightbox
+        lightbox.setLightboxIndex(null);
+        props.onPairClick!(pairIndex);
+      },
+    };
+  }, [segmentSlots, props.onPairClick, lightbox.lightboxIndex, lightbox.currentImages, lightbox.setLightboxIndex]);
 
   const gridColsClass = GRID_COLS_CLASSES[props.columns || 4] || 'grid-cols-4';
   const isMobile = useIsMobile();
@@ -531,6 +634,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
                   console.log('[AddWithoutPosDebug] 🚀 onNavigateToShot called with:', shot?.name);
                   navigateToShot(shot, { scrollToTop: true });
                 }}
+                adjacentSegments={adjacentSegmentsData}
               />
             );
           })()}

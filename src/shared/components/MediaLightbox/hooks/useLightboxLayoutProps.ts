@@ -224,6 +224,9 @@ export interface UseLightboxLayoutPropsInput {
   handleReplaceInShot: () => Promise<void>;
   isDeleting?: string | null;
   handleDelete: () => void;
+
+  // Adjacent segment navigation
+  adjacentSegments?: any;
 }
 
 export interface UseLightboxLayoutPropsReturn {
@@ -555,6 +558,8 @@ export function useLightboxLayoutProps(
     workflowBarProps,
     floatingToolProps,
     controlsPanelProps,
+    // Adjacent segment navigation
+    adjacentSegments: input.adjacentSegments,
   }), [
     input.onClose, input.readOnly, input.selectedProjectId, input.isMobile,
     input.actualGenerationId, input.media, input.isVideo, input.effectiveMediaUrl,
@@ -578,7 +583,7 @@ export function useLightboxLayoutProps(
     input.showNavigation, input.hasNext, input.hasPrevious, input.handleSlotNavNext,
     input.handleSlotNavPrev, input.swipeNavigation, input.effectiveTasksPaneOpen,
     input.effectiveTasksPaneWidth, input.buttonGroupProps, workflowBarProps,
-    floatingToolProps, controlsPanelProps,
+    floatingToolProps, controlsPanelProps, input.adjacentSegments,
   ]);
 
   // Build centered layout props (simpler, no controls panel)
@@ -672,6 +677,8 @@ export function useLightboxLayoutProps(
       isDeleting: input.isDeleting,
       handleDelete: input.handleDelete,
     },
+    // Adjacent segment navigation
+    adjacentSegments: input.adjacentSegments,
   }), [
     input.onClose, input.readOnly, input.selectedProjectId, input.isMobile,
     input.actualGenerationId, input.media, input.isVideo, input.effectiveMediaUrl,
@@ -694,7 +701,7 @@ export function useLightboxLayoutProps(
     input.canvasRef, input.maskCanvasRef, input.isFlippedHorizontally, input.isSaving,
     input.showNavigation, input.hasNext, input.hasPrevious, input.handleSlotNavNext,
     input.handleSlotNavPrev, input.swipeNavigation, input.buttonGroupProps,
-    workflowBarProps, input.isDeleting, input.handleDelete,
+    workflowBarProps, input.isDeleting, input.handleDelete, input.adjacentSegments,
   ]);
 
   return {

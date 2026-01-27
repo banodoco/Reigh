@@ -13,6 +13,7 @@ import type { BrushStroke, AnnotationMode } from '../../hooks/useInpainting';
 import type { EditMode } from '../../hooks/useGenerationEditSettings';
 import type { ControlsPanelProps } from '../ControlsPanel';
 import type { ImageTransform } from '../../hooks/useRepositionMode';
+import type { AdjacentSegmentsData } from '../../types';
 
 /**
  * Core props needed by all layouts
@@ -258,6 +259,9 @@ export interface SidePanelLayoutProps extends
 
   // Controls panel props - the full set for ControlsPanel component
   controlsPanelProps: Omit<ControlsPanelProps, 'variant'>;
+
+  // Adjacent segment navigation (for jumping to video segments from image lightbox)
+  adjacentSegments?: AdjacentSegmentsData;
 }
 
 /**
@@ -288,6 +292,9 @@ export interface CenteredLayoutProps extends
     isDeleting?: string | null;
     handleDelete: () => void;
   } & LayoutWorkflowBarProps;
+
+  // Adjacent segment navigation (for jumping to video segments from image lightbox)
+  adjacentSegments?: AdjacentSegmentsData;
 }
 
 // Re-export ControlsPanelProps for convenience
