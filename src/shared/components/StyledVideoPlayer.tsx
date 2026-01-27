@@ -263,55 +263,60 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
   };
 
   return (
+    // Outer container: fills parent and centers the inner content
     <div
-      className={cn("relative flex items-center justify-center w-full h-full", className)}
+      className={cn("flex items-center justify-center w-full h-full", className)}
       style={wrapperStyle}
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
-      onClick={handleContainerClick}
     >
-      {/* Video Element */}
-      <video
-        ref={videoRef}
-        src={src}
-        poster={poster}
-        loop={loop}
-        muted={isMuted}
-        autoPlay={autoPlay}
-        playsInline={playsInline}
-        preload={preload}
-        className="block max-w-full max-h-full object-contain rounded-lg bg-black cursor-pointer"
-        onDoubleClick={isMobile ? undefined : toggleFullscreen}
-        onLoadedMetadata={onLoadedMetadata}
+      {/* Inner container: shrink-wraps to video so controls align with video edges */}
+      <div
+        className="relative inline-flex max-w-full max-h-full"
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
+        onClick={handleContainerClick}
       >
-        Your browser does not support the video tag.
-      </video>
+        {/* Video Element */}
+        <video
+          ref={videoRef}
+          src={src}
+          poster={poster}
+          loop={loop}
+          muted={isMuted}
+          autoPlay={autoPlay}
+          playsInline={playsInline}
+          preload={preload}
+          className="block max-w-full max-h-full object-contain rounded-lg bg-black cursor-pointer"
+          onDoubleClick={isMobile ? undefined : toggleFullscreen}
+          onLoadedMetadata={onLoadedMetadata}
+        >
+          Your browser does not support the video tag.
+        </video>
 
-      {/* Thumbnail overlay while video is loading */}
-      {poster && !isVideoReady && (
-        <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
-          <img
-            src={getDisplayUrl(poster)}
-            alt=""
-            className="max-w-full max-h-full object-contain rounded-lg"
-          />
-          {/* Loading spinner overlay */}
-          <div className="absolute inset-0 flex items-center justify-center">
+        {/* Thumbnail overlay while video is loading */}
+        {poster && !isVideoReady && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
+            <img
+              src={getDisplayUrl(poster)}
+              alt=""
+              className="max-w-full max-h-full object-contain rounded-lg"
+            />
+            {/* Loading spinner overlay */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-black/60 rounded-full p-3">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading spinner when no thumbnail available */}
+        {!poster && !isVideoReady && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="bg-black/60 rounded-full p-3">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Loading spinner when no thumbnail available */}
-      {!poster && !isVideoReady && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="bg-black/60 rounded-full p-3">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-          </div>
-        </div>
-      )}
+        )}
 
 
       {/* Custom Controls Overlay */}
@@ -405,7 +410,8 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
           </div>
         </div>
       </div>
-
+      {/* End of inner container that shrink-wraps to video */}
+      </div>
     </div>
   );
 };
