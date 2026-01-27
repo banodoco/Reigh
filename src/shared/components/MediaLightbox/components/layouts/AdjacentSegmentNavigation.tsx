@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import { Play } from 'lucide-react';
+import { Video } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import type { AdjacentSegmentsData } from '../../types';
 
@@ -52,36 +52,37 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
           onClick={handlePrevClick}
           disabled={!prev}
           className={cn(
-            'relative flex items-center gap-0.5 rounded-lg overflow-hidden shadow-lg transition-all',
+            'relative w-12 h-12 md:w-14 md:h-14 rounded-lg overflow-hidden shadow-lg transition-all',
             'hover:scale-105 hover:shadow-xl',
             'focus:outline-none focus:ring-2 focus:ring-white/50',
             !prev && 'opacity-30 cursor-not-allowed pointer-events-none'
           )}
         >
-          {prev?.startImageUrl && (
-            <div className="w-10 h-10 md:w-12 md:h-12 overflow-hidden">
-              <img
-                src={prev.startImageUrl}
-                alt="Start"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          )}
-          {prev?.endImageUrl && (
-            <div className="w-10 h-10 md:w-12 md:h-12 overflow-hidden">
-              <img
-                src={prev.endImageUrl}
-                alt="End"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          )}
+          {/* Two images side by side in square container */}
+          <div className="absolute inset-0 flex">
+            {prev?.startImageUrl && (
+              <div className="w-1/2 h-full overflow-hidden">
+                <img
+                  src={prev.startImageUrl}
+                  alt="Start"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            {prev?.endImageUrl && (
+              <div className="w-1/2 h-full overflow-hidden">
+                <img
+                  src={prev.endImageUrl}
+                  alt="End"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+          </div>
           {/* Video icon overlay */}
           {prev && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-              <div className="bg-black/50 rounded-full p-1">
-                <Play className="w-3 h-3 md:w-4 md:h-4 text-white/80 fill-white/80" />
-              </div>
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <Video className="w-5 h-5 md:w-6 md:h-6 text-white/90" />
             </div>
           )}
         </button>
@@ -91,36 +92,37 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
           onClick={handleNextClick}
           disabled={!next}
           className={cn(
-            'relative flex items-center gap-0.5 rounded-lg overflow-hidden shadow-lg transition-all',
+            'relative w-12 h-12 md:w-14 md:h-14 rounded-lg overflow-hidden shadow-lg transition-all',
             'hover:scale-105 hover:shadow-xl',
             'focus:outline-none focus:ring-2 focus:ring-white/50',
             !next && 'opacity-30 cursor-not-allowed pointer-events-none'
           )}
         >
-          {next?.startImageUrl && (
-            <div className="w-10 h-10 md:w-12 md:h-12 overflow-hidden">
-              <img
-                src={next.startImageUrl}
-                alt="Start"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          )}
-          {next?.endImageUrl && (
-            <div className="w-10 h-10 md:w-12 md:h-12 overflow-hidden">
-              <img
-                src={next.endImageUrl}
-                alt="End"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          )}
+          {/* Two images side by side in square container */}
+          <div className="absolute inset-0 flex">
+            {next?.startImageUrl && (
+              <div className="w-1/2 h-full overflow-hidden">
+                <img
+                  src={next.startImageUrl}
+                  alt="Start"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            {next?.endImageUrl && (
+              <div className="w-1/2 h-full overflow-hidden">
+                <img
+                  src={next.endImageUrl}
+                  alt="End"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+          </div>
           {/* Video icon overlay */}
           {next && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-              <div className="bg-black/50 rounded-full p-1">
-                <Play className="w-3 h-3 md:w-4 md:h-4 text-white/80 fill-white/80" />
-              </div>
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+              <Video className="w-5 h-5 md:w-6 md:h-6 text-white/90" />
             </div>
           )}
         </button>

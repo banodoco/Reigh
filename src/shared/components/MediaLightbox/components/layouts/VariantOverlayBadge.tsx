@@ -18,6 +18,8 @@ interface VariantOverlayBadgeProps {
   isMakingMainVariant: boolean;
   canMakeMainVariant: boolean;
   onMakeMainVariant: () => void;
+  /** Whether segment navigation buttons are shown above - adds extra top offset */
+  hasSegmentNavAbove?: boolean;
 }
 
 export const VariantOverlayBadge: React.FC<VariantOverlayBadgeProps> = ({
@@ -27,6 +29,7 @@ export const VariantOverlayBadge: React.FC<VariantOverlayBadgeProps> = ({
   isMakingMainVariant,
   canMakeMainVariant,
   onMakeMainVariant,
+  hasSegmentNavAbove,
 }) => {
   if (readOnly || !activeVariant || !variants) {
     return null;
@@ -34,7 +37,9 @@ export const VariantOverlayBadge: React.FC<VariantOverlayBadgeProps> = ({
 
   return (
     <div
-      className="absolute top-8 md:top-16 left-1/2 transform -translate-x-1/2 z-[60] select-none"
+      className={`absolute left-1/2 transform -translate-x-1/2 z-[60] select-none ${
+        hasSegmentNavAbove ? 'top-16 md:top-24' : 'top-8 md:top-16'
+      }`}
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-2">

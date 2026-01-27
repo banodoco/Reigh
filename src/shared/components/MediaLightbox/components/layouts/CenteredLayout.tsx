@@ -301,6 +301,7 @@ export const CenteredLayout: React.FC<CenteredLayoutProps> = (props) => {
           isMakingMainVariant={isMakingMainVariant}
           canMakeMainVariant={canMakeMainVariant}
           onMakeMainVariant={handleMakeMainVariant}
+          hasSegmentNavAbove={!!(adjacentSegments && !isVideo)}
         />
 
         {/* Top Left - New image button */}

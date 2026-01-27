@@ -286,6 +286,7 @@ export const DesktopSidePanelLayout: React.FC<SidePanelLayoutProps> = (props) =>
           isMakingMainVariant={isMakingMainVariant}
           canMakeMainVariant={canMakeMainVariant}
           onMakeMainVariant={handleMakeMainVariant}
+          hasSegmentNavAbove={!!(adjacentSegments && !isVideo)}
         />
 
         {/* Top Left - New image button */}
