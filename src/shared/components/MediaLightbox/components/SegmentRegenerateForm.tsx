@@ -301,6 +301,8 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
                 metadata: {
                   ...currentMetadata,
                   enhanced_prompt: enhancedPromptResult,
+                  // Store the base prompt so we can reveal it when clearing enhanced
+                  base_prompt_for_enhancement: effectiveSettings.prompt?.trim() || '',
                 },
               })
               .eq('id', pairShotGenerationId);

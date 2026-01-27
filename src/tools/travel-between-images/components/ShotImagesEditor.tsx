@@ -594,6 +594,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // When set, child components (ShotImageManagerDesktop/Timeline) will open the lightbox for this image
   const [pendingImageToOpen, setPendingImageToOpen] = useState<string | null>(null);
 
+  // Track lightbox transitions to keep overlay visible during navigation between image/segment lightboxes
+  const [isLightboxTransitioning, setIsLightboxTransitioning] = useState(false);
+
   // Enhanced position management
   // Centralized position management - shared between Timeline and ShotImageManager
   // When preloadedImages is provided, use new utility hook; otherwise use legacy hook
@@ -986,6 +989,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
       // Navigate to constituent image - closes segment slot and opens image lightbox
       onNavigateToImage: (shotGenerationId: string) => {
         console.log('[ConstituentImageNav] Navigate to image:', shotGenerationId?.substring(0, 8));
+        // Keep overlay visible during transition
+        setIsLightboxTransitioning(true);
         // Close the segment slot lightbox
         setSegmentSlotLightboxIndex(null);
         // Request the image lightbox to open in the child component
@@ -2275,6 +2280,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 // Constituent image navigation support (from segment back to image)
                 pendingImageToOpen={pendingImageToOpen}
                 onClearPendingImageToOpen={() => setPendingImageToOpen(null)}
+                // Lightbox transition support (keeps overlay visible during navigation)
+                onStartLightboxTransition={() => setIsLightboxTransitioning(true)}
               />
               
               {/* Helper for un-positioned generations - in timeline mode, show after timeline */}

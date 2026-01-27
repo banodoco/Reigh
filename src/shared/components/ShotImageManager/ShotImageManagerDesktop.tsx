@@ -47,6 +47,8 @@ interface ShotImageManagerDesktopProps extends ShotImageManagerProps {
   pendingImageToOpen?: string | null;
   /** Callback to clear the pending image request after handling */
   onClearPendingImageToOpen?: () => void;
+  /** Callback to signal start of lightbox transition (keeps overlay visible during navigation) */
+  onStartLightboxTransition?: () => void;
 }
 
 export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = ({
@@ -64,6 +66,7 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
   hasPendingTask,
   pendingImageToOpen,
   onClearPendingImageToOpen,
+  onStartLightboxTransition,
   ...props
 }) => {
   // State for showing success tick after adding to shot (positioned)
@@ -277,12 +280,14 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
       prev,
       next,
       onNavigateToSegment: (pairIndex: number) => {
+        // Keep overlay visible during transition
+        onStartLightboxTransition?.();
         // Close the current lightbox and open the segment slot lightbox
         lightbox.setLightboxIndex(null);
         props.onPairClick!(pairIndex);
       },
     };
-  }, [segmentSlots, props.onPairClick, lightbox.lightboxIndex, lightbox.currentImages, lightbox.setLightboxIndex]);
+  }, [segmentSlots, props.onPairClick, lightbox.lightboxIndex, lightbox.currentImages, lightbox.setLightboxIndex, onStartLightboxTransition]);
 
   const gridColsClass = GRID_COLS_CLASSES[props.columns || 4] || 'grid-cols-4';
   const isMobile = useIsMobile();

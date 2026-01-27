@@ -193,6 +193,8 @@ export interface TimelineProps {
   pendingImageToOpen?: string | null;
   // Callback to clear the pending image request after handling
   onClearPendingImageToOpen?: () => void;
+  // Callback to signal start of lightbox transition (keeps overlay visible during navigation)
+  onStartLightboxTransition?: () => void;
 }
 
 // Stable empty object to avoid creating new references when enhancedPrompts is undefined
@@ -275,6 +277,8 @@ const Timeline: React.FC<TimelineProps> = ({
   // Constituent image navigation support
   pendingImageToOpen,
   onClearPendingImageToOpen,
+  // Lightbox transition support (keeps overlay visible during navigation)
+  onStartLightboxTransition,
 }) => {
   // [RefactorMetrics] Track render count for baseline measurements
   useRenderCount('Timeline');
@@ -685,12 +689,14 @@ const Timeline: React.FC<TimelineProps> = ({
       prev: prevSegment,
       next: nextSegment,
       onNavigateToSegment: (pairIndex: number) => {
+        // Keep overlay visible during transition
+        onStartLightboxTransition?.();
         // Close the current lightbox and open the segment slot lightbox
         closeLightbox();
         onOpenSegmentSlot(pairIndex);
       },
     };
-  }, [segmentSlots, onOpenSegmentSlot, lightboxIndex, currentImages, closeLightbox]);
+  }, [segmentSlots, onOpenSegmentSlot, lightboxIndex, currentImages, closeLightbox, onStartLightboxTransition]);
 
   // Adapter functions for onAddToShot that use the target shot ID from the callback
   // CRITICAL FIX: Now receives targetShotId from the callback, not from local state!

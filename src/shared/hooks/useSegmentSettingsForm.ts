@@ -161,6 +161,7 @@ export function useSegmentSettingsForm(
     hasOverride,
     shotDefaults,
     enhancedPrompt,
+    basePromptForEnhancement,
     clearEnhancedPrompt,
   } = useSegmentSettings({
     pairShotGenerationId,
@@ -188,6 +189,7 @@ export function useSegmentSettingsForm(
 
     // Enhanced prompt (AI-generated, stored separately)
     enhancedPrompt,
+    basePromptForEnhancement,
     onClearEnhancedPrompt: clearEnhancedPrompt,
 
     // Display context
@@ -223,6 +225,7 @@ export function useSegmentSettingsForm(
     saveAsShotDefaults,
     saveFieldAsDefault,
     enhancedPrompt,
+    basePromptForEnhancement,
     clearEnhancedPrompt,
     segmentIndex,
     startImageUrl,

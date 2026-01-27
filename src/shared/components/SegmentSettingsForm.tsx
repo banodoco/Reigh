@@ -147,6 +147,8 @@ export interface SegmentSettingsFormProps {
   // Enhanced prompt (AI-generated)
   /** AI-generated enhanced prompt (stored separately from user settings) */
   enhancedPrompt?: string;
+  /** The base prompt that was used when enhanced prompt was created (for comparison) */
+  basePromptForEnhancement?: string;
   /** Callback to clear the enhanced prompt */
   onClearEnhancedPrompt?: () => Promise<boolean>;
   /** Whether to enhance prompt during generation (controlled by parent) */
@@ -512,6 +514,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   structureVideoUrl,
   structureVideoFrameRange,
   enhancedPrompt,
+  basePromptForEnhancement,
   onClearEnhancedPrompt,
   enhancePromptEnabled,
   onEnhancePromptChange,
@@ -583,6 +586,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   const promptField = usePromptFieldState({
     settingsPrompt: settings.prompt,
     enhancedPrompt,
+    basePromptForEnhancement,
     defaultPrompt: shotDefaults?.prompt,
     onSettingsChange: (value) => onChange({ prompt: value }),
     onClearEnhancedPrompt,

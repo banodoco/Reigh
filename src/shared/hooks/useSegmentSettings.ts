@@ -137,6 +137,8 @@ export interface UseSegmentSettingsReturn {
   shotDefaults: ShotDefaults;
   /** AI-generated enhanced prompt (stored separately from user settings) */
   enhancedPrompt: string | undefined;
+  /** The base prompt that was used when enhanced prompt was created (for comparison) */
+  basePromptForEnhancement: string | undefined;
   /** Clear the enhanced prompt from metadata */
   clearEnhancedPrompt: () => Promise<boolean>;
 }
@@ -1036,8 +1038,9 @@ export function useSegmentSettings({
     setIsDirty(false);
   }, [instanceId, shotId, settings.numFrames, clearEnhancedPrompt, pairShotGenerationId, saveSettings]);
 
-  // Extract enhanced prompt from pair metadata (AI-generated, stored separately)
+  // Extract enhanced prompt and base prompt from pair metadata (AI-generated, stored separately)
   const enhancedPrompt = (pairMetadata as Record<string, any> | null)?.enhanced_prompt as string | undefined;
+  const basePromptForEnhancement = (pairMetadata as Record<string, any> | null)?.base_prompt_for_enhancement as string | undefined;
 
   return {
     settings,
@@ -1054,6 +1057,7 @@ export function useSegmentSettings({
     hasOverride,
     shotDefaults: shotDefaultsValue,
     enhancedPrompt: enhancedPrompt?.trim() || undefined,
+    basePromptForEnhancement: basePromptForEnhancement?.trim() || undefined,
     clearEnhancedPrompt,
   };
 }
