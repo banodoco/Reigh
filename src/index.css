@@ -2995,3 +2995,21 @@
 }
 
 /* Note: mobile tap "flash" is handled in React to avoid sticky :hover */
+
+/* Lightbox transition overlay - prevents flash when navigating between image/segment lightboxes */
+/* Uses CSS pseudo-element so it appears INSTANTLY when class is added (no React render wait) */
+body.lightbox-transitioning::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 100001;
+  pointer-events: none;
+}
+
+/* Also disable animations on the dialogs during transition for instant close/open */
+body.lightbox-transitioning [data-radix-dialog-overlay],
+body.lightbox-transitioning [data-radix-dialog-content] {
+  animation: none !important;
+  transition: none !important;
+}

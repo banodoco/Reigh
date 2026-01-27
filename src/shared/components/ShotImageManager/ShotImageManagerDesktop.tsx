@@ -280,9 +280,10 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
       prev,
       next,
       onNavigateToSegment: (pairIndex: number) => {
-        // Keep overlay visible during transition
+        // Synchronously add class - CSS will show overlay and disable animations
+        document.body.classList.add('lightbox-transitioning');
         onStartLightboxTransition?.();
-        // Close the current lightbox and open the segment slot lightbox
+        // Close the old lightbox and open the new one synchronously
         lightbox.setLightboxIndex(null);
         props.onPairClick!(pairIndex);
       },

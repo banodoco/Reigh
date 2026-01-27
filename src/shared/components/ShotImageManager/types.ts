@@ -57,6 +57,8 @@ export interface ShotImageManagerProps {
   pendingImageToOpen?: string | null;
   /** Callback to clear the pending image request after handling */
   onClearPendingImageToOpen?: () => void;
+  /** Callback to signal start of lightbox transition (keeps overlay visible during navigation) */
+  onStartLightboxTransition?: () => void;
 }
 
 /** Props for segment video outputs in batch view */

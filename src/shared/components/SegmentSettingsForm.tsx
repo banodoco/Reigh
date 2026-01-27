@@ -34,7 +34,7 @@ import { LoraSelectorModal } from '@/shared/components/LoraSelectorModal';
 import { DefaultableTextarea } from '@/shared/components/DefaultableTextarea';
 import { DatasetBrowserModal } from '@/shared/components/DatasetBrowserModal';
 import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { usePublicLoras, useCreateResource, type LoraModel, type Resource, type StructureVideoMetadata } from '@/shared/hooks/useResources';
 import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { uploadVideoToStorage, extractVideoMetadata } from '@/shared/lib/videoUploader';
@@ -229,61 +229,53 @@ const FieldDefaultControls: React.FC<{
 };
 
 // =============================================================================
-// ENHANCED PROMPT BADGE (matches VariantBadge style)
+// ENHANCED PROMPT BADGE (matches VariantBadge tooltip pattern)
 // =============================================================================
 
 /**
- * Shows "Enhanced" badge with hover-to-clear behavior (matching VariantBadge).
- * After hovering for 1.5s, shows "X clear" which can be clicked to remove enhanced prompt.
+ * Shows "Enhanced" badge with tooltip containing the original prompt and clear action.
+ * Matches the VariantBadge UX pattern for consistency.
  */
 const EnhancedPromptBadge: React.FC<{
   onClear: () => void;
   onSetAsDefault?: () => void;
   isSaving?: boolean;
-}> = ({ onClear, onSetAsDefault, isSaving }) => {
-  const [showDismiss, setShowDismiss] = useState(false);
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleMouseEnter = useCallback(() => {
-    hoverTimerRef.current = setTimeout(() => {
-      setShowDismiss(true);
-    }, 1500); // Same delay as VariantBadge
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    if (hoverTimerRef.current) {
-      clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
-    setShowDismiss(false);
-  }, []);
-
-  const handleDismissClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    onClear();
-    setShowDismiss(false);
-  }, [onClear]);
+  basePrompt?: string;
+}> = ({ onClear, onSetAsDefault, isSaving, basePrompt }) => {
+  // Truncate base prompt for display
+  const truncatedBase = basePrompt && basePrompt.length > 50
+    ? basePrompt.substring(0, 50) + '...'
+    : basePrompt;
 
   return (
     <div className="flex items-center gap-1">
-      {/* Enhanced badge - matches VariantBadge "new" style */}
-      <div
-        className="bg-green-500 text-white text-[8px] font-bold px-1 py-0.5 rounded flex items-center gap-0.5 transition-all cursor-pointer hover:bg-green-400"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        onClick={showDismiss ? handleDismissClick : undefined}
-        title={showDismiss ? 'Click to clear enhanced prompt' : 'AI-enhanced prompt (hover to clear)'}
-      >
-        {showDismiss ? (
-          <>
-            <X className="h-2.5 w-2.5" strokeWidth={3} />
-            <span>clear</span>
-          </>
-        ) : (
-          <>Enhanced</>
-        )}
-      </div>
+      {/* Enhanced badge with tooltip - matches VariantBadge pattern */}
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="bg-green-500 text-white text-[8px] font-bold px-1 py-0.5 rounded cursor-help">
+              Enhanced
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="flex flex-col gap-1 max-w-xs">
+            {basePrompt ? (
+              <p className="text-xs">Enhanced from: <span className="italic">"{truncatedBase}"</span></p>
+            ) : (
+              <p>AI-enhanced prompt</p>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                onClear();
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+            >
+              Clear enhanced prompt
+            </button>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       {/* Set as Default button */}
       {onSetAsDefault && (
         <button
@@ -934,6 +926,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                 onClear={promptField.handleClearEnhanced}
                 onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('prompt', promptField.displayValue) : undefined}
                 isSaving={savingField === 'prompt'}
+                basePrompt={basePromptForEnhancement}
               />
             )}
             {promptField.badgeType === 'default' && (

@@ -50,9 +50,10 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
         <button
           onClick={handlePrevClick}
           disabled={!prev}
+          title="View previous video segment"
           className={cn(
             'relative w-12 h-12 md:w-14 md:h-14 rounded-lg overflow-hidden shadow-lg transition-all',
-            'hover:scale-105 hover:shadow-xl',
+            'hover:scale-105 hover:shadow-xl hover:ring-2 hover:ring-white/40',
             'focus:outline-none focus:ring-2 focus:ring-white/50',
             !prev && 'opacity-30 cursor-not-allowed pointer-events-none'
           )}
@@ -90,9 +91,10 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
         <button
           onClick={handleNextClick}
           disabled={!next}
+          title="View next video segment"
           className={cn(
             'relative w-12 h-12 md:w-14 md:h-14 rounded-lg overflow-hidden shadow-lg transition-all',
-            'hover:scale-105 hover:shadow-xl',
+            'hover:scale-105 hover:shadow-xl hover:ring-2 hover:ring-white/40',
             'focus:outline-none focus:ring-2 focus:ring-white/50',
             !next && 'opacity-30 cursor-not-allowed pointer-events-none'
           )}

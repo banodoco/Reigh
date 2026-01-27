@@ -60,6 +60,7 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
           <button
             onClick={handleStartClick}
             disabled={!startImageId}
+            title="View start image"
             className={cn(
               'relative w-10 h-10 rounded-lg overflow-hidden transition-all',
               'hover:scale-105 hover:ring-2 hover:ring-primary/50',
@@ -70,7 +71,7 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
             {startImageUrl && (
               <img
                 src={startImageUrl}
-                alt="Start"
+                alt="Start image"
                 className="w-full h-full object-cover"
               />
             )}
@@ -84,6 +85,7 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
           <button
             onClick={handleEndClick}
             disabled={!endImageId}
+            title="View end image"
             className={cn(
               'relative w-10 h-10 rounded-lg overflow-hidden transition-all',
               'hover:scale-105 hover:ring-2 hover:ring-primary/50',
@@ -94,7 +96,7 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
             {endImageUrl && (
               <img
                 src={endImageUrl}
-                alt="End"
+                alt="End image"
                 className="w-full h-full object-cover"
               />
             )}
@@ -109,9 +111,10 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
   }
 
   // Overlay variant for positioning on top of video
+  // Position at bottom-8 md:bottom-16 to match AdjacentSegmentNavigation's top-8 md:top-16
   return (
     <div
-      className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-[60] select-none"
+      className="absolute bottom-8 md:bottom-16 left-1/2 transform -translate-x-1/2 z-[60] select-none"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-3">
@@ -119,9 +122,10 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
         <button
           onClick={handleStartClick}
           disabled={!startImageId}
+          title="View start image"
           className={cn(
             'relative w-12 h-12 md:w-14 md:h-14 rounded-lg overflow-hidden shadow-lg transition-all',
-            'hover:scale-105 hover:shadow-xl',
+            'hover:scale-105 hover:shadow-xl hover:ring-2 hover:ring-white/40',
             'focus:outline-none focus:ring-2 focus:ring-white/50',
             !startImageId && 'opacity-30 cursor-not-allowed pointer-events-none'
           )}
@@ -129,7 +133,7 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
           {startImageUrl && (
             <img
               src={startImageUrl}
-              alt="Start"
+              alt="Start image"
               className="w-full h-full object-cover"
             />
           )}
@@ -143,9 +147,10 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
         <button
           onClick={handleEndClick}
           disabled={!endImageId}
+          title="View end image"
           className={cn(
             'relative w-12 h-12 md:w-14 md:h-14 rounded-lg overflow-hidden shadow-lg transition-all',
-            'hover:scale-105 hover:shadow-xl',
+            'hover:scale-105 hover:shadow-xl hover:ring-2 hover:ring-white/40',
             'focus:outline-none focus:ring-2 focus:ring-white/50',
             !endImageId && 'opacity-30 cursor-not-allowed pointer-events-none'
           )}
@@ -153,7 +158,7 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
           {endImageUrl && (
             <img
               src={endImageUrl}
-              alt="End"
+              alt="End image"
               className="w-full h-full object-cover"
             />
           )}

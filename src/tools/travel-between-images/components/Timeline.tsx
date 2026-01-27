@@ -689,9 +689,11 @@ const Timeline: React.FC<TimelineProps> = ({
       prev: prevSegment,
       next: nextSegment,
       onNavigateToSegment: (pairIndex: number) => {
-        // Keep overlay visible during transition
+        // Synchronously add class - CSS will show overlay and disable animations
+        document.body.classList.add('lightbox-transitioning');
         onStartLightboxTransition?.();
-        // Close the current lightbox and open the segment slot lightbox
+        // Close the old lightbox and open the new one synchronously
+        // The CSS overlay covers any flash
         closeLightbox();
         onOpenSegmentSlot(pairIndex);
       },
