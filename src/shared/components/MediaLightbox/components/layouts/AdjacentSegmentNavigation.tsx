@@ -81,8 +81,8 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
           </div>
           {/* Video icon overlay */}
           {prev && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Video className="w-5 h-5 md:w-6 md:h-6 text-white/90" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+              <Video className="w-5 h-5 md:w-6 md:h-6 text-white/50" />
             </div>
           )}
         </button>
@@ -121,8 +121,8 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
           </div>
           {/* Video icon overlay */}
           {next && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-              <Video className="w-5 h-5 md:w-6 md:h-6 text-white/90" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+              <Video className="w-5 h-5 md:w-6 md:h-6 text-white/50" />
             </div>
           )}
         </button>
