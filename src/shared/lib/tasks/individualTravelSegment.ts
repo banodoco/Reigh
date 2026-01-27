@@ -44,6 +44,8 @@ export interface IndividualTravelSegmentParams {
   
   // Overrides - these can override values from originalParams
   base_prompt?: string;
+  // AI-enhanced prompt (kept separate from base_prompt, worker prefers this when present)
+  enhanced_prompt?: string;
   negative_prompt?: string;
   num_frames?: number;
   seed?: number;
@@ -232,11 +234,16 @@ function buildIndividualTravelSegmentParams(
   // params.base_prompt is the explicit override from the SegmentCard UI
   const basePrompt = params.base_prompt ?? orig.base_prompt ?? orig.prompt ?? "";
   const negativePrompt = params.negative_prompt ?? orig.negative_prompt ?? "";
-  
+  // AI-enhanced prompt (kept separate from base_prompt)
+  // When present, worker should prefer this over base_prompt
+  const enhancedPrompt = params.enhanced_prompt ?? orig.enhanced_prompt;
+
   // [SegmentPromptDebug] Log prompt resolution to verify UI values are being used
   console.log('[IndividualTravelSegment] [SegmentPromptDebug] Prompt resolution:', {
     hasParamsBasePrompt: params.base_prompt !== undefined && params.base_prompt !== null,
     paramsBasePrompt: params.base_prompt?.substring(0, 50),
+    hasEnhancedPrompt: !!enhancedPrompt,
+    enhancedPromptPreview: enhancedPrompt?.substring(0, 50),
     origBasePrompt: orig.base_prompt?.substring(0, 50),
     origPrompt: orig.prompt?.substring(0, 50),
     finalBasePrompt: basePrompt?.substring(0, 50),
@@ -409,6 +416,8 @@ function buildIndividualTravelSegmentParams(
     project_id: params.project_id,
     shot_id: params.shot_id, // CRITICAL: Include shot_id for "Open Shot" button in TasksPane
     base_prompt: basePrompt,
+    // AI-enhanced prompt (kept separate from base_prompt, worker should prefer this when present)
+    ...(enhancedPrompt ? { enhanced_prompt: enhancedPrompt } : {}),
     fps_helpers: orig.fps_helpers ?? orchDetails.fps_helpers ?? 16,
     seed_to_use: finalSeed,
     
@@ -496,8 +505,10 @@ function buildIndividualTravelSegmentParams(
     
     // Prompts
     base_prompt: basePrompt,
+    // AI-enhanced prompt (kept separate from base_prompt, worker should prefer this when present)
+    ...(enhancedPrompt ? { enhanced_prompt: enhancedPrompt } : {}),
     negative_prompt: negativePrompt,
-    
+
     // Frame settings
     num_frames: numFrames,
     

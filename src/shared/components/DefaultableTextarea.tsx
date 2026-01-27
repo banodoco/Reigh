@@ -41,8 +41,11 @@ export interface DefaultableTextareaProps extends Omit<TextareaProps, 'value' | 
   containerClassName?: string;
   /** Callback to use shot default value */
   onUseDefault?: () => void;
-  /** Callback to set current value as shot default */
-  onSetAsDefault?: () => void;
+  /**
+   * Callback to set current value as shot default.
+   * Receives the actual displayed value (what the user sees in the field).
+   */
+  onSetAsDefault?: (displayValue: string) => void;
   /** Whether currently saving as default */
   isSavingDefault?: boolean;
 }
@@ -56,7 +59,8 @@ const FieldBadge: React.FC<{
   onUseDefault?: () => void;
   onSetAsDefault?: () => void;
   isSaving?: boolean;
-}> = ({ type, label, onUseDefault, onSetAsDefault, isSaving }) => {
+  displayValue?: string;
+}> = ({ type, label, onUseDefault, onSetAsDefault, isSaving, displayValue }) => {
   // If using default, show badge
   if (type) {
     const styles = {
@@ -96,7 +100,7 @@ const FieldBadge: React.FC<{
       {onSetAsDefault && (
         <button
           type="button"
-          onClick={onSetAsDefault}
+          onClick={() => onSetAsDefault(displayValue ?? '')}
           disabled={isSaving}
           className="text-[10px] bg-muted hover:bg-primary/15 text-muted-foreground hover:text-primary px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-colors disabled:opacity-50"
           title="Set this value as the shot default"
@@ -154,6 +158,7 @@ export const DefaultableTextarea: React.FC<DefaultableTextareaProps> = ({
           onUseDefault={onUseDefault}
           onSetAsDefault={onSetAsDefault}
           isSaving={isSavingDefault}
+          displayValue={displayValue}
         />
       </div>
       <Textarea

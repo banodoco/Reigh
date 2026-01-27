@@ -194,11 +194,15 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
           const enhancedPromptResult = enhanceResult?.enhanced_prompt?.trim() || promptToEnhance;
           console.log('[SegmentSlotFormView] ✅ Enhanced prompt:', enhancedPromptResult.substring(0, 80) + '...');
 
-          // 2. Apply before/after text to the enhanced prompt
+          // 2. Apply before/after text to both original and enhanced prompts
           const beforeText = effectiveSettings.textBeforePrompts?.trim() || '';
           const afterText = effectiveSettings.textAfterPrompts?.trim() || '';
-          const finalPrompt = [beforeText, enhancedPromptResult, afterText].filter(Boolean).join(' ');
-          console.log('[SegmentSlotFormView] 📝 Final prompt with before/after:', finalPrompt.substring(0, 100) + '...');
+          // Original prompt with before/after (what user would have gotten without enhancement)
+          const originalPromptWithPrefixes = [beforeText, effectiveSettings.prompt?.trim() || '', afterText].filter(Boolean).join(' ');
+          // Enhanced prompt with before/after (the AI-enhanced version)
+          const enhancedPromptWithPrefixes = [beforeText, enhancedPromptResult, afterText].filter(Boolean).join(' ');
+          console.log('[SegmentSlotFormView] 📝 Original prompt with before/after:', originalPromptWithPrefixes.substring(0, 100) + '...');
+          console.log('[SegmentSlotFormView] 📝 Enhanced prompt with before/after:', enhancedPromptWithPrefixes.substring(0, 100) + '...');
 
           // 3. Store enhanced prompt in metadata
           if (pairShotGenerationId && enhancedPromptResult !== promptToEnhance) {
@@ -222,9 +226,10 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
             queryClient.invalidateQueries({ queryKey: ['pair-metadata', pairShotGenerationId] });
           }
 
-          // 4. Build task params with final prompt (enhanced + before/after)
+          // 4. Build task params with original prompt as base_prompt, enhanced as separate field
+          // The worker should prefer enhanced_prompt over base_prompt when present
           const taskParams = buildTaskParams(
-            { ...effectiveSettings, prompt: finalPrompt },
+            { ...effectiveSettings, prompt: originalPromptWithPrefixes },
             {
               projectId: segmentSlotMode.projectId,
               shotId: segmentSlotMode.shotId,
@@ -237,6 +242,7 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
               endImageGenerationId: segmentSlotMode.pairData.endImage?.generationId,
               pairShotGenerationId,
               projectResolution: segmentSlotMode.projectResolution,
+              enhancedPrompt: enhancedPromptWithPrefixes,
             }
           );
 

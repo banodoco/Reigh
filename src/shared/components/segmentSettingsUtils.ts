@@ -492,6 +492,8 @@ export function buildTaskParams(
     endImageGenerationId?: string;
     pairShotGenerationId?: string;
     projectResolution?: string;
+    // Optional enhanced prompt (AI-enhanced version, kept separate from base_prompt)
+    enhancedPrompt?: string;
   }
 ): Record<string, any> {
   return {
@@ -508,6 +510,8 @@ export function buildTaskParams(
     // Settings
     base_prompt: settings.prompt,
     negative_prompt: settings.negativePrompt,
+    // Enhanced prompt (AI-enhanced version) - worker should prefer this over base_prompt when present
+    ...(context.enhancedPrompt && { enhanced_prompt: context.enhancedPrompt }),
     num_frames: settings.numFrames,
     random_seed: settings.randomSeed,
     seed: settings.seed,

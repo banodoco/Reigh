@@ -963,7 +963,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                   onChange={(value) => onChange({ textBeforePrompts: value })}
                   onClear={() => onChange({ textBeforePrompts: '' })}
                   onUseDefault={() => onChange({ textBeforePrompts: undefined })}
-                  onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('textBeforePrompts', settings.textBeforePrompts ?? shotDefaults?.textBeforePrompts ?? '') : undefined}
+                  onSetAsDefault={onSaveFieldAsDefault ? (displayValue) => handleSaveFieldAsDefault('textBeforePrompts', displayValue) : undefined}
                   isSavingDefault={savingField === 'textBeforePrompts'}
                   className="h-14 text-xs resize-none"
                   placeholder="Text to prepend..."
@@ -976,7 +976,7 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                   onChange={(value) => onChange({ textAfterPrompts: value })}
                   onClear={() => onChange({ textAfterPrompts: '' })}
                   onUseDefault={() => onChange({ textAfterPrompts: undefined })}
-                  onSetAsDefault={onSaveFieldAsDefault ? () => handleSaveFieldAsDefault('textAfterPrompts', settings.textAfterPrompts ?? shotDefaults?.textAfterPrompts ?? '') : undefined}
+                  onSetAsDefault={onSaveFieldAsDefault ? (displayValue) => handleSaveFieldAsDefault('textAfterPrompts', displayValue) : undefined}
                   isSavingDefault={savingField === 'textAfterPrompts'}
                   className="h-14 text-xs resize-none"
                   placeholder="Text to append..."
