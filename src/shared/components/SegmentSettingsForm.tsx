@@ -835,27 +835,25 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
 
       {/* Prompt */}
       {(() => {
-        // Priority: settings.prompt > enhancedPrompt > shotDefaults.prompt
-        // Key: check for undefined specifically, not falsiness
-        // - undefined = no override, fall through to enhanced/default
-        // - '' = user explicitly cleared, show empty (no badge)
-        // - 'text' = user typed something, show it (no badge)
-        const userHasSetPrompt = settings.prompt !== undefined;
+        // Priority: enhancedPrompt > settings.prompt > shotDefaults.prompt
+        // Enhanced prompt (AI-generated) takes precedence when it exists.
+        // If user wants to override, they edit the field which clears enhanced prompt.
         const hasEnhancedPrompt = !!enhancedPrompt?.trim();
+        const userHasSetPrompt = settings.prompt !== undefined;
         const hasDefaultPrompt = shotDefaults?.prompt !== undefined;
 
         // Determine what to display and which badge
         let promptDisplayValue: string;
         let badgeType: 'enhanced' | 'default' | null = null;
 
-        if (userHasSetPrompt) {
+        if (hasEnhancedPrompt) {
+          // AI-enhanced prompt takes priority
+          promptDisplayValue = enhancedPrompt!;
+          badgeType = 'enhanced';
+        } else if (userHasSetPrompt) {
           // User has explicitly set a prompt (even if empty)
           promptDisplayValue = settings.prompt;
           badgeType = null;
-        } else if (hasEnhancedPrompt) {
-          // AI-enhanced prompt (user hasn't overridden it)
-          promptDisplayValue = enhancedPrompt!;
-          badgeType = 'enhanced';
         } else if (hasDefaultPrompt) {
           // Fall back to shot defaults
           promptDisplayValue = shotDefaults!.prompt;
@@ -891,7 +889,13 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
               </div>
               <Textarea
                 value={promptDisplayValue}
-                onChange={(e) => onChange({ prompt: e.target.value })}
+                onChange={(e) => {
+                  // If editing while enhanced prompt is showing, clear it since user is overriding
+                  if (hasEnhancedPrompt) {
+                    onClearEnhancedPrompt?.();
+                  }
+                  onChange({ prompt: e.target.value });
+                }}
                 className="h-20 text-sm resize-none"
                 placeholder="Describe this segment..."
                 clearable
@@ -903,6 +907,10 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
                 voiceInput
                 voiceContext="This is a prompt for a video segment. Describe the motion, action, or visual content you want in this part of the video."
                 onVoiceResult={(result) => {
+                  // If using voice while enhanced is showing, clear it
+                  if (hasEnhancedPrompt) {
+                    onClearEnhancedPrompt?.();
+                  }
                   onChange({ prompt: result.prompt || result.transcription });
                 }}
               />
