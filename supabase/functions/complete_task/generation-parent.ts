@@ -4,7 +4,7 @@
  */
 
 import { extractShotAndPosition } from './params.ts';
-import { TOOL_TYPES } from './constants.ts';
+import { TOOL_TYPES, TASK_TYPES } from './constants.ts';
 import {
   findExistingGeneration,
   createVariant,
@@ -66,9 +66,17 @@ export async function getOrCreateParentGeneration(
 
     const newId = crypto.randomUUID();
     const baseParams = orchTask?.params || segmentParams || {};
+
+    // Determine the correct tool_type based on orchestrator task type
+    const taskType = orchTask?.task_type || '';
+    const isJoinClips = taskType === TASK_TYPES.JOIN_CLIPS_ORCHESTRATOR ||
+                        taskType === TASK_TYPES.JOIN_CLIPS_SEGMENT ||
+                        taskType === TASK_TYPES.JOIN_FINAL_STITCH;
+    const defaultToolType = isJoinClips ? TOOL_TYPES.JOIN_CLIPS : TOOL_TYPES.TRAVEL_BETWEEN_IMAGES;
+
     const placeholderParams = {
       ...baseParams,
-      tool_type: baseParams.tool_type || TOOL_TYPES.TRAVEL_BETWEEN_IMAGES
+      tool_type: baseParams.tool_type || defaultToolType
     };
 
     const placeholderRecord = {
