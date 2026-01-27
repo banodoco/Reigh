@@ -288,14 +288,12 @@ export const StyledVideoPlayer: React.FC<StyledVideoPlayerProps> = ({
       </video>
 
       {/* Thumbnail overlay while video is loading */}
-      {/* Uses aspectRatio on img to help with initial sizing for tall videos on mobile */}
       {poster && !isVideoReady && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden flex items-center justify-center">
           <img
             src={getDisplayUrl(poster)}
             alt=""
             className="max-w-full max-h-full object-contain rounded-lg"
-            style={videoDimensions ? { aspectRatio: `${videoDimensions.width} / ${videoDimensions.height}` } : undefined}
           />
           {/* Loading spinner overlay */}
           <div className="absolute inset-0 flex items-center justify-center">
