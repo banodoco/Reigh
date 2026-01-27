@@ -123,6 +123,8 @@ export interface ControlsPanelProps extends ModeProps {
   onEnterVideoEditMode: InfoPanelProps['onEnterVideoEditMode'];
   onClose: InfoPanelProps['onClose'];
   taskDetailsData: InfoPanelProps['taskDetailsData'];
+  /** Task ID for copy functionality in edit mode (extracted from taskDetailsData) */
+  taskId?: string | null;
   derivedItems: InfoPanelProps['derivedItems'];
   replaceImages: InfoPanelProps['replaceImages'];
   onReplaceImagesChange: InfoPanelProps['onReplaceImagesChange'];
@@ -246,6 +248,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
     onEnterVideoEditMode,
     onClose,
     taskDetailsData,
+    taskId,
     derivedItems,
     replaceImages,
     onReplaceImagesChange,
@@ -305,6 +308,8 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         projectId={projectId}
         // Regenerate props
         regenerateFormProps={regenerateFormProps}
+        // Task ID for copy functionality
+        taskId={taskId}
         // Variants props
         variants={variants}
         activeVariantId={activeVariant?.id || null}
@@ -333,6 +338,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         sourcePrimaryVariant={sourcePrimaryVariant}
         onMakeMainVariant={onMakeMainVariant}
         canMakeMainVariant={canMakeMainVariant}
+        taskId={taskId}
         editMode={editMode}
         setEditMode={setEditMode}
         setIsInpaintMode={setIsInpaintMode}

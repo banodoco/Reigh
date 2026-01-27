@@ -33,6 +33,9 @@ export interface EditModePanelProps {
   onMakeMainVariant?: () => Promise<void>;
   canMakeMainVariant?: boolean;
 
+  // Task ID for copy functionality
+  taskId?: string | null;
+
   // Edit mode state
   editMode: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img';
   setEditMode: (mode: 'text' | 'inpaint' | 'annotate' | 'reposition' | 'img2img') => void;
@@ -149,6 +152,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   sourcePrimaryVariant,
   onMakeMainVariant,
   canMakeMainVariant,
+  taskId,
   editMode,
   setEditMode,
   setIsInpaintMode,
@@ -311,6 +315,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         onExitEditMode={handleExitMagicEditMode}
         hideInfoEditToggle={hideInfoEditToggle}
         modeSelector={modeSelector}
+        taskId={taskId}
         variants={variants}
         activeVariantId={activeVariantId}
         onVariantSelect={onVariantSelect}

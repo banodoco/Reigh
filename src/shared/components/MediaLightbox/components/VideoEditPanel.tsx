@@ -69,6 +69,9 @@ export interface VideoEditPanelProps {
   // Regenerate mode props - pass props instead of JSX for proper hook pattern
   regenerateFormProps?: SegmentRegenerateFormProps | null;
 
+  // Task ID for copy functionality
+  taskId?: string | null;
+
   // Variants props
   variants: GenerationVariant[];
   activeVariantId: string | null;
@@ -111,6 +114,8 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
   projectId,
   // Regenerate props
   regenerateFormProps,
+  // Task ID
+  taskId,
   // Variants props
   variants,
   activeVariantId,
@@ -155,6 +160,7 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
       onClose={onClose}
       onExitEditMode={onExitVideoEditMode}
       modeSelector={modeSelector}
+      taskId={taskId}
       variants={variants}
       activeVariantId={activeVariantId}
       onVariantSelect={onVariantSelect}

@@ -5,7 +5,7 @@
  * Provides consistent header, mode selector, scrollable content area, and variants section.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { X } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
@@ -32,6 +32,9 @@ export interface EditPanelLayoutProps {
   /** Main content below the mode selector */
   children: React.ReactNode;
 
+  /** Task ID for copy functionality */
+  taskId?: string | null;
+
   /** Variants props */
   variants?: GenerationVariant[];
   activeVariantId?: string | null;
@@ -57,6 +60,7 @@ export const EditPanelLayout: React.FC<EditPanelLayoutProps> = ({
   hideInfoEditToggle = false,
   modeSelector,
   children,
+  taskId,
   variants,
   activeVariantId,
   onVariantSelect,
@@ -71,40 +75,71 @@ export const EditPanelLayout: React.FC<EditPanelLayoutProps> = ({
   const hasVariants = variants && variants.length >= 1 && onVariantSelect;
   const padding = isMobile ? 'p-3' : 'p-6';
   const spacing = isMobile ? 'space-y-2' : 'space-y-4';
+  const [idCopied, setIdCopied] = useState(false);
+
+  // Handle ID copy with simple approach that works on all devices
+  const handleCopyId = () => {
+    if (!taskId) return;
+    setIdCopied(true);
+    setTimeout(() => setIdCopied(false), 2000);
+    navigator.clipboard.writeText(taskId).catch(() => {
+      // Silently fail - we already showed feedback
+    });
+  };
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header with Info/Edit toggle and close button */}
+      {/* Header with ID copy, Info/Edit toggle and close button */}
       <div className={cn(
-        "flex items-center justify-end border-b border-border bg-background flex-shrink-0",
+        "flex items-center justify-between border-b border-border bg-background flex-shrink-0",
         isMobile ? "px-3 py-2 gap-2" : "p-4 gap-3"
       )}>
-        {!hideInfoEditToggle && (
-          <SegmentedControl
-            value="edit"
-            onValueChange={(value) => {
-              console.log('[EditPanelLayout] SegmentedControl onValueChange:', value);
-              console.log('[EditPanelLayout] SegmentedControl stack:', new Error().stack);
-              if (value === 'info') {
-                onExitEditMode();
-              }
+        {/* Left side - copy id */}
+        <div className="flex items-center gap-2">
+          {taskId && (
+            <button
+              onClick={handleCopyId}
+              className={cn(
+                "px-2 py-1 text-xs rounded transition-colors touch-manipulation",
+                idCopied
+                  ? "text-green-400"
+                  : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+              )}
+            >
+              {idCopied ? 'copied' : 'id'}
+            </button>
+          )}
+        </div>
+
+        {/* Right side - toggles and close button */}
+        <div className="flex items-center gap-3">
+          {!hideInfoEditToggle && (
+            <SegmentedControl
+              value="edit"
+              onValueChange={(value) => {
+                console.log('[EditPanelLayout] SegmentedControl onValueChange:', value);
+                console.log('[EditPanelLayout] SegmentedControl stack:', new Error().stack);
+                if (value === 'info') {
+                  onExitEditMode();
+                }
+              }}
+            >
+              <SegmentedControlItem value="info">Info</SegmentedControlItem>
+              <SegmentedControlItem value="edit">Edit</SegmentedControlItem>
+            </SegmentedControl>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
             }}
+            className={cn("p-0 hover:bg-muted", isMobile ? "h-7 w-7" : "h-8 w-8")}
           >
-            <SegmentedControlItem value="info">Info</SegmentedControlItem>
-            <SegmentedControlItem value="edit">Edit</SegmentedControlItem>
-          </SegmentedControl>
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          className={cn("p-0 hover:bg-muted", isMobile ? "h-7 w-7" : "h-8 w-8")}
-        >
-          <X className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
-        </Button>
+            <X className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
+          </Button>
+        </div>
       </div>
 
       {/* Scrollable content area */}

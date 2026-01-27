@@ -334,6 +334,7 @@ export function useLightboxLayoutProps(
     onEnterVideoEditMode: input.handleEnterVideoEditMode,
     onClose: input.onClose,
     taskDetailsData: input.adjustedTaskDetailsData,
+    taskId: input.adjustedTaskDetailsData?.taskId || null,
     generationName: input.generationName,
     onGenerationNameChange: input.handleGenerationNameChange,
     isEditingGenerationName: input.isEditingGenerationName,
