@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, Suspense } from 'react';
+import React, { useEffect, useRef, useState, Suspense } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select';
 import { Textarea } from '@/shared/components/ui/textarea';
@@ -101,6 +101,9 @@ export interface EditModePanelProps {
   // Variant deletion
   onDeleteVariant?: (variantId: string) => Promise<void>;
 
+  // Load variant settings into form
+  onLoadVariantSettings?: (variantParams: Record<string, any>) => void;
+
   // Variant
   variant: 'desktop' | 'mobile';
   hideInfoEditToggle?: boolean;
@@ -193,6 +196,7 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
   onPromoteToGeneration,
   isPromoting,
   onDeleteVariant,
+  onLoadVariantSettings,
   onClose,
   variant,
   hideInfoEditToggle = false,
@@ -221,6 +225,18 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
 
   // Track previous edit mode to detect changes
   const prevEditModeRef = useRef<'text' | 'inpaint' | 'annotate'>(editMode);
+
+  // Track if user has interacted with the prompt field (to prevent default from reappearing on clear)
+  const [hasUserEditedPrompt, setHasUserEditedPrompt] = useState(false);
+
+  // Reset the flag when media changes
+  const prevMediaIdRef = useRef(currentMediaId);
+  useEffect(() => {
+    if (currentMediaId !== prevMediaIdRef.current) {
+      setHasUserEditedPrompt(false);
+      prevMediaIdRef.current = currentMediaId;
+    }
+  }, [currentMediaId]);
 
   // Auto-reset LoRA mode to "none" when switching to inpaint or annotate
   useEffect(() => {
@@ -324,12 +340,13 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
         onPromoteToGeneration={onPromoteToGeneration}
         isPromoting={isPromoting}
         onDeleteVariant={onDeleteVariant}
+        onLoadVariantSettings={onLoadVariantSettings}
       >
           {/* Prompt Field - Hidden for img2img mode (has its own prompt field) */}
           {editMode !== 'img2img' && (() => {
-            // For reposition mode, show default prompt when user hasn't entered anything
+            // For reposition mode, show default prompt only if user hasn't interacted with the field yet
             const isRepositionMode = editMode === 'reposition';
-            const isUsingDefaultPrompt = isRepositionMode && !inpaintPrompt;
+            const isUsingDefaultPrompt = isRepositionMode && !inpaintPrompt && !hasUserEditedPrompt;
             const displayPromptValue = isUsingDefaultPrompt ? REPOSITION_DEFAULT_PROMPT : inpaintPrompt;
 
             return (
@@ -345,7 +362,10 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                 </div>
                 <Textarea
                   value={displayPromptValue}
-                  onChange={(e) => setInpaintPrompt(e.target.value)}
+                  onChange={(e) => {
+                    setHasUserEditedPrompt(true);
+                    setInpaintPrompt(e.target.value);
+                  }}
                   placeholder={
                     editMode === 'text'
                       ? (isMobile ? "Describe changes..." : "Describe the text-based edit to make...")
@@ -358,10 +378,14 @@ export const EditModePanel: React.FC<EditModePanelProps> = ({
                   className={`w-full ${textareaMinHeight} ${textareaPadding} ${textareaTextSize} resize-none`}
                   rows={textareaRows}
                   clearable
-                  onClear={() => setInpaintPrompt('')}
+                  onClear={() => {
+                    setHasUserEditedPrompt(true);
+                    setInpaintPrompt('');
+                  }}
                   voiceInput
                   voiceContext="This is an image editing prompt. Describe what changes to make to the image - what to add, remove, or modify in the selected/masked area. Be specific about the visual result you want."
                   onVoiceResult={(result) => {
+                    setHasUserEditedPrompt(true);
                     setInpaintPrompt(result.prompt || result.transcription);
                   }}
                 />

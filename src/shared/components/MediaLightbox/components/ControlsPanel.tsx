@@ -378,6 +378,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         onPromoteToGeneration={onPromoteToGeneration}
         isPromoting={isPromoting}
         onDeleteVariant={onDeleteVariant}
+        onLoadVariantSettings={onLoadVariantSettings}
         onClose={onClose}
         variant={variant}
         createAsGeneration={createAsGeneration}
