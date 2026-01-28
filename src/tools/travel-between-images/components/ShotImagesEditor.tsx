@@ -17,6 +17,7 @@ import type { PairData } from "./Timeline/TimelineContainer";
 import { Download, Loader2, Play, Pause, ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/components/ui/dialog';
 import { useSegmentOutputsForShot } from '../hooks/useSegmentOutputsForShot';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from "sonner";
 import { getDisplayUrl } from '@/shared/lib/utils';
 import type { VideoMetadata } from '@/shared/lib/videoUploader';
@@ -276,6 +277,96 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     setIsDragInProgress(isDragging);
     onDragStateChange?.(isDragging);
   }, [onDragStateChange]);
+
+  // Handle segment video deletion - deletes ALL children for the same pair
+  const handleDeleteSegment = useCallback(async (generationId: string) => {
+    setDeletingSegmentId(generationId);
+    try {
+      console.log('[SegmentDelete] Start delete:', generationId.substring(0, 8));
+
+      // Fetch the generation to find its parent and pair_shot_generation_id
+      const { data: beforeData, error: fetchError } = await supabase
+        .from('generations')
+        .select('id, type, parent_generation_id, location, params, primary_variant_id, pair_shot_generation_id')
+        .eq('id', generationId)
+        .single();
+
+      if (!beforeData) {
+        console.log('[SegmentDelete] Generation not found before delete');
+        return;
+      }
+
+      // Use FK column first, fall back to params for legacy data
+      const pairShotGenId = beforeData.pair_shot_generation_id ||
+        (beforeData.params as any)?.individual_segment_params?.pair_shot_generation_id ||
+        (beforeData.params as any)?.pair_shot_generation_id;
+      const parentId = beforeData.parent_generation_id;
+
+      // Delete ALL child generations for this pair (prevents another segment from taking its slot)
+      let idsToDelete = [generationId];
+      if (pairShotGenId && parentId) {
+        const { data: siblings } = await supabase
+          .from('generations')
+          .select('id, pair_shot_generation_id, params')
+          .eq('parent_generation_id', parentId);
+
+        idsToDelete = (siblings || [])
+          .filter(child => {
+            const childPairId = child.pair_shot_generation_id ||
+              (child.params as any)?.individual_segment_params?.pair_shot_generation_id ||
+              (child.params as any)?.pair_shot_generation_id;
+            return childPairId === pairShotGenId;
+          })
+          .map(child => child.id);
+      }
+
+      console.log('[SegmentDelete] Deleting children for pair:', {
+        pairShotGenId: pairShotGenId?.substring(0, 8) || 'none',
+        count: idsToDelete.length,
+        ids: idsToDelete.map(id => id.substring(0, 8))
+      });
+
+      const { error: deleteError } = await supabase
+        .from('generations')
+        .delete()
+        .in('id', idsToDelete);
+
+      if (deleteError) {
+        throw new Error(`Failed to delete: ${deleteError.message}`);
+      }
+
+      // Optimistic cache update
+      console.log('[SegmentDelete] Applying optimistic cache update...');
+      queryClient.setQueriesData(
+        { predicate: (query) => query.queryKey[0] === 'segment-child-generations' },
+        (oldData: any) => {
+          if (!oldData || !Array.isArray(oldData)) return oldData;
+          return oldData.filter((item: any) => !idsToDelete.includes(item.id));
+        }
+      );
+
+      // Invalidate and refetch
+      console.log('[SegmentDelete] Invalidating caches...');
+      await queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === 'segment-child-generations',
+        refetchType: 'all'
+      });
+      await queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === 'segment-parent-generations',
+        refetchType: 'all'
+      });
+      await queryClient.invalidateQueries({ queryKey: ['unified-generations'] });
+      await queryClient.invalidateQueries({ queryKey: ['generations'] });
+
+      console.log('[SegmentDelete] Delete complete');
+    } catch (error) {
+      console.error('[SegmentDelete] ❌ FAILED:', error);
+      toast.error(`Failed to delete segment: ${(error as Error).message}`);
+    } finally {
+      setDeletingSegmentId(null);
+    }
+  }, [queryClient]);
+
   // [ZoomDebug] Track ShotImagesEditor mounts to detect unwanted remounts
   const shotImagesEditorMountRef = React.useRef(0);
   React.useEffect(() => {
@@ -601,6 +692,10 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
 
   // Track lightbox transitions to keep overlay visible during navigation between image/segment lightboxes
   const [isLightboxTransitioning, setIsLightboxTransitioning] = useState(false);
+
+  // Segment deletion state
+  const [deletingSegmentId, setDeletingSegmentId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Ref for synchronous overlay control (React state updates are async, causing flash)
   const transitionOverlayRef = useRef<HTMLDivElement>(null);
@@ -2578,6 +2673,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                   onDragStateChange={handleDragStateChange}
                   // Segment slots for video display in batch mode
                   segmentSlots={segmentSlots}
+                  onSegmentDelete={handleDeleteSegment}
+                  deletingSegmentId={deletingSegmentId}
                   // Constituent image navigation support (from segment back to image)
                   pendingImageToOpen={pendingImageToOpen}
                   onClearPendingImageToOpen={() => {

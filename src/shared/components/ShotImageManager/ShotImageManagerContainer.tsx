@@ -248,8 +248,10 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
           segmentSlots={segmentSlots}
           onSegmentClick={handleSegmentClick}
           hasPendingTask={hasPendingTask}
+          onSegmentDelete={props.onSegmentDelete}
+          deletingSegmentId={props.deletingSegmentId}
         />
-        
+
         {/* Segment video lightbox */}
         {currentSegmentMedia && (
           <MediaLightbox
@@ -297,6 +299,8 @@ export const ShotImageManagerContainer: React.FC<ShotImageManagerProps> = (props
         segmentSlots={segmentSlots}
         onSegmentClick={handleSegmentClick}
         hasPendingTask={hasPendingTask}
+        onSegmentDelete={props.onSegmentDelete}
+        deletingSegmentId={props.deletingSegmentId}
       />
       
       {/* Segment video lightbox */}

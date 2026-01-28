@@ -59,6 +59,15 @@ export interface ShotImageManagerProps {
   onClearPendingImageToOpen?: () => void;
   /** Callback to signal start of lightbox transition (keeps overlay visible during navigation) */
   onStartLightboxTransition?: () => void;
+  // Segment video output props
+  segmentSlots?: SegmentSlot[];
+  onSegmentClick?: (slotIndex: number) => void;
+  /** Check if a pair_shot_generation_id has a pending task */
+  hasPendingTask?: (pairShotGenerationId: string | null | undefined) => boolean;
+  /** Delete a segment video */
+  onSegmentDelete?: (generationId: string) => void;
+  /** ID of segment currently being deleted */
+  deletingSegmentId?: string | null;
 }
 
 /** Props for segment video outputs in batch view */
@@ -112,6 +121,10 @@ export interface BaseShotImageManagerProps {
   onSegmentClick?: (slotIndex: number) => void;
   /** Check if a pair_shot_generation_id has a pending task */
   hasPendingTask?: (pairShotGenerationId: string | null | undefined) => boolean;
+  /** Delete a segment video */
+  onSegmentDelete?: (generationId: string) => void;
+  /** ID of segment currently being deleted */
+  deletingSegmentId?: string | null;
 }
 
 export interface MobileImageItemProps {

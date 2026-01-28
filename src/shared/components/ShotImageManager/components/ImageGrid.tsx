@@ -57,6 +57,10 @@ interface ImageGridProps {
   onSegmentClick?: (slotIndex: number) => void;
   /** Check if a pair_shot_generation_id has a pending task */
   hasPendingTask?: (pairShotGenerationId: string | null | undefined) => boolean;
+  /** Delete a segment video */
+  onSegmentDelete?: (generationId: string) => void;
+  /** ID of segment currently being deleted */
+  deletingSegmentId?: string | null;
   // Scrubbing preview props
   /** Index of the currently scrubbing segment (null if none) */
   activeScrubbingIndex?: number | null;
@@ -98,6 +102,8 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
   segmentSlots,
   onSegmentClick,
   hasPendingTask,
+  onSegmentDelete,
+  deletingSegmentId,
   activeScrubbingIndex,
   onScrubbingStart,
   scrubbing,
@@ -213,6 +219,8 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
                           pairIndex={slotIndex}
                           onClick={() => onSegmentClick?.(slotIndex)}
                           onOpenPairSettings={onPairClick}
+                          onDelete={onSegmentDelete}
+                          isDeleting={prevSegmentSlot.type === 'child' && prevSegmentSlot.child.id === deletingSegmentId}
                           projectAspectRatio={projectAspectRatio}
                           isMobile={isMobile}
                           layout="flow"
@@ -284,6 +292,8 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
                           pairIndex={slotIndex}
                           onClick={() => onSegmentClick?.(slotIndex)}
                           onOpenPairSettings={onPairClick}
+                          onDelete={onSegmentDelete}
+                          isDeleting={segmentSlot.type === 'child' && segmentSlot.child.id === deletingSegmentId}
                           projectAspectRatio={projectAspectRatio}
                           isMobile={isMobile}
                           layout="flow"

@@ -43,6 +43,10 @@ interface ShotImageManagerDesktopProps extends ShotImageManagerProps {
   onSegmentClick?: (slotIndex: number) => void;
   /** Check if a pair_shot_generation_id has a pending task */
   hasPendingTask?: (pairShotGenerationId: string | null | undefined) => boolean;
+  /** Delete a segment video */
+  onSegmentDelete?: (generationId: string) => void;
+  /** ID of segment currently being deleted */
+  deletingSegmentId?: string | null;
   /** Request to open lightbox for specific image (from segment constituent navigation) */
   pendingImageToOpen?: string | null;
   /** Callback to clear the pending image request after handling */
@@ -64,6 +68,8 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
   segmentSlots,
   onSegmentClick,
   hasPendingTask,
+  onSegmentDelete,
+  deletingSegmentId,
   pendingImageToOpen,
   onClearPendingImageToOpen,
   onStartLightboxTransition,
@@ -474,6 +480,8 @@ export const ShotImageManagerDesktop: React.FC<ShotImageManagerDesktopProps> = (
               segmentSlots={segmentSlots}
               onSegmentClick={onSegmentClick}
               hasPendingTask={hasPendingTask}
+              onSegmentDelete={onSegmentDelete}
+              deletingSegmentId={deletingSegmentId}
               // Scrubbing props
               activeScrubbingIndex={activeScrubbingIndex}
               onScrubbingStart={handleScrubbingStart}
