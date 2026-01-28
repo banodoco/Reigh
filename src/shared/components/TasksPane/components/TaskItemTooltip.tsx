@@ -10,6 +10,7 @@ import { GenerationRow } from '@/types/shots';
 import { SharedTaskDetails } from '@/tools/travel-between-images/components/SharedTaskDetails';
 import { isImageEditTaskType } from '@/tools/travel-between-images/components/TaskDetails';
 import SharedMetadataDetails from '@/shared/components/SharedMetadataDetails';
+import type { LoraModel } from '@/shared/components/LoraSelectorModal';
 
 interface TaskItemTooltipProps {
   task: Task;
@@ -27,6 +28,8 @@ interface TaskItemTooltipProps {
   onOpenVideoLightbox?: (task: Task, media: GenerationRow[], videoIndex: number, initialVariantId?: string) => void;
   onOpenImageLightbox?: (task: Task, media: GenerationRow, initialVariantId?: string) => void;
   onResetHoverState: () => void;
+  // Available LoRAs for proper display names
+  availableLoras?: LoraModel[];
   // The content to wrap
   children: React.ReactNode;
 }
@@ -45,6 +48,7 @@ export const TaskItemTooltip: React.FC<TaskItemTooltipProps> = ({
   onOpenVideoLightbox,
   onOpenImageLightbox,
   onResetHoverState,
+  availableLoras,
   children,
 }) => {
   // Don't show tooltips on mobile to improve performance and UX
@@ -95,6 +99,7 @@ export const TaskItemTooltip: React.FC<TaskItemTooltipProps> = ({
               inputImages={isVideoTask ? travelImageUrls : []}
               variant="hover"
               isMobile={false}
+              availableLoras={availableLoras}
             />
           ) : (
             <SharedMetadataDetails

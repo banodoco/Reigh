@@ -15,6 +15,7 @@ import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { usePrefetchTaskData, usePrefetchTaskById } from '@/shared/hooks/useUnifiedGenerations';
+import { usePublicLoras } from '@/shared/hooks/useResources';
 import { SharedTaskDetails } from '@/tools/travel-between-images/components/SharedTaskDetails';
 import type { VariantSelectorProps, GenerationVariant } from '../types';
 
@@ -105,6 +106,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   const [deletingVariantId, setDeletingVariantId] = useState<string | null>(null);
   const [copiedVariantId, setCopiedVariantId] = useState<string | null>(null);
   const isMobile = useIsMobile();
+  const { data: availableLoras } = usePublicLoras();
 
   // Prefetch task data on hover (desktop only)
   // For variants, we need to prefetch the source_task_id directly (if available)
@@ -619,6 +621,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                           inputImages={[]}
                           variant="hover"
                           isMobile={false}
+                          availableLoras={availableLoras}
                         />
                       </div>
                     )}

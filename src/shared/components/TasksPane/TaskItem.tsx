@@ -17,6 +17,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useTaskType } from '@/shared/hooks/useTaskType';
+import { usePublicLoras } from '@/shared/hooks/useResources';
 
 // Import from new modules
 import { parseTaskParamsForDisplay, getAbbreviatedTaskName, extractShotId, extractPairShotGenerationId, isSegmentVideoTask } from './utils/task-utils';
@@ -74,6 +75,9 @@ const TaskItem: React.FC<TaskItemProps> = ({
   const { data: taskTypeInfo } = useTaskType(task.taskType);
   const displayTaskType = taskTypeInfo?.display_name || getTaskDisplayName(task.taskType);
   const abbreviatedTaskType = getAbbreviatedTaskName(displayTaskType);
+
+  // Available LoRAs for tooltip display (shared cache across all TaskItems)
+  const { data: availableLoras = [] } = usePublicLoras();
 
   // Parse task params
   const taskParams = useMemo(() => parseTaskParamsForDisplay(task.params), [task.params]);
@@ -597,6 +601,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
       onOpenVideoLightbox={onOpenVideoLightbox}
       onOpenImageLightbox={onOpenImageLightbox}
       onResetHoverState={() => setIsHoveringTaskItem(false)}
+      availableLoras={availableLoras}
     >
       {taskItemContent}
     </TaskItemTooltip>
