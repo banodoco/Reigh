@@ -103,6 +103,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   const [currentPage, setCurrentPage] = useState(0);
   const [loadedSettingsVariantId, setLoadedSettingsVariantId] = useState<string | null>(null);
   const [deletingVariantId, setDeletingVariantId] = useState<string | null>(null);
+  const [copiedVariantId, setCopiedVariantId] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
   // Prefetch task data on hover (desktop only)
@@ -554,31 +555,49 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                 </TooltipTrigger>
                 <TooltipContent side="top" className="z-[100001] max-w-md p-0">
                   <div className="p-2 space-y-2">
-                    {/* Header with label, time, delete button */}
+                    {/* Header with label, time, id copy, delete button */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-sm">{label}</p>
                         <span className="text-[10px] text-muted-foreground">{getTimeAgo(variant.created_at)}</span>
                       </div>
-                      {/* Delete button - only for non-primary variants */}
-                      {onDeleteVariant && !isPrimary && (
+                      <div className="flex items-center gap-1">
+                        {/* Copy ID button */}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setDeletingVariantId(variant.id);
-                            onDeleteVariant(variant.id).finally(() => setDeletingVariantId(null));
+                            navigator.clipboard.writeText(variant.id).catch(() => {});
+                            setCopiedVariantId(variant.id);
+                            setTimeout(() => setCopiedVariantId(null), 2000);
                           }}
-                          disabled={deletingVariantId === variant.id}
-                          className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                          title="Delete variant"
-                        >
-                          {deletingVariantId === variant.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5" />
+                          className={cn(
+                            "px-1.5 py-0.5 rounded text-[10px] transition-colors",
+                            copiedVariantId === variant.id
+                              ? "text-green-400 bg-green-400/10"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted"
                           )}
+                        >
+                          {copiedVariantId === variant.id ? 'copied' : 'id'}
                         </button>
-                      )}
+                        {/* Delete button - only for non-primary variants */}
+                        {onDeleteVariant && !isPrimary && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingVariantId(variant.id);
+                              onDeleteVariant(variant.id).finally(() => setDeletingVariantId(null));
+                            }}
+                            disabled={deletingVariantId === variant.id}
+                            className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                          >
+                            {deletingVariantId === variant.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Status indicators */}
