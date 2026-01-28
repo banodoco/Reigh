@@ -1023,7 +1023,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
   useEffect(() => {
     if (!variantParamsToLoad || isVideo) return;
 
-    const taskType = variantParamsToLoad.task_type as string | undefined;
+    // Check both task_type and created_from fields (variants store task type in created_from)
+    const taskType = (variantParamsToLoad.task_type || variantParamsToLoad.created_from) as string | undefined;
 
     // Check if it's an image edit task type
     const imageEditTaskTypes = [
@@ -1035,6 +1036,13 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       'flux_image_edit',
       'annotated_image_edit',
     ];
+
+    console.log('[MediaLightbox] Checking variant params for image edit:', {
+      task_type: variantParamsToLoad.task_type,
+      created_from: variantParamsToLoad.created_from,
+      resolvedTaskType: taskType,
+      isImageEdit: taskType ? imageEditTaskTypes.includes(taskType) : false,
+    });
 
     if (!taskType || !imageEditTaskTypes.includes(taskType)) {
       // Not an image edit task, let video handling deal with it
