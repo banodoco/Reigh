@@ -228,6 +228,10 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
       hasOnOpenPairSettings: !!onOpenPairSettings,
     });
 
+    // Clear scrubbing state before opening lightbox to prevent preview from getting stuck
+    setActiveScrubbingIndex(null);
+    scrubbing.reset();
+
     if (slot?.type === 'child') {
       // Mark as viewed when opening lightbox
       markGenerationViewed(slot.child.id);
@@ -242,7 +246,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
       console.log('[SegmentClickDebug] Using local lightbox with slotIndex:', slotIndex);
       setLightboxIndex(slotIndex);
     }
-  }, [markGenerationViewed, onOpenPairSettings]);
+  }, [markGenerationViewed, onOpenPairSettings, scrubbing]);
   
   // Lightbox navigation - get indices of child slots that have locations
   const childSlotIndices = useMemo(() => 
