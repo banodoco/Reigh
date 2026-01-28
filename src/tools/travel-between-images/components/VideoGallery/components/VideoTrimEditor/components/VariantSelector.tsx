@@ -657,14 +657,13 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                     )}
 
                     {/* Action buttons row - Make Primary and/or Load Settings - hidden in readOnly mode */}
-                    {console.log('[VariantSelector] Action buttons check:', {
+                    {console.log('[LoadVariantSettings] Action buttons check:', {
                       variantId: variant.id.substring(0, 8),
                       readOnly,
                       isPrimary,
-                      hasOnMakePrimary: !!onMakePrimary,
                       hasOnLoadVariantSettings: !!onLoadVariantSettings,
                       hasParams: !!variant.params,
-                      paramsTaskType: variant.params?.task_type,
+                      createdFrom: variant.params?.created_from,
                     })}
                     {!readOnly && ((!isPrimary && onMakePrimary) || (onLoadVariantSettings && variant.params)) && (
                       <div className="flex gap-1.5">
@@ -694,7 +693,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              console.log('[VariantSelector] Load settings clicked for variant:', variant.id);
+                              console.log('[LoadVariantSettings] Load settings clicked for variant:', variant.id);
                               onLoadVariantSettings(variant.params as Record<string, any>);
                               setLoadedSettingsVariantId(variant.id);
                               setTimeout(() => setLoadedSettingsVariantId(null), 2000);

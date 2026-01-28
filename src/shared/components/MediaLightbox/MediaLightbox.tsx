@@ -1037,7 +1037,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       'annotated_image_edit',
     ];
 
-    console.log('[MediaLightbox] Checking variant params for image edit:', {
+    console.log('[LoadVariantSettings] Checking variant params for image edit:', {
       task_type: variantParamsToLoad.task_type,
       created_from: variantParamsToLoad.created_from,
       resolvedTaskType: taskType,
@@ -1049,7 +1049,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
       return;
     }
 
-    console.log('[MediaLightbox] Loading image edit variant settings:', {
+    console.log('[LoadVariantSettings] Loading image edit variant settings:', {
       taskType,
       prompt: variantParamsToLoad.prompt?.substring(0, 50),
       hasLoras: !!variantParamsToLoad.loras?.length,
