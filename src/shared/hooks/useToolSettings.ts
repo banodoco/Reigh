@@ -674,14 +674,20 @@ export function useToolSettings<T>(
           // Use generous timeout for mobile networks
           const { data: { user } } = await getUserWithTimeout();
           idForScope = user?.id;
+          // Gracefully skip if user is not authenticated (e.g., on public share pages)
+          if (!idForScope) {
+            console.debug('[useToolSettings] Skipping user settings update - not authenticated');
+            return null;
+          }
         } else if (scope === 'project') {
           idForScope = projectId;
         } else if (scope === 'shot') {
           idForScope = shotId;
         }
       }
-      
+
       if (!idForScope) {
+        // For project/shot scope, still throw if missing (these are programming errors)
         throw new Error(`Missing identifier for ${scope} tool settings update`);
       }
   
@@ -697,6 +703,11 @@ export function useToolSettings<T>(
       return fullMergedSettings;
     },
     onSuccess: (fullMergedSettings) => {
+      // Skip cache update if mutation was skipped (e.g., user not authenticated)
+      if (fullMergedSettings === null) {
+        return;
+      }
+
       // Optimistically update the cache by merging with existing cache
       // CRITICAL: The cache stores { settings: T, hasShotSettings: boolean } shape
       // Handle legacy format where settings are directly on the object (no wrapper)

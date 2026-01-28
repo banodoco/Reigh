@@ -141,7 +141,8 @@ export function useUserUIState<K extends keyof UISettings>(
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          console.warn('[useUserUIState] No authenticated user');
+          // Skip loading for unauthenticated users (e.g., on public share pages)
+          console.debug('[useUserUIState] Skipping - no authenticated user');
           setIsLoading(false);
           return;
         }
