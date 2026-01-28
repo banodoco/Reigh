@@ -62,6 +62,9 @@ export interface InfoPanelProps {
   isPromoting?: boolean;
   // Variant deletion
   onDeleteVariant?: (variantId: string) => Promise<void>;
+
+  /** Task ID for copy functionality (fallback when not in taskDetailsData) */
+  taskId?: string | null;
 }
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -104,13 +107,15 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   isPromoting,
   // Variant deletion
   onDeleteVariant,
+  // Task ID fallback
+  taskId: taskIdProp,
 }) => {
   const isMobile = variant === 'mobile';
   const hasVariants = variants && variants.length >= 1;
   const [idCopied, setIdCopied] = useState(false);
-  
-  // Get task ID for copy functionality
-  const taskId = taskDetailsData?.taskId;
+
+  // Get task ID for copy functionality - use prop as fallback for videos
+  const taskId = taskDetailsData?.taskId || taskIdProp;
 
   // Responsive styles
   const variantsMaxHeight = isMobile ? 'max-h-[120px]' : 'max-h-[200px]';
