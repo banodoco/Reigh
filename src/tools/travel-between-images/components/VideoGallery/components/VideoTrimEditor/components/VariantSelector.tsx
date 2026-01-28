@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import { Check, Scissors, Sparkles, Film, Star, Loader2, ArrowDown, ArrowUp, X, ChevronLeft, ChevronRight, ImagePlus, Download, Trash2 } from 'lucide-react';
+import { Check, Scissors, Sparkles, Film, Star, Loader2, ArrowDown, ArrowUp, X, ChevronLeft, ChevronRight, ImagePlus, Download, Trash2, GitBranch } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { Skeleton } from '@/shared/components/ui/skeleton';
@@ -17,6 +17,8 @@ import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { usePrefetchTaskData, usePrefetchTaskById } from '@/shared/hooks/useUnifiedGenerations';
 import { usePublicLoras } from '@/shared/hooks/useResources';
 import { SharedTaskDetails } from '@/tools/travel-between-images/components/SharedTaskDetails';
+import { LineageGifModal } from '@/shared/components/LineageGifModal';
+import { checkHasLineage } from '@/shared/hooks/useLineageChain';
 import type { VariantSelectorProps, GenerationVariant } from '../types';
 
 const ITEMS_PER_PAGE = 20;
@@ -106,6 +108,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   const [loadedSettingsVariantId, setLoadedSettingsVariantId] = useState<string | null>(null);
   const [deletingVariantId, setDeletingVariantId] = useState<string | null>(null);
   const [copiedVariantId, setCopiedVariantId] = useState<string | null>(null);
+  const [lineageGifGenerationId, setLineageGifGenerationId] = useState<string | null>(null);
+  const [variantLineageStatus, setVariantLineageStatus] = useState<Record<string, boolean>>({});
   const isMobile = useIsMobile();
   const { data: availableLoras } = usePublicLoras();
 
@@ -233,6 +237,42 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
     setCurrentPage(0);
   }, [relationshipFilter]);
 
+  // Check for lineage on each variant's generation
+  // This allows showing the "Lineage GIF" button for variants with edit history
+  // Use a ref to track which IDs we've started checking to avoid redundant queries
+  const checkedLineageIdsRef = React.useRef<Set<string>>(new Set());
+
+  React.useEffect(() => {
+    const checkLineageForVariants = async () => {
+      const generationIds = [...new Set(variants.map(v => v.generation_id))];
+      const uncheckedIds = generationIds.filter(id => !checkedLineageIdsRef.current.has(id));
+
+      if (uncheckedIds.length === 0) return;
+
+      // Mark as checking immediately to prevent duplicate requests
+      uncheckedIds.forEach(id => checkedLineageIdsRef.current.add(id));
+
+      const results: Record<string, boolean> = {};
+
+      await Promise.all(
+        uncheckedIds.map(async (genId) => {
+          try {
+            const hasLineage = await checkHasLineage(genId);
+            results[genId] = hasLineage;
+          } catch {
+            results[genId] = false;
+          }
+        })
+      );
+
+      setVariantLineageStatus(prev => ({ ...prev, ...results }));
+    };
+
+    if (variants.length > 0) {
+      checkLineageForVariants();
+    }
+  }, [variants]);
+
   const hasRelationships = parentVariants.size > 0 || childVariants.size > 0;
 
   // Don't show if no variants at all
@@ -278,6 +318,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   }
 
   return (
+    <>
     <TooltipProvider delayDuration={300}>
       <div className="flex flex-col gap-2 p-2 bg-background/90 backdrop-blur-sm rounded-lg border border-border/50 shadow-lg overflow-hidden">
         {/* Header section - stacks on mobile, single row on desktop */}
@@ -719,6 +760,21 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                         )}
                       </div>
                     )}
+                    {/* Lineage GIF button - only shown if the generation has lineage (based_on is set) */}
+                    {variantLineageStatus[variant.generation_id] && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLineageGifGenerationId(variant.generation_id);
+                        }}
+                        className="h-6 text-xs gap-1 w-full mt-1.5"
+                      >
+                        <GitBranch className="w-3 h-3" />
+                        Show Lineage GIF
+                      </Button>
+                    )}
                   </div>
                 </TooltipContent>
               </Tooltip>
@@ -734,6 +790,14 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
         )}
       </div>
     </TooltipProvider>
+
+    {/* Lineage GIF Modal - outside TooltipProvider to avoid z-index issues */}
+    <LineageGifModal
+      open={!!lineageGifGenerationId}
+      onClose={() => setLineageGifGenerationId(null)}
+      generationId={lineageGifGenerationId}
+    />
+    </>
   );
 };
 

@@ -70,6 +70,7 @@
     "drizzle-kit": "^0.31.4",
     "drizzle-orm": "^0.44.3",
     "embla-carousel-react": "^8.3.0",
+    "gifenc": "^1.0.3",
     "input-otp": "^1.2.4",
     "jszip": "^3.10.1",
     "konva": "^10.2.0",
