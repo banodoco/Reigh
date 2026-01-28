@@ -295,15 +295,17 @@ const PaneControlTab: React.FC<PaneControlTabProps> = ({
   if (buttons.length === 0) return null;
 
   // Container styling
-  // Only TasksPane (right side) should appear above MediaLightbox (z-[100000])
-  // Other panes use normal z-index to stay behind the lightbox
+  // TasksPane (right side) should appear above MediaLightbox (z-[100000]) on iPad/desktop
+  // but BEHIND the lightbox on mobile phones for cleaner full-screen lightbox experience
   const isTasksPane = side === 'right';
+  const isMobilePhone = isMobile && !isTablet;
   const aboveLightboxZIndex = 'z-[100001]';
+  const belowLightboxZIndex = 'z-[99]'; // Below lightbox (z-[100000])
   const normalLockedZIndex = PANE_CONFIG.zIndex.CONTROL_LOCKED;
   const normalUnlockedZIndex = PANE_CONFIG.zIndex.CONTROL_UNLOCKED;
 
   const zIndex = isTasksPane
-    ? aboveLightboxZIndex  // TasksPane always above lightbox
+    ? (isMobilePhone ? belowLightboxZIndex : aboveLightboxZIndex)  // Behind lightbox on mobile phones
     : (isLocked || (isOpen && !isLocked) ? normalLockedZIndex : normalUnlockedZIndex);
 
   const bgOpacity = isLocked || (isOpen && !isLocked) ? 'bg-zinc-800/90' : 'bg-zinc-800/80';

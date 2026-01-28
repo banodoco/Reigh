@@ -255,23 +255,25 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
 
   // Placeholder (no video generated yet) state - show CTA to generate or pending indicator
   if (slot.type === 'placeholder') {
-    // If a task is pending (Queued/In Progress), show loading state
+    // If a task is pending (Queued/In Progress), show loading state (still clickable to open settings)
     if (isPending) {
       return (
-        <div
+        <button
           className={cn(
-            "bg-muted/40 border-2 border-dashed border-primary/40 flex items-center justify-center",
+            "bg-muted/40 border-2 border-dashed border-primary/40 flex items-center justify-center cursor-pointer transition-all duration-150",
             roundedClass,
             layout === 'flow' && "shadow-sm",
+            "hover:bg-muted/60 hover:border-primary/60",
             flowContainerClasses
           )}
           style={adjustedPositionStyle}
+          onClick={() => onOpenPairSettings?.(pairIndex)}
         >
           <div className="flex flex-col items-center gap-0.5 text-primary">
             <Loader2 className={cn(layout === 'flow' && compact ? "w-3.5 h-3.5" : "w-4 h-4", "animate-spin")} />
             <span className="text-[10px] font-medium">Pending</span>
           </div>
-        </div>
+        </button>
       );
     }
 
