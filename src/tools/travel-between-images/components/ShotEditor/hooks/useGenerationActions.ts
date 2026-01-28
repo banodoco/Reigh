@@ -570,7 +570,12 @@ export const useGenerationActions = ({
 
       // Check for orphaned video variants after image deletion
       // Videos whose source images have changed will be demoted
-      await demoteOrphanedVariantsRef.current(currentShot.id);
+      console.log('[DemoteOrphaned] 🎯 Triggering from handleDeleteImageFromShot', {
+        shotId: currentShot.id.substring(0, 8),
+        deletedSlotId: shotImageEntryId.substring(0, 8),
+        deletedGenId: actualGenerationId?.substring(0, 8),
+      });
+      await demoteOrphanedVariantsRef.current(currentShot.id, 'single-image-delete');
     } catch (error) {
       console.error('[DeleteDebug] ❌ Error during deletion or frame shift:', error);
       // Error handling is done by the mutation itself
@@ -608,7 +613,12 @@ export const useGenerationActions = ({
       console.log('[BATCH_DELETE] Batch removal completed successfully');
 
       // Check for orphaned video variants after batch deletion
-      await demoteOrphanedVariantsRef.current(currentShot.id);
+      console.log('[DemoteOrphaned] 🎯 Triggering from handleBatchDeleteImages', {
+        shotId: currentShot.id.substring(0, 8),
+        deletedCount: shotImageEntryIds.length,
+        deletedIds: shotImageEntryIds.map(id => id.substring(0, 8)),
+      });
+      await demoteOrphanedVariantsRef.current(currentShot.id, 'batch-image-delete');
     } catch (error) {
       toast.error('Failed to remove some images from timeline');
     }

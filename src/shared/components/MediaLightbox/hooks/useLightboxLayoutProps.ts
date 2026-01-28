@@ -230,6 +230,9 @@ export interface UseLightboxLayoutPropsInput {
 
   // Segment slot mode (for constituent image navigation)
   segmentSlotMode?: any;
+
+  // Pending tasks count (for showing in InfoPanel)
+  pendingTaskCount?: number;
 }
 
 export interface UseLightboxLayoutPropsReturn {
@@ -368,6 +371,7 @@ export function useLightboxLayoutProps(
     isPromoting: input.isPromoting,
     onDeleteVariant: input.deleteVariant,
     onLoadVariantSettings: input.setVariantParamsToLoad,
+    pendingTaskCount: input.pendingTaskCount,
   }), [
     input.isInVideoEditMode, input.isSpecialEditMode, input.videoEditSubMode,
     input.handleEnterVideoTrimMode, input.handleEnterVideoReplaceMode,
@@ -403,6 +407,7 @@ export function useLightboxLayoutProps(
     input.derivedPage, input.derivedTotalPages, input.setDerivedPage, input.variants,
     input.activeVariant, input.isLoadingVariants, input.handlePromoteToGeneration,
     input.isPromoting, input.deleteVariant, input.setVariantParamsToLoad,
+    input.pendingTaskCount,
   ]);
 
   // Build workflow bar props (shared across all layouts)

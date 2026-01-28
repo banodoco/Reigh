@@ -40,6 +40,7 @@ import { useUserUIState } from '@/shared/hooks/useUserUIState';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
 import { usePublicLoras } from '@/shared/hooks/useResources';
 import { useLoraManager } from '@/shared/hooks/useLoraManager';
+import { usePendingGenerationTasks } from '@/shared/hooks/usePendingGenerationTasks';
 import type { LoraModel } from '@/shared/components/LoraSelectorModal';
 
 // Import extracted hooks
@@ -753,6 +754,12 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     selectedProjectId,
     actualGenerationId,
   });
+
+  // Track pending tasks for this generation (shows in info panel)
+  const { pendingCount: pendingTaskCount } = usePendingGenerationTasks(
+    actualGenerationId,
+    selectedProjectId
+  );
 
   // Fetch available LoRAs - needed by edit modes and img2img
   const { data: availableLoras } = usePublicLoras();
@@ -1854,6 +1861,9 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
 
     // Segment slot mode (for constituent image navigation)
     segmentSlotMode: hasSegmentVideo ? segmentSlotMode : undefined,
+
+    // Pending tasks count
+    pendingTaskCount,
   });
 
   return (

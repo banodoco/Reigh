@@ -1880,7 +1880,12 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       onSuccess: () => {
         // Check for orphaned video variants after reorder
         // Videos whose source images have changed positions will be demoted
-        demoteOrphanedVariantsRef.current(shot.id);
+        console.log('[DemoteOrphaned] 🎯 Triggering from handleReorderImagesInShot', {
+          shotId: shot.id.substring(0, 8),
+          newOrderCount: orderedShotGenerationIds.length,
+          newOrder: orderedShotGenerationIds.map(id => id.substring(0, 8)),
+        });
+        demoteOrphanedVariantsRef.current(shot.id, 'image-reorder');
       },
       onError: (error) => {
         console.error('[ShotEditor] Failed to reorder images:', error);

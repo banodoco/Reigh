@@ -10,7 +10,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { SegmentedControl, SegmentedControlItem } from '@/shared/components/ui/segmented-control';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 
 import { TaskDetailsPanelWrapper } from './TaskDetailsPanelWrapper';
@@ -68,6 +68,9 @@ export interface InfoPanelProps {
 
   /** Task ID for copy functionality (fallback when not in taskDetailsData) */
   taskId?: string | null;
+
+  /** Number of pending tasks that will create variants/derived from this generation */
+  pendingTaskCount?: number;
 }
 
 export const InfoPanel: React.FC<InfoPanelProps> = ({
@@ -114,6 +117,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   onLoadVariantSettings,
   // Task ID fallback
   taskId: taskIdProp,
+  // Pending tasks
+  pendingTaskCount = 0,
 }) => {
   const isMobile = variant === 'mobile';
   const hasVariants = variants && variants.length >= 1;
@@ -215,6 +220,12 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
               </svg>
             </button>
+          )}
+          {pendingTaskCount > 0 && (
+            <div className="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-primary/10 text-primary">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              <span>{pendingTaskCount} pending</span>
+            </div>
           )}
         </div>
 
