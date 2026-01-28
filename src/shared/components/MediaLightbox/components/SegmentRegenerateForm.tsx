@@ -5,7 +5,7 @@
  * Uses the controlled SegmentSettingsForm pattern.
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useSegmentSettingsForm } from '@/shared/hooks/useSegmentSettingsForm';
@@ -165,16 +165,42 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   const { enhancedPrompt } = formProps;
 
   // Enhance prompt toggle state
-  // Default: false if enhanced prompt exists, true if not
-  const defaultEnhanceEnabled = useMemo(() => !enhancedPrompt?.trim(), [enhancedPrompt]);
+  // We track both the user's explicit choice AND whether they've "seen" the current state
+  // This prevents the default from flipping unexpectedly after user has viewed the form
   const [enhancePromptEnabled, setEnhancePromptEnabled] = useState<boolean | null>(null);
 
-  // Compute effective enhance state (user choice > default)
+  // Track previous pair to detect actual pair changes (not just re-renders)
+  const prevPairRef = useRef<string | undefined>(undefined);
+  const hasUserSeenCurrentPair = useRef(false);
+
+  // Default: false if enhanced prompt exists, true if not
+  // But ONLY use this default before user has "seen" the form for this pair
+  const defaultEnhanceEnabled = useMemo(() => !enhancedPrompt?.trim(), [enhancedPrompt]);
+
+  // Once user has seen the form, lock in the current effective state
+  // This prevents the toggle from flipping if enhancedPrompt changes later
+  useEffect(() => {
+    if (!hasUserSeenCurrentPair.current && pairShotGenerationId) {
+      hasUserSeenCurrentPair.current = true;
+      // Lock in the initial state based on current default
+      // This ensures what user SEES is what they GET
+      if (enhancePromptEnabled === null) {
+        setEnhancePromptEnabled(defaultEnhanceEnabled);
+      }
+    }
+  }, [pairShotGenerationId, defaultEnhanceEnabled, enhancePromptEnabled]);
+
+  // Compute effective enhance state (user's explicit choice, or locked-in default)
   const effectiveEnhanceEnabled = enhancePromptEnabled ?? defaultEnhanceEnabled;
 
-  // Reset enhance state when pair changes
+  // Reset enhance state ONLY when pair actually changes to a different value
   useEffect(() => {
-    setEnhancePromptEnabled(null);
+    if (prevPairRef.current !== undefined && prevPairRef.current !== pairShotGenerationId) {
+      // Pair actually changed - reset state for new pair
+      setEnhancePromptEnabled(null);
+      hasUserSeenCurrentPair.current = false;
+    }
+    prevPairRef.current = pairShotGenerationId;
   }, [pairShotGenerationId]);
 
   // Handle frame count change - wrap to include pairShotGenerationId
