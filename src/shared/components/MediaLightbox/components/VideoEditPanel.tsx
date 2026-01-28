@@ -84,6 +84,9 @@ export interface VideoEditPanelProps {
 
   /** Handler to delete a variant */
   onDeleteVariant?: (variantId: string) => Promise<void>;
+
+  /** Number of pending tasks that will create variants/derived from this generation */
+  pendingTaskCount?: number;
 }
 
 export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
@@ -124,6 +127,7 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
   isLoadingVariants,
   onLoadVariantSettings,
   onDeleteVariant,
+  pendingTaskCount = 0,
 }) => {
   // Mode selector items for video editing
   const modeSelectorItems = [
@@ -168,6 +172,7 @@ export const VideoEditPanel: React.FC<VideoEditPanelProps> = ({
       isLoadingVariants={isLoadingVariants}
       onLoadVariantSettings={onLoadVariantSettings}
       onDeleteVariant={onDeleteVariant}
+      pendingTaskCount={pendingTaskCount}
     >
       {/* Sub-mode content */}
       {videoEditSubMode === 'trim' && (

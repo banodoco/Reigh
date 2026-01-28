@@ -325,6 +325,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         isPromoting={isPromoting}
         onLoadVariantSettings={onLoadVariantSettings}
         onDeleteVariant={onDeleteVariant}
+        pendingTaskCount={pendingTaskCount}
       />
     );
   }
@@ -406,6 +407,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
         isLocalGeneration={isLocalGeneration}
         qwenEditModel={qwenEditModel}
         setQwenEditModel={setQwenEditModel}
+        pendingTaskCount={pendingTaskCount}
       />
     );
   }
