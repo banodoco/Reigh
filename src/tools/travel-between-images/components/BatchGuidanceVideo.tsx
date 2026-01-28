@@ -324,15 +324,20 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
   }, [onVideoUploaded]);
 
   if (!videoUrl) {
+    // In readOnly mode, don't show upload UI when there's no video
+    if (readOnly) {
+      return null;
+    }
+
     // Upload prompt - responsive width with drag-drop support
     return (
       <>
         <div className="mb-4">
-          <div 
+          <div
             ref={dropZoneRef}
             className={`w-full sm:w-2/3 md:w-1/2 lg:w-1/3 p-4 border-2 border-dashed rounded-lg transition-colors ${
-              isDragging 
-                ? 'border-primary bg-primary/10' 
+              isDragging
+                ? 'border-primary bg-primary/10'
                 : 'border-border bg-muted/20 hover:border-muted-foreground/50'
             }`}
             onDragEnter={handleDragEnter}
@@ -343,11 +348,11 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
             <div className="flex flex-col items-center gap-3 text-center">
               <Video className={`h-8 w-8 ${isDragging ? 'text-primary' : 'text-muted-foreground'}`} />
               <p className="text-xs text-muted-foreground">
-                {isDragging 
-                  ? 'Drop video here' 
+                {isDragging
+                  ? 'Drop video here'
                   : 'Add a motion guidance video to control the animation'}
               </p>
-              
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -357,7 +362,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
                 className="hidden"
                 id={`batch-video-upload-${shotId}`}
               />
-              
+
               <div className="flex gap-2 w-full">
                 <Label htmlFor={`batch-video-upload-${shotId}`} className="m-0 cursor-pointer flex-1">
                   <Button
@@ -372,7 +377,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
                     </span>
                   </Button>
                 </Label>
-                
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -384,7 +389,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
                   Browse
                 </Button>
               </div>
-              
+
               {isUploading && (
                 <div className="w-full bg-muted rounded-full h-2">
                   <div
@@ -396,7 +401,7 @@ export const BatchGuidanceVideo: React.FC<BatchGuidanceVideoProps> = ({
             </div>
           </div>
         </div>
-        
+
         <DatasetBrowserModal
           isOpen={showBrowser}
           onOpenChange={setShowBrowser}

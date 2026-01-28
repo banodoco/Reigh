@@ -96,6 +96,9 @@ interface BatchSettingsFormProps {
   onTextBeforePromptsChange?: (value: string) => void;
   textAfterPrompts?: string;
   onTextAfterPromptsChange?: (value: string) => void;
+
+  // Read-only mode - hides interactive buttons like mic and clear
+  readOnly?: boolean;
 }
 
 const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
@@ -144,6 +147,7 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
   onTextBeforePromptsChange,
   textAfterPrompts = '',
   onTextAfterPromptsChange,
+  readOnly = false,
 }) => {
     // Get project context for persistent state
     const { selectedProjectId: contextProjectId } = useProject();
@@ -250,9 +254,10 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                       placeholder="Enter a global prompt for all video segments... (e.g., cinematic transition)"
                       className="min-h-[120px]"
                       rows={5}
-                      clearable
+                      readOnly={readOnly}
+                      clearable={!readOnly}
                       onClear={() => onBatchVideoPromptChange('')}
-                      voiceInput
+                      voiceInput={!readOnly}
                       voiceContext="This is a video generation prompt for AI video transitions between images. Describe the motion, transition style, or visual transformation you want. Focus on movement, camera motion, or how elements should animate."
                       onVoiceResult={(result) => {
                         onBatchVideoPromptChange(result.prompt || result.transcription);
@@ -302,9 +307,10 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     placeholder="e.g., blurry, low quality"
                     className="min-h-[120px]"
                     rows={5}
-                    clearable
+                    readOnly={readOnly}
+                    clearable={!readOnly}
                     onClear={() => onNegativePromptChange('')}
-                    voiceInput
+                    voiceInput={!readOnly}
                     voiceContext="This is a negative prompt - things to AVOID in the video generation. List unwanted qualities like 'blurry, distorted, low quality, shaky'. Keep it as a comma-separated list of terms to avoid."
                     onVoiceResult={(result) => {
                       onNegativePromptChange(result.prompt || result.transcription);
@@ -371,9 +377,10 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     placeholder="Text to prepend to each prompt..."
                     className="min-h-[60px] resize-none"
                     rows={2}
-                    clearable
+                    readOnly={readOnly}
+                    clearable={!readOnly}
                     onClear={() => onTextBeforePromptsChange?.('')}
-                    voiceInput
+                    voiceInput={!readOnly}
                     voiceContext="This is text that will be prepended to every video generation prompt. Keep it short - things like style prefixes or descriptions that apply to all video segments."
                     onVoiceResult={(result) => {
                       onTextBeforePromptsChange?.(result.prompt || result.transcription);
@@ -393,9 +400,10 @@ const BatchSettingsForm: React.FC<BatchSettingsFormProps> = ({
                     placeholder="Text to append to each prompt..."
                     className="min-h-[60px] resize-none"
                     rows={2}
-                    clearable
+                    readOnly={readOnly}
+                    clearable={!readOnly}
                     onClear={() => onTextAfterPromptsChange?.('')}
-                    voiceInput
+                    voiceInput={!readOnly}
                     voiceContext="This is text that will be appended to every video generation prompt. Keep it short - things like quality suffixes or parameters that apply to all video segments."
                     onVoiceResult={(result) => {
                       onTextAfterPromptsChange?.(result.prompt || result.transcription);

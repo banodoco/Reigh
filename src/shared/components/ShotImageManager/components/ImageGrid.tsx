@@ -263,6 +263,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
                       pairPhaseConfig={pairOverrides?.[index - 1]?.phaseConfig}
                       pairLoras={pairOverrides?.[index - 1]?.loras}
                       pairMotionSettings={pairOverrides?.[index - 1]?.motionSettings}
+                      readOnly={readOnly}
                     />
                   )}
                 </div>
@@ -336,6 +337,7 @@ export const ImageGrid: React.FC<ImageGridProps> = ({
                       pairPhaseConfig={pairOverrides?.[index]?.phaseConfig}
                       pairLoras={pairOverrides?.[index]?.loras}
                       pairMotionSettings={pairOverrides?.[index]?.motionSettings}
+                      readOnly={readOnly}
                     />
                   )}
                 </div>

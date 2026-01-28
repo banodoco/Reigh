@@ -24,6 +24,8 @@ interface PairPromptIndicatorProps {
   pairPhaseConfig?: PhaseConfig;
   pairLoras?: PairLoraConfig[];
   pairMotionSettings?: PairMotionSettings;
+  /** Read-only mode - disables click interactions */
+  readOnly?: boolean;
 }
 
 /**
@@ -48,6 +50,7 @@ const PairPromptIndicatorComponent: React.FC<PairPromptIndicatorProps> = ({
   pairPhaseConfig,
   pairLoras,
   pairMotionSettings,
+  readOnly = false,
 }) => {
   // Color schemes matching timeline PairRegion
   const pairColorSchemes = [
@@ -73,17 +76,20 @@ const PairPromptIndicatorComponent: React.FC<PairPromptIndicatorProps> = ({
       <Tooltip>
         <TooltipTrigger asChild>
           <button
-            onClick={(e) => {
+            onClick={readOnly ? undefined : (e) => {
               e.stopPropagation();
               onPairClick();
             }}
             className={cn(
               "flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-all duration-200",
-              "shadow-sm hover:shadow-md hover:scale-105",
-              "bg-card/90 dark:bg-gray-800/90 hover:bg-card dark:hover:bg-gray-800",
+              "shadow-sm",
+              "bg-card/90 dark:bg-gray-800/90",
               colorScheme.border,
               colorScheme.text,
-              "text-[11px] font-light cursor-pointer"
+              "text-[11px] font-light",
+              readOnly
+                ? "cursor-default"
+                : "cursor-pointer hover:shadow-md hover:scale-105 hover:bg-card dark:hover:bg-gray-800"
             )}
           >
             <span className="whitespace-nowrap">
@@ -121,9 +127,12 @@ const PairPromptIndicatorComponent: React.FC<PairPromptIndicatorProps> = ({
           </button>
         </TooltipTrigger>
         <TooltipContent>
-          <div 
-            className="max-w-xs cursor-pointer hover:bg-accent/50 p-2 -m-2 rounded transition-colors"
-            onClick={(e) => {
+          <div
+            className={cn(
+              "max-w-xs p-2 -m-2 rounded transition-colors",
+              readOnly ? "" : "cursor-pointer hover:bg-accent/50"
+            )}
+            onClick={readOnly ? undefined : (e) => {
               e.stopPropagation();
               onPairClick();
             }}
@@ -193,6 +202,7 @@ export const PairPromptIndicator = React.memo(
       prevProps.defaultNegativePrompt === nextProps.defaultNegativePrompt &&
       prevProps.isMobile === nextProps.isMobile &&
       prevProps.className === nextProps.className &&
+      prevProps.readOnly === nextProps.readOnly &&
       // NEW: Check override presence (truthiness comparison is sufficient for icons)
       !!prevProps.pairPhaseConfig === !!nextProps.pairPhaseConfig &&
       !!(prevProps.pairLoras?.length) === !!(nextProps.pairLoras?.length) &&

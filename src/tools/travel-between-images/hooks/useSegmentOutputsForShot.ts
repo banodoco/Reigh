@@ -140,7 +140,9 @@ export function useSegmentOutputsForShot(
   /** Optional controlled selected parent ID (lifted state from parent) */
   controlledSelectedParentId?: string | null,
   /** Optional callback when selected parent changes (for controlled mode) */
-  onSelectedParentChange?: (id: string | null) => void
+  onSelectedParentChange?: (id: string | null) => void,
+  /** Optional preloaded generations for readOnly mode (bypasses database queries) */
+  preloadedGenerations?: GenerationRow[]
 ): UseSegmentOutputsReturn {
   // Debug: Log when local positions are passed
   if (localShotGenPositions && localShotGenPositions.size > 0) {
@@ -172,7 +174,61 @@ export function useSegmentOutputsForShot(
     shotId: shotId?.substring(0, 8) || 'null',
   });
 
+  // Derive parent generations from preloaded data if available
+  // Parent generations are videos that:
+  // 1. type = 'video'
+  // 2. parent_generation_id IS NULL (not a child itself)
+  // 3. Has orchestrator_details OR has children pointing to it
+  const preloadedParentGenerations = useMemo(() => {
+    if (!preloadedGenerations) return undefined;
+
+    // First, find all generation IDs that are referenced as parents
+    const parentIds = new Set<string>();
+    preloadedGenerations.forEach(gen => {
+      const parentId = (gen as any).parent_generation_id || (gen.based_on as any)?.parent_generation_id;
+      if (parentId) parentIds.add(parentId);
+    });
+
+    console.log('[PreloadedDebug] All preloaded generations:', preloadedGenerations.map(gen => ({
+      id: gen.id?.substring(0, 8),
+      generation_id: gen.generation_id?.substring(0, 8),
+      type: gen.type,
+      parent_generation_id: (gen as any).parent_generation_id?.substring(0, 8),
+      hasOrchestratorDetails: !!(gen.params as any)?.orchestrator_details,
+    })));
+
+    const parents = preloadedGenerations.filter(gen => {
+      const isVideo = gen.type?.includes('video');
+      // Check if this is NOT a child (no parent_generation_id)
+      const isNotChild = !(gen as any).parent_generation_id;
+      // Has orchestrator_details OR is referenced as a parent by other generations
+      const hasOrchestratorDetails = !!(gen.params as any)?.orchestrator_details;
+      // Use generation_id for parent lookup (shot_generations.generation_id -> generations.id)
+      const genId = gen.generation_id || gen.id;
+      const hasChildren = parentIds.has(genId);
+
+      return isVideo && isNotChild && (hasOrchestratorDetails || hasChildren);
+    });
+
+    // Sort by created_at descending (most recent first) to match actual page behavior
+    // This ensures auto-select picks the most recent parent
+    parents.sort((a, b) => {
+      const dateA = new Date(a.created_at || a.createdAt || 0).getTime();
+      const dateB = new Date(b.created_at || b.createdAt || 0).getTime();
+      return dateB - dateA; // Descending - most recent first
+    });
+
+    console.log('[PreloadedDebug] Found parent generations (sorted by most recent):', parents.length, parents.map(p => ({
+      id: p.id?.substring(0, 8),
+      generation_id: p.generation_id?.substring(0, 8),
+      created_at: p.created_at,
+    })));
+
+    return parents;
+  }, [preloadedGenerations]);
+
   // Fetch parent generations using the shot_final_videos view (single query, all filtering server-side)
+  // Skip query when preloaded data is available
   const {
     data: parentGenerationsData,
     isLoading: isLoadingParents,
@@ -203,11 +259,12 @@ export function useSegmentOutputsForShot(
 
       return (data || []).map(transformToGenerationRow);
     },
-    enabled: !!shotId && !!projectId,
+    enabled: !!shotId && !!projectId && !preloadedGenerations,
     staleTime: 30000, // 30 seconds
   });
-  
-  const parentGenerations = parentGenerationsData || [];
+
+  // Use preloaded data if available, otherwise use query data
+  const parentGenerations = (preloadedParentGenerations ?? parentGenerationsData) || [];
   
   // Auto-select the first (most recent) parent if none selected
   // IMPORTANT: Only auto-select when:
@@ -217,16 +274,24 @@ export function useSegmentOutputsForShot(
   useEffect(() => {
     // Don't auto-select if query is disabled (we're just using controlled state passthrough)
     if (!shotId) return;
-    
+
     // Don't auto-select if in controlled mode - parent component manages selection
     if (isControlled) return;
-    
+
     if (parentGenerations.length > 0 && !selectedParentId) {
+      const toSelect = parentGenerations[0];
+      console.log('[ParentAutoSelect] Auto-selecting most recent parent:', {
+        id: toSelect.id?.substring(0, 8),
+        generation_id: toSelect.generation_id?.substring(0, 8),
+        created_at: toSelect.created_at,
+        totalParents: parentGenerations.length,
+      });
       setSelectedParentId(parentGenerations[0].id);
     } else if (parentGenerations.length > 0 && selectedParentId) {
       // Validate that current selection exists in the list
       const selectionExists = parentGenerations.some(p => p.id === selectedParentId);
       if (!selectionExists) {
+        console.log('[ParentAutoSelect] Current selection invalid, switching to most recent');
         setSelectedParentId(parentGenerations[0].id);
       }
     }
@@ -239,11 +304,62 @@ export function useSegmentOutputsForShot(
     return parentGenerations.find(p => p.id === selectedParentId) || null;
   }, [parentGenerations, selectedParentId]);
   
+  // Derive children from preloaded data if available
+  // Children are generations with parent_generation_id pointing to the selected parent
+  const preloadedChildren = useMemo(() => {
+    if (!preloadedGenerations || !selectedParentId) return undefined;
+
+    // The selected parent might be a shot_generations.id or a generations.id
+    // We need to find the generation_id for the selected parent
+    const selectedParent = parentGenerations.find(p => p.id === selectedParentId || p.generation_id === selectedParentId);
+    const parentGenId = selectedParent?.generation_id || selectedParentId;
+
+    console.log('[PreloadedDebug] Looking for children of parent:', {
+      selectedParentId: selectedParentId?.substring(0, 8),
+      parentGenId: parentGenId?.substring(0, 8),
+      parentGenerationsCount: parentGenerations.length,
+      selectedParentDetails: selectedParent ? {
+        id: selectedParent.id?.substring(0, 8),
+        generation_id: selectedParent.generation_id?.substring(0, 8),
+        type: selectedParent.type,
+      } : 'not found',
+    });
+
+    // Log all generations with parent_generation_id set (for debugging)
+    const generationsWithParent = preloadedGenerations.filter(gen => (gen as any).parent_generation_id);
+    console.log('[PreloadedDebug] Generations with parent_generation_id:',
+      generationsWithParent.length,
+      generationsWithParent.slice(0, 5).map(gen => ({
+        id: gen.id?.substring(0, 8),
+        generation_id: gen.generation_id?.substring(0, 8),
+        parent_generation_id: (gen as any).parent_generation_id?.substring(0, 8),
+        type: gen.type,
+        hasLocation: !!(gen.location || gen.imageUrl),
+      }))
+    );
+
+    const children = preloadedGenerations.filter(gen => {
+      // Check if this generation's parent_generation_id matches the selected parent
+      const parentId = (gen as any).parent_generation_id;
+      return parentId === parentGenId || parentId === selectedParentId;
+    });
+
+    console.log('[PreloadedDebug] Found children for selected parent:', children.length,
+      children.slice(0, 3).map(c => ({
+        id: c.id?.substring(0, 8),
+        parent_generation_id: (c as any).parent_generation_id?.substring(0, 8),
+        child_order: (c as any).child_order,
+        hasLocation: !!(c.location || c.imageUrl),
+      }))
+    );
+    return children;
+  }, [preloadedGenerations, selectedParentId, parentGenerations]);
+
   // Smart polling for segment children - allows new segments to appear after task completion
   const childrenQueryKey = ['segment-child-generations', selectedParentId];
   const childrenPollingConfig = useSmartPollingConfig(childrenQueryKey);
-  
-  // Fetch children for selected parent
+
+  // Fetch children for selected parent - skip if preloaded data available
   const {
     data: childGenerationsData,
     isLoading: isLoadingChildren,
@@ -253,40 +369,56 @@ export function useSegmentOutputsForShot(
     queryKey: childrenQueryKey,
     queryFn: async () => {
       if (!selectedParentId) return [];
-      
+
       console.log('[useSegmentOutputsForShot] Fetching children for parent:', selectedParentId.substring(0, 8));
-      
+
       const { data, error } = await supabase
         .from('generations')
         .select('*')
         .eq('parent_generation_id', selectedParentId)
         .order('child_order', { ascending: true })
         .order('created_at', { ascending: false });
-      
+
       if (error) {
         console.error('[useSegmentOutputsForShot] Error fetching children:', error);
         throw error;
       }
-      
+
       console.log('[useSegmentOutputsForShot] Found children:', data?.length || 0);
 
       return (data || []).map(transformToGenerationRow);
     },
-    enabled: !!selectedParentId,
+    enabled: !!selectedParentId && !preloadedGenerations,
     // Smart polling config - polls when realtime is unhealthy, otherwise relies on invalidation
     ...childrenPollingConfig,
     refetchOnWindowFocus: false,
   });
-  
-  const childGenerations = childGenerationsData || [];
+
+  // Use preloaded children if available
+  const childGenerations = (preloadedChildren ?? childGenerationsData) || [];
   
   // Filter to only segments (not join outputs)
   const segments = useMemo(() => {
     return childGenerations.filter(child => isSegment(child.params as any));
   }, [childGenerations]);
   
+  // Derive timeline data from preloaded generations if available
+  const preloadedTimelineData = useMemo(() => {
+    if (!preloadedGenerations) return undefined;
+    // Filter to positioned items and map to timeline format
+    return preloadedGenerations
+      .filter(gen => gen.timeline_frame !== null && gen.timeline_frame !== undefined && gen.timeline_frame >= 0)
+      .sort((a, b) => (a.timeline_frame ?? 0) - (b.timeline_frame ?? 0))
+      .map(gen => ({
+        id: gen.id,  // shot_generations.id
+        generation_id: gen.generation_id,
+        timeline_frame: gen.timeline_frame,
+      }));
+  }, [preloadedGenerations]);
+
   // Fetch LIVE shot_generations to get current timeline order
   // This is the source of truth for video positioning - videos move with their images
+  // Skip if preloaded data available
   const {
     data: liveTimelineData,
     refetch: refetchTimeline,
@@ -294,45 +426,48 @@ export function useSegmentOutputsForShot(
     queryKey: ['segment-live-timeline', shotId],
     queryFn: async () => {
       if (!shotId) return [];
-      
+
       console.log('[PairSlot] 🟡 Fetching LIVE timeline for shot:', shotId.substring(0, 8));
-      
+
       const { data, error } = await supabase
         .from('shot_generations')
         .select('id, generation_id, timeline_frame')
         .eq('shot_id', shotId)
         .gte('timeline_frame', 0) // Only positioned images
         .order('timeline_frame', { ascending: true });
-      
+
       if (error) {
         console.error('[PairSlot] Error fetching live timeline:', error);
         throw error;
       }
-      
+
       console.log('[PairSlot] 🟡 LIVE timeline result:', data?.length, 'images');
-      
+
       return data || [];
     },
-    enabled: !!shotId,
+    enabled: !!shotId && !preloadedGenerations,
     staleTime: 10000, // Refresh more frequently to catch timeline changes
   });
+
+  // Use preloaded timeline if available
+  const effectiveTimelineData = preloadedTimelineData ?? liveTimelineData;
   
   // Build map of shot_generation.id → current position (live, not snapshot)
   const liveShotGenIdToPosition = useMemo(() => {
     const map = new Map<string, number>();
-    (liveTimelineData || []).forEach((sg, index) => {
+    (effectiveTimelineData || []).forEach((sg, index) => {
       map.set(sg.id, index);
     });
-    
+
     // Log the live timeline state
-    if (liveTimelineData && liveTimelineData.length > 0) {
-      console.log('[PairSlot] 🟣 LIVE TIMELINE MAP:', liveTimelineData.map((sg, i) => 
+    if (effectiveTimelineData && effectiveTimelineData.length > 0) {
+      console.log('[PairSlot] 🟣 LIVE TIMELINE MAP:', effectiveTimelineData.map((sg, i) =>
         `[${i}]→${sg.id} (frame:${sg.timeline_frame})`
       ).join(' | '));
     }
-    
+
     return map;
-  }, [liveTimelineData]);
+  }, [effectiveTimelineData]);
   
   // Extract expected segment data from selected parent
   const expectedSegmentData = useMemo(() => {
@@ -346,9 +481,9 @@ export function useSegmentOutputsForShot(
     // Prefer local positions (instant updates) over live DB query
     const useLocalPositions = localShotGenPositions && localShotGenPositions.size > 0;
     const positionMap = useLocalPositions ? localShotGenPositions : liveShotGenIdToPosition;
-    const slotCount = useLocalPositions 
+    const slotCount = useLocalPositions
       ? localShotGenPositions.size - 1  // N images = N-1 pairs
-      : (liveTimelineData?.length ? liveTimelineData.length - 1 : 0);
+      : (effectiveTimelineData?.length ? effectiveTimelineData.length - 1 : 0);
     
     const expectedCount = expectedSegmentData?.count || slotCount;
     
@@ -451,8 +586,8 @@ export function useSegmentOutputsForShot(
     for (let i = 0; i < slotCount; i++) {
       const child = childrenBySlot.get(i);
       // Use live timeline for pair_shot_generation_id (shot_generations.id of start image)
-      const liveStartImage = liveTimelineData?.[i];
-      const liveEndImage = liveTimelineData?.[i + 1];
+      const liveStartImage = effectiveTimelineData?.[i];
+      const liveEndImage = effectiveTimelineData?.[i + 1];
       // Get pair_shot_generation_id: prefer live data, fall back to expected data
       const pairShotGenerationId = liveStartImage?.id || expectedSegmentData?.pairShotGenIds?.[i];
 
@@ -470,9 +605,9 @@ export function useSegmentOutputsForShot(
         });
       }
     }
-    
+
     return slots;
-  }, [segments, expectedSegmentData, liveTimelineData, liveShotGenIdToPosition, localShotGenPositions]);
+  }, [segments, expectedSegmentData, effectiveTimelineData, liveShotGenIdToPosition, localShotGenPositions]);
   
   // Calculate progress
   const segmentProgress = useMemo(() => {

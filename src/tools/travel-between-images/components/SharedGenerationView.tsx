@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/card';
+import { Label } from '@/shared/components/ui/label';
+import { Slider } from '@/shared/components/ui/slider';
 import { Copy, Check, LogIn } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,30 +11,41 @@ import { ProjectSelectorModal } from '@/shared/components/ProjectSelectorModal';
 import BatchSettingsForm from './BatchSettingsForm';
 import { MotionControl } from './MotionControl';
 import { SectionHeader } from '@/tools/image-generation/components/ImageGenerationForm/components/SectionHeader';
-import { getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
+import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import ShotImagesEditor from './ShotImagesEditor';
-import type { GenerationRow } from '@/types/shots';
-import { PhaseConfig } from '../settings';
+import { VideoTravelSettings } from '../settings';
+import { GenerationRow } from '@/types/shots';
+import { FinalVideoSection } from './FinalVideoSection';
+import {
+  transformGenerationToParentRow,
+  calculateColumnsForDevice,
+  extractStructureVideos,
+} from '../utils/shareDataTransformers';
 
+// RPC returns raw data - same format as hooks
 interface SharedGenerationViewProps {
   shareData: {
+    shot_id: string;
+    shot_name: string;
     generation: any;
-    task: any;
+    images: GenerationRow[];  // Same format as useAllShotGenerations
+    settings: VideoTravelSettings;  // Same format as useShotSettings
     creator_id: string | null;
     view_count: number;
+    creator_username?: string | null;
+    creator_name?: string | null;
+    creator_avatar_url?: string | null;
   };
   shareSlug: string;
 }
 
 /**
- * SharedGenerationView - Displays a shared generation with video and settings
- * 
- * Features:
- * - Video player with thumbnail fallback
- * - Task settings details (reusing SharedTaskDetails)
- * - Floating "Copy to My Account" CTA
- * - Authentication flow handling
+ * SharedGenerationView - Displays a shared generation
+ *
+ * Uses the SAME data format as the real page:
+ * - images: GenerationRow[] (same as useAllShotGenerations)
+ * - settings: VideoTravelSettings (same as useShotSettings)
  */
 export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
   shareData,
@@ -43,155 +56,69 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [videoLoaded, setVideoLoaded] = useState(false);
   const [showProjectSelector, setShowProjectSelector] = useState(false);
-
-  const generation = shareData.generation;
-  const task = shareData.task;
   const isMobile = useIsMobile();
+  const { mobileColumns, isPhone } = useDeviceDetection();
 
-  // Extract generation mode and frames early for shotImages calculation
-  const params = task?.params || {};
-  const orchestratorPayload = params.full_orchestrator_payload || {};
-  const orchestratorDetails = params.orchestrator_details || {};
-  const generationMode = orchestratorDetails.generation_mode || orchestratorPayload.generation_mode || params.generation_mode || 'batch';
-  
-  // Calculate total frames from segment_frames_expanded (sum of all segment durations)
-  const segmentFramesEarly = orchestratorDetails.segment_frames_expanded 
-    || orchestratorPayload.segment_frames_expanded 
-    || [];
-  const frames = segmentFramesEarly.length > 0 
-    ? segmentFramesEarly.reduce((sum: number, val: number) => sum + val, 0)
-    : (orchestratorPayload.frames || orchestratorDetails.frames || params.frames || 16);
+  // Data comes directly from RPC - same format as the hooks
+  const { generation, images, settings } = shareData;
 
-  // Extract input images from task params
-  const inputImages = useMemo(() => {
-    console.log('[SharedGenDebug] Extracting input images from task:', {
-      hasTask: !!task,
-      taskParams: task?.params,
-      fullTask: task
-    });
-    
-    const cleanUrl = (url: string): string => {
-      if (typeof url !== 'string') return url;
-      return url.replace(/^["']|["']$/g, '');
-    };
-    
-    const p = task?.params || {};
-    const orchestratorPayload = p.full_orchestrator_payload || {};
-    const orchestratorDetails = p.orchestrator_details || {};
-    
-    console.log('[SharedGenDebug] Checking locations:', {
-      'orchestratorDetails.input_image_paths_resolved': orchestratorDetails.input_image_paths_resolved,
-      'orchestratorPayload.input_image_paths_resolved': orchestratorPayload.input_image_paths_resolved,
-      'p.input_image_paths_resolved': p.input_image_paths_resolved,
-      'p.input_images': p.input_images,
-      'p.imageUrls': p.imageUrls,
-    });
-    
-    // Try multiple possible locations for input images
-    // Primary location: orchestrator_details.input_image_paths_resolved (current task structure)
-    if (Array.isArray(orchestratorDetails.input_image_paths_resolved) && orchestratorDetails.input_image_paths_resolved.length > 0) {
-      console.log('[SharedGenDebug] Found images in orchestratorDetails.input_image_paths_resolved:', orchestratorDetails.input_image_paths_resolved);
-      return orchestratorDetails.input_image_paths_resolved.map(cleanUrl);
-    }
-    // Legacy location: full_orchestrator_payload.input_image_paths_resolved
-    if (Array.isArray(orchestratorPayload.input_image_paths_resolved) && orchestratorPayload.input_image_paths_resolved.length > 0) {
-      console.log('[SharedGenDebug] Found images in orchestratorPayload.input_image_paths_resolved:', orchestratorPayload.input_image_paths_resolved);
-      return orchestratorPayload.input_image_paths_resolved.map(cleanUrl);
-    }
-    // Direct params location
-    if (Array.isArray(p.input_image_paths_resolved) && p.input_image_paths_resolved.length > 0) {
-      console.log('[SharedGenDebug] Found images in p.input_image_paths_resolved:', p.input_image_paths_resolved);
-      return p.input_image_paths_resolved.map(cleanUrl);
-    }
-    // Alternative names
-    if (Array.isArray(p.input_images) && p.input_images.length > 0) {
-      console.log('[SharedGenDebug] Found images in p.input_images:', p.input_images);
-      return p.input_images.map(cleanUrl);
-    }
-    if (Array.isArray(p.imageUrls) && p.imageUrls.length > 0) {
-      console.log('[SharedGenDebug] Found images in p.imageUrls:', p.imageUrls);
-      return p.imageUrls.map(cleanUrl);
-    }
-    
-    console.warn('[SharedGenDebug] No input images found in any location!');
-    return [];
-  }, [task]);
+  // Debug: Log what we received from RPC
+  const videoImages = images?.filter(img => img.type?.includes('video')) || [];
+  const imagesWithParent = images?.filter(img => (img as any).parent_generation_id) || [];
+  const parentVideos = videoImages.filter(v => !(v as any).parent_generation_id);
+  const childVideos = videoImages.filter(v => (v as any).parent_generation_id);
 
-  // Convert input images to shot images format for ShotImagesEditor
-  const shotImages = useMemo(() => {
-    // Extract segment_frames_expanded from task params
-    const p = task?.params || {};
-    const orchestratorPayload = p.full_orchestrator_payload || {};
-    const orchestratorDetails = p.orchestrator_details || {};
-    const segmentFrames = orchestratorDetails.segment_frames_expanded 
-      || orchestratorPayload.segment_frames_expanded 
-      || p.segment_frames_expanded
-      || [];
-    
-    // In timeline mode, first image is ALWAYS at frame 0
-    // segment_frames_expanded contains frame COUNTS per segment (e.g., [38, 38])
-    // We need to convert to cumulative positions (e.g., [0, 38, 76])
-    // For n images, we have n-1 segments
-    const timelineFrames: number[] = [];
-    if (generationMode === 'timeline' && segmentFrames.length > 0) {
-      let cumulativePosition = 0;
-      timelineFrames.push(0); // First image always at frame 0
-      for (const frameCount of segmentFrames) {
-        cumulativePosition += frameCount;
-        timelineFrames.push(cumulativePosition);
-      }
-    }
-    
-    console.log('[SharedGenDebug] Segment frames from task:', {
-      rawSegmentFrames: segmentFrames,
-      timelineFramesWithZero: timelineFrames,
-      orchestratorPayload_segment_frames: orchestratorPayload.segment_frames_expanded,
-      orchestratorDetails_segment_frames: orchestratorDetails.segment_frames_expanded,
-      params_segment_frames: p.segment_frames_expanded,
-    });
+  console.log('[SharedGenerationView] Data from RPC:', {
+    shot_id: shareData.shot_id,
+    imageCount: images?.length,
+    settings: settings,
+    structureVideo: settings?.structureVideo,
+    hasStructureVideoPath: !!settings?.structureVideo?.path,
+    generationMode: settings?.generationMode,
 
-    const images = inputImages.map((url, index) => ({
-      id: `shared-image-${index}`,
-      shotImageEntryId: `shared-image-${index}`, // Required for Timeline component
-      shot_id: 'shared-shot',
-      generation_id: null,
-      position: index,
-      imageUrl: url,
-      image_url: url,
-      location: url,
-      // Use actual timeline frames (with 0 prepended) if available, otherwise calculate
-      timeline_frame: generationMode === 'timeline' 
-        ? (timelineFrames[index] !== undefined 
-            ? timelineFrames[index] 
-            : Math.round(index * (frames / (inputImages.length - 1 || 1))))
-        : undefined,
-      created_at: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-    }));
-    
-    console.log('[SharedGenDebug] Created shotImages:', {
-      inputImagesCount: inputImages.length,
-      shotImagesCount: images.length,
-      shotImages: images,
-      generationMode: generationMode,
-      usedSegmentFrames: timelineFrames.length > 0,
-      framePositions: images.map(img => img.timeline_frame),
-    });
-    
-    return images;
-  }, [inputImages, generationMode, frames, task]);
+    // Video breakdown
+    videoCount: videoImages.length,
+    parentVideoCount: parentVideos.length,
+    childVideoCount: childVideos.length,
+    imagesWithParentCount: imagesWithParent.length,
+
+    // Sample of children (segment videos)
+    childVideos: childVideos.slice(0, 5).map(img => ({
+      id: img.id?.substring(0, 8),
+      generation_id: img.generation_id?.substring(0, 8),
+      parent_generation_id: (img as any).parent_generation_id?.substring(0, 8),
+      child_order: (img as any).child_order,
+      type: img.type,
+      hasLocation: !!img.imageUrl || !!img.location,
+      pair_shot_generation_id: (img as any).pair_shot_generation_id?.substring(0, 8),
+    })),
+
+    // Parent videos
+    parentVideos: parentVideos.slice(0, 3).map(img => ({
+      id: img.id?.substring(0, 8),
+      generation_id: img.generation_id?.substring(0, 8),
+      type: img.type,
+      hasOrchestratorDetails: !!(img.params as any)?.orchestrator_details,
+    })),
+
+    // All images summary
+    images: images?.map(img => ({
+      id: img.id?.substring(0, 8),
+      generation_id: img.generation_id?.substring(0, 8),
+      type: img.type,
+      timeline_frame: img.timeline_frame,
+      hasLocation: !!img.imageUrl || !!img.location,
+      parent_generation_id: (img as any).parent_generation_id?.substring(0, 8),
+    }))
+  });
 
   // Check authentication status
   useEffect(() => {
     checkAuth();
-    
-    // Listen for auth state changes
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setIsAuthenticated(!!session);
-      
-      // If user just signed in, check for pending share
       if (event === 'SIGNED_IN') {
         checkPendingShare();
       }
@@ -211,28 +138,20 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
     const pendingShare = sessionStorage.getItem('pending_share');
     if (pendingShare) {
       sessionStorage.removeItem('pending_share');
-      // Automatically trigger copy
       handleCopyToAccount();
     }
   };
 
   const handleCopyToAccount = async () => {
     if (!isAuthenticated) {
-      // Store share slug in session storage
       sessionStorage.setItem('pending_share', shareSlug);
-      
-      // Redirect to sign in/up
       toast({
         title: "Sign in required",
         description: "Please sign in to copy this to your account"
       });
-      
-      // Redirect to home which will show auth
       navigate('/?action=copy-share');
       return;
     }
-
-    // Show project selector for authenticated users
     setShowProjectSelector(true);
   };
 
@@ -241,93 +160,31 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
     setIsCopying(true);
 
     try {
-      // All client-side! RLS policies protect against unauthorized writes
-      
-      // Copy task data (excluding id and project-specific fields)
-      const taskData = { ...task };
-      delete taskData.id;
-      delete taskData.created_at;
-      delete taskData.updated_at;
-      
-      const { data: newTask, error: taskError } = await supabase
-        .from('tasks')
-        .insert({
-          ...taskData,
-          project_id: projectId,
-          copied_from_share: shareSlug,
-        })
-        .select('id')
-        .single();
+      const { data: newShotId, error: copyError } = await supabase
+        .rpc('copy_shot_from_share', {
+          share_slug_param: shareSlug,
+          target_project_id: projectId,
+        });
 
-      if (taskError) {
-        console.error('[SharedGenerationView] Failed to copy task:', taskError);
+      if (copyError) {
+        console.error('[SharedGenerationView] Failed to copy shot:', copyError);
         toast({
           title: "Copy failed",
-          description: taskError.message || "Failed to copy task settings",
+          description: copyError.message || "Failed to copy shot to your project",
           variant: "destructive"
         });
         setIsCopying(false);
         return;
       }
-
-      // Copy generation data (excluding id and system fields)
-      const generationData = { ...generation };
-      delete generationData.id;
-      delete generationData.created_at;
-      delete generationData.updated_at;
-      
-      // generations.tasks is JSONB array, update it with the new task ID
-      const tasksArray = [newTask.id];
-      
-      const { data: newGeneration, error: genError } = await supabase
-        .from('generations')
-        .insert({
-          ...generationData,
-          tasks: tasksArray, // JSONB array of task IDs
-          project_id: projectId, // Ensure project_id is set correctly
-          copied_from_share: shareSlug,
-        })
-        .select('id')
-        .single();
-
-      if (genError) {
-        console.error('[SharedGenerationView] Failed to copy generation:', genError);
-        toast({
-          title: "Copy failed",
-          description: genError.message || "Failed to copy generation",
-          variant: "destructive"
-        });
-        setIsCopying(false);
-        return;
-      }
-
-      // Create the original variant for the copied generation
-      if (generationData.location) {
-        await supabase.from('generation_variants').insert({
-          generation_id: newGeneration.id,
-          location: generationData.location,
-          thumbnail_url: generationData.thumbnail_url || generationData.location,
-          is_primary: true,
-          variant_type: 'original',
-          name: 'Original',
-          params: generationData.params || {},
-        });
-      }
-
-      console.log('[SharedGenerationView] Successfully copied:', {
-        newTaskId: newTask.id,
-        newGenerationId: newGeneration.id,
-        projectId
-      });
 
       setCopied(true);
       toast({
         title: "Copied to your account!",
-        description: "You can now find this in your generations"
+        description: "The shot has been added to your project"
       });
 
       setTimeout(() => {
-        navigate('/tools/image-generation');
+        navigate('/tools/travel-between-images');
       }, 1500);
 
     } catch (error) {
@@ -341,164 +198,128 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
     }
   };
 
-  // Extract task settings from cached task data
-  const taskSettings = useMemo(() => {
-    const params = task?.params || {};
-    const orchestratorPayload = params.full_orchestrator_payload || {};
-    const orchestratorDetails = params.orchestrator_details || {};
-    
-    // Get frames from segment_frames_expanded if available (first value represents frames per segment)
-    const segmentFrames = orchestratorDetails.segment_frames_expanded || orchestratorPayload.segment_frames_expanded || [];
-    const framesValue = segmentFrames[0] || orchestratorPayload.frames || orchestratorDetails.frames || params.frames || 16;
-    
-    // Extract steps - could be in steps_per_phase for advanced mode
-    const phaseConfigData = orchestratorDetails.phase_config || orchestratorPayload.phase_config || params.phase_config || null;
-    const stepsPerPhase = phaseConfigData?.steps_per_phase;
-    const stepsValue = stepsPerPhase?.[0] || orchestratorPayload.steps || orchestratorDetails.steps || params.steps || 6;
-    
-    // Parse resolution
-    const resolutionStr = orchestratorDetails.parsed_resolution_wh || orchestratorPayload.parsed_resolution_wh || '';
-    let width = 512, height = 512;
-    if (resolutionStr && resolutionStr.includes('x')) {
-      const [w, h] = resolutionStr.split('x').map(Number);
-      if (!isNaN(w) && !isNaN(h)) {
-        width = w;
-        height = h;
-      }
-    }
-    
-    // Get negative prompts from expanded array
-    const negativePromptsExpanded = orchestratorDetails.negative_prompts_expanded || orchestratorPayload.negative_prompts_expanded || [];
-    const negativePrompt = negativePromptsExpanded[0] || orchestratorPayload.negative_prompt || orchestratorDetails.negative_prompt || params.negative_prompt || '';
-    
-    return {
-      prompt: orchestratorDetails.base_prompt || orchestratorPayload.base_prompt || params.prompt || '',
-      frames: framesValue,
-      context_frames: orchestratorPayload.context_frames || orchestratorDetails.context_frames || params.context_frames || 0,
-      steps: stepsValue,
-      width,
-      height,
-      motion: orchestratorPayload.amount_of_motion || orchestratorDetails.amount_of_motion || params.amount_of_motion || 50,
-      seed: orchestratorDetails.seed_base || orchestratorPayload.seed_base || params.seed || -1,
-      negative_prompt: negativePrompt,
-      advancedMode: phaseConfigData ? true : false,
-      phaseConfig: phaseConfigData as PhaseConfig | null,
-      generationMode: orchestratorDetails.generation_mode || orchestratorPayload.generation_mode || params.generation_mode || 'batch',
-      textBeforePrompts: orchestratorPayload.text_before_prompts || orchestratorDetails.text_before_prompts || params.text_before_prompts || '',
-      textAfterPrompts: orchestratorPayload.text_after_prompts || orchestratorDetails.text_after_prompts || params.text_after_prompts || '',
-      enhancePrompt: orchestratorDetails.enhance_prompt || orchestratorPayload.enhance_prompt || params.enhance_prompt || false,
-      turboMode: params.turbo_mode || false,
-      motionMode: phaseConfigData ? 'advanced' as const : 'basic' as const,
-    };
-  }, [task]);
+  // Transform generation to GenerationRow format for FinalVideoSection
+  // Uses utility function to ensure consistency with hook data shapes
+  const preloadedParent = useMemo(
+    () => transformGenerationToParentRow(generation),
+    [generation]
+  );
 
-  const videoUrl = getDisplayUrl((generation?.location || generation?.imageUrl || '') as string);
-  const thumbnailUrl = generation?.thumbUrl ? getDisplayUrl(generation.thumbUrl as string) : null;
+  // Use settings directly - same field names as VideoTravelSettings
+  const generationMode = settings?.generationMode || 'batch';
+  const prompt = settings?.prompt || '';
+  const negativePrompt = settings?.negativePrompt || '';
+  const batchVideoFrames = settings?.batchVideoFrames || 61;
+  const batchVideoSteps = settings?.batchVideoSteps || 6;
+  const amountOfMotion = settings?.amountOfMotion || 50;
+  const enhancePrompt = settings?.enhancePrompt || false;
+  const turboMode = settings?.turboMode || false;
+  const advancedMode = settings?.advancedMode || false;
+  const motionMode = settings?.motionMode || 'basic';
+  const phaseConfig = settings?.phaseConfig;
+  const loras = settings?.loras || [];
+  const textBeforePrompts = settings?.textBeforePrompts || '';
+  const textAfterPrompts = settings?.textAfterPrompts || '';
+  const structureVideo = settings?.structureVideo;
+  // Multi-video array support - uses utility to handle both single and array formats
+  const structureVideos = extractStructureVideos(settings);
 
-  console.log('[SharedGenDebug] Rendering component with:', {
-    shotImagesLength: shotImages.length,
-    shotImages: shotImages,
-    videoUrl,
-    thumbnailUrl,
-    taskSettingsPrompt: taskSettings.prompt?.substring(0, 50),
-    taskSettingsContextFrames: taskSettings.context_frames,
+  // Calculate columns to match actual page behavior using utility function
+  const columns = calculateColumnsForDevice(mobileColumns);
+
+  // Debug structure video settings in detail
+  console.log('[SharedGenerationView] Structure video settings:', {
+    settingsKeys: settings ? Object.keys(settings) : 'no settings',
+    structureVideo: structureVideo,
+    structureVideoPath: structureVideo?.path,
+    structureVideoMetadata: structureVideo?.metadata,
+    structureVideoStartFrame: structureVideo?.startFrame,
+    structureVideoEndFrame: structureVideo?.endFrame,
+    hasPath: !!structureVideo?.path,
+    structureVideosCount: structureVideos?.length || 0,
+    structureVideos: structureVideos?.map(v => ({
+      path: v.path?.substring(0, 50),
+      start_frame: v.start_frame,
+      end_frame: v.end_frame,
+      treatment: v.treatment,
+    })),
+    generationMode,
   });
 
   return (
     <div className="container mx-auto px-4 pt-8 pb-24 sm:pb-28 max-w-6xl">
       <div className="space-y-6">
-        {/* Output Video Display - FIRST */}
-        <Card className="overflow-hidden">
-          <div className="relative bg-black w-full flex items-center justify-center min-h-[300px] max-h-[70vh]">
-            {/* Thumbnail (shown until video loads) */}
-            {thumbnailUrl && !videoLoaded && (
-              <img 
-                src={thumbnailUrl}
-                alt="Generation preview"
-                className="w-full h-full object-contain max-h-[70vh]"
-              />
-            )}
-            
-            {/* Video */}
-            {videoUrl && (
-              <video
-                src={videoUrl}
-                controls
-                loop
-                playsInline
-                className="w-full h-full object-contain max-h-[70vh]"
-                onLoadedData={() => setVideoLoaded(true)}
-                poster={thumbnailUrl || undefined}
-              />
-            )}
-            
-            {!videoUrl && !thumbnailUrl && (
-              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-                No preview available
-              </div>
-            )}
-          </div>
-        </Card>
+        {/* Output Video Display - using FinalVideoSection in read-only mode */}
+        <FinalVideoSection
+          shotId={shareData.shot_id}
+          projectId=""
+          readOnly={true}
+          preloadedParent={preloadedParent}
+        />
 
-        {/* Input Images - Timeline/Batch Editor (Read-Only) - SECOND */}
-        {shotImages.length > 0 && (
+        {/* Input Images - Timeline/Batch Editor (Read-Only) */}
+        {images.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base sm:text-lg font-light">
-                {taskSettings.generationMode === 'timeline' ? 'Timeline View' : 'Batch View'}
+                {generationMode === 'timeline' ? 'Timeline View' : 'Batch View'}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="pointer-events-none select-none opacity-90">
+              <div className="select-none opacity-90">
                 <ShotImagesEditor
                   isModeReady={true}
                   settingsError={null}
                   isMobile={isMobile}
-                  generationMode={taskSettings.generationMode as 'batch' | 'timeline'}
-                  onGenerationModeChange={() => {}} // Read-only
-                  selectedShotId="shared-shot"
-                  preloadedImages={shotImages}
+                  generationMode={generationMode as 'batch' | 'timeline'}
+                  onGenerationModeChange={() => {}}
+                  selectedShotId={shareData.shot_id}
+                  preloadedImages={images}
                   readOnly={true}
-                  projectId="shared-project"
-                  shotName="Shared Generation"
-                  batchVideoFrames={taskSettings.frames}
-                  onImageReorder={() => {}} // Read-only
-                  onContextFramesChange={() => {}} // Read-only
-                  onFramePositionsChange={() => {}} // Read-only
-                  onImageDrop={async () => {}} // Read-only
+                  projectId={null}
+                  shotName={shareData.shot_name || "Shared Generation"}
+                  batchVideoFrames={batchVideoFrames}
+                  onImageReorder={() => {}}
+                  onContextFramesChange={() => {}}
+                  onFramePositionsChange={() => {}}
+                  onImageDrop={async () => {}}
                   pendingPositions={new Map()}
-                  onPendingPositionApplied={() => {}} // Read-only
-                  onImageDelete={() => {}} // Read-only
-                  onBatchImageDelete={() => {}} // Read-only
-                  onImageDuplicate={() => {}} // Read-only
-                  columns={isMobile ? 2 : 3}
+                  onPendingPositionApplied={() => {}}
+                  onImageDelete={() => {}}
+                  onBatchImageDelete={() => {}}
+                  onImageDuplicate={() => {}}
+                  columns={columns}
                   skeleton={null}
                   unpositionedGenerationsCount={0}
-                  onOpenUnpositionedPane={() => {}} // Read-only
+                  onOpenUnpositionedPane={() => {}}
                   fileInputKey={0}
-                  onImageUpload={async () => {}} // Read-only
+                  onImageUpload={async () => {}}
                   isUploadingImage={false}
                   duplicatingImageId={null}
                   duplicateSuccessImageId={null}
                   projectAspectRatio={undefined}
-                  defaultPrompt={taskSettings.prompt}
-                  onDefaultPromptChange={() => {}} // Read-only
-                  defaultNegativePrompt={taskSettings.negative_prompt}
-                  onDefaultNegativePromptChange={() => {}} // Read-only
-                  structureVideoPath={null}
-                  structureVideoMetadata={null}
-                  structureVideoTreatment="motion"
-                  structureVideoMotionStrength={taskSettings.motion}
-                  structureVideoType="flow"
-                  onStructureVideoChange={() => {}} // Read-only
-                  onSelectionChange={() => {}} // Read-only
+                  defaultPrompt={prompt}
+                  onDefaultPromptChange={() => {}}
+                  defaultNegativePrompt={negativePrompt}
+                  onDefaultNegativePromptChange={() => {}}
+                  structureVideoPath={structureVideo?.path || null}
+                  structureVideoMetadata={structureVideo?.metadata || null}
+                  structureVideoTreatment={structureVideo?.treatment || "adjust"}
+                  structureVideoMotionStrength={structureVideo?.motionStrength ?? amountOfMotion}
+                  structureVideoType={structureVideo?.structureType || "uni3c"}
+                  onStructureVideoChange={() => {}}
+                  structureVideos={structureVideos}
+                  onAddStructureVideo={() => {}}
+                  onUpdateStructureVideo={() => {}}
+                  onRemoveStructureVideo={() => {}}
+                  onSelectionChange={() => {}}
                 />
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Settings Section - Mirroring ShotEditor structure, all disabled */}
+        {/* Settings Section */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base sm:text-lg font-light">Generation Settings</CardTitle>
@@ -510,83 +331,151 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
                 <div className="mb-4">
                   <SectionHeader title="Settings" theme="orange" />
                 </div>
-                <div className="pointer-events-none opacity-75">
+                <div className="opacity-75">
                   <BatchSettingsForm
-                    batchVideoPrompt={taskSettings.prompt}
-                    onBatchVideoPromptChange={() => {}} // No-op
-                    batchVideoFrames={taskSettings.frames}
-                    onBatchVideoFramesChange={() => {}} // No-op
-                    batchVideoSteps={taskSettings.steps}
-                    onBatchVideoStepsChange={() => {}} // No-op
+                    batchVideoPrompt={prompt}
+                    onBatchVideoPromptChange={() => {}}
+                    batchVideoFrames={batchVideoFrames}
+                    onBatchVideoFramesChange={() => {}}
+                    batchVideoSteps={batchVideoSteps}
+                    onBatchVideoStepsChange={() => {}}
                     dimensionSource="custom"
-                    onDimensionSourceChange={() => {}} // No-op
-                    customWidth={taskSettings.width}
-                    onCustomWidthChange={() => {}} // No-op
-                    customHeight={taskSettings.height}
-                    onCustomHeightChange={() => {}} // No-op
-                    negativePrompt={taskSettings.negative_prompt || ''}
-                    onNegativePromptChange={() => {}} // No-op
+                    onDimensionSourceChange={() => {}}
+                    customWidth={512}
+                    onCustomWidthChange={() => {}}
+                    customHeight={512}
+                    onCustomHeightChange={() => {}}
+                    negativePrompt={negativePrompt}
+                    onNegativePromptChange={() => {}}
                     projects={[]}
                     selectedProjectId={null}
-                    enhancePrompt={taskSettings.enhancePrompt}
-                    onEnhancePromptChange={() => {}} // No-op
-                    turboMode={taskSettings.turboMode}
-                    onTurboModeChange={() => {}} // No-op
-                    amountOfMotion={taskSettings.motion}
-                    onAmountOfMotionChange={() => {}} // No-op
-                    advancedMode={taskSettings.advancedMode}
-                    phaseConfig={taskSettings.phaseConfig}
-                    onPhaseConfigChange={() => {}} // No-op
+                    enhancePrompt={enhancePrompt}
+                    onEnhancePromptChange={() => {}}
+                    turboMode={turboMode}
+                    onTurboModeChange={() => {}}
+                    amountOfMotion={amountOfMotion}
+                    onAmountOfMotionChange={() => {}}
+                    advancedMode={advancedMode}
+                    phaseConfig={phaseConfig}
+                    onPhaseConfigChange={() => {}}
                     selectedPhasePresetId={null}
-                    onPhasePresetSelect={() => {}} // No-op
-                    onPhasePresetRemove={() => {}} // No-op
+                    onPhasePresetSelect={() => {}}
+                    onPhasePresetRemove={() => {}}
                     accelerated={false}
-                    onAcceleratedChange={() => {}} // No-op
+                    onAcceleratedChange={() => {}}
                     randomSeed={true}
-                    onRandomSeedChange={() => {}} // No-op
+                    onRandomSeedChange={() => {}}
+                    textBeforePrompts={textBeforePrompts}
+                    onTextBeforePromptsChange={() => {}}
+                    textAfterPrompts={textAfterPrompts}
+                    onTextAfterPromptsChange={() => {}}
+                    readOnly={true}
                   />
                 </div>
               </div>
 
-              {/* Right Column: Motion Control */}
+              {/* Right Column: Motion Control (includes Camera Guidance when structure video exists) */}
               <div className="lg:w-1/2 order-1 lg:order-2">
                 <div className="mb-4">
                   <SectionHeader title="Motion" theme="purple" />
                 </div>
+
+                {/* Camera Guidance - shown only when structure video is present */}
+                {structureVideo?.path && (
+                  <div className="mb-6 pointer-events-none opacity-75">
+                    <h4 className="text-sm font-medium text-muted-foreground mb-3">Camera Guidance:</h4>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Strength slider */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm">Strength:</Label>
+                            <span className="text-sm font-medium">{(structureVideo?.motionStrength ?? 1.0).toFixed(1)}x</span>
+                          </div>
+                          <Slider
+                            value={[structureVideo?.motionStrength ?? 1.0]}
+                            disabled
+                            min={0}
+                            max={2}
+                            step={0.1}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>0x</span>
+                            <span>1x</span>
+                            <span>2x</span>
+                          </div>
+                        </div>
+
+                        {/* Uni3C End Percent */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm">End:</Label>
+                            <span className="text-sm font-medium">{((structureVideos[0]?.uni3c_end_percent ?? 0.1) * 100).toFixed(0)}%</span>
+                          </div>
+                          <Slider
+                            value={[structureVideos[0]?.uni3c_end_percent ?? 0.1]}
+                            disabled
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            className="w-full"
+                          />
+                          <div className="flex justify-between text-xs text-muted-foreground">
+                            <span>0%</span>
+                            <span>50%</span>
+                            <span>100%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Model Guidance - subheader only shown when Camera Guidance is also present */}
+                {structureVideo?.path && (
+                  <h4 className="text-sm font-medium text-muted-foreground mb-3 opacity-75">Model Guidance:</h4>
+                )}
+
                 <div className="pointer-events-none opacity-75">
                   <MotionControl
-                    motionMode={taskSettings.advancedMode ? 'advanced' : (taskSettings.motionMode === 'presets' ? 'basic' : (taskSettings.motionMode || 'basic'))}
-                    onMotionModeChange={() => {}} // No-op
-                    selectedLoras={[]}
+                    motionMode={advancedMode ? 'advanced' : (motionMode as 'basic' | 'advanced')}
+                    onMotionModeChange={() => {}}
+                    selectedLoras={loras}
                     availableLoras={[]}
-                    onAddLoraClick={() => {}} // No-op
-                    onRemoveLora={() => {}} // No-op
-                    onLoraStrengthChange={() => {}} // No-op
+                    onAddLoraClick={() => {}}
+                    onRemoveLora={() => {}}
+                    onLoraStrengthChange={() => {}}
                     selectedPhasePresetId={null}
-                    onPhasePresetSelect={() => {}} // No-op
-                    onPhasePresetRemove={() => {}} // No-op
+                    onPhasePresetSelect={() => {}}
+                    onPhasePresetRemove={() => {}}
                     currentSettings={{
-                      basePrompt: taskSettings.prompt,
-                      negativePrompt: taskSettings.negative_prompt,
-                      enhancePrompt: taskSettings.enhancePrompt,
-                      durationFrames: taskSettings.frames,
+                      basePrompt: prompt,
+                      negativePrompt: negativePrompt,
+                      enhancePrompt: enhancePrompt,
+                      durationFrames: batchVideoFrames,
                     }}
-                    phaseConfig={taskSettings.phaseConfig || undefined}
-                    onPhaseConfigChange={() => {}} // No-op
+                    phaseConfig={phaseConfig || undefined}
+                    onPhaseConfigChange={() => {}}
                     randomSeed={false}
-                    onRandomSeedChange={() => {}} // No-op
-                    turboMode={taskSettings.turboMode}
+                    onRandomSeedChange={() => {}}
+                    turboMode={turboMode}
                     settingsLoading={false}
+                    // Structure video settings
+                    hasStructureVideo={!!structureVideo?.path}
+                    structureType={structureVideo?.structureType as 'uni3c' | 'flow' | 'canny' | 'depth' || 'uni3c'}
+                    structureVideoMotionStrength={structureVideo?.motionStrength ?? 1.0}
+                    onStructureVideoMotionStrengthChange={() => {}}
+                    onStructureTypeChange={() => {}}
                   />
                 </div>
               </div>
             </div>
           </CardContent>
         </Card>
-
       </div>
 
-      {/* Floating CTA Button - Fixed at bottom with safe area spacing */}
+      {/* Floating CTA Button */}
       <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
         <div className="container mx-auto max-w-6xl px-4 pb-4 sm:pb-6">
           <div className="flex justify-end pointer-events-auto">
@@ -595,8 +484,8 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
               onClick={handleCopyToAccount}
               disabled={isCopying || copied}
               className={`shadow-xl transition-all ${
-                copied 
-                  ? 'bg-green-500 hover:bg-green-600' 
+                copied
+                  ? 'bg-green-500 hover:bg-green-600'
                   : 'bg-primary hover:bg-primary/90'
               }`}
             >
@@ -613,7 +502,7 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
               ) : isAuthenticated ? (
                 <>
                   <Copy className="mr-2 h-4 w-4" />
-                  Copy to My Account
+                  Copy Shot
                 </>
               ) : (
                 <>
@@ -637,4 +526,3 @@ export const SharedGenerationView: React.FC<SharedGenerationViewProps> = ({
     </div>
   );
 };
-

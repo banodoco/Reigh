@@ -7,7 +7,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { Check, Film, Loader2, Trash2 } from 'lucide-react';
+import { Check, Film, Loader2, Trash2, Share2, Copy } from 'lucide-react';
 import { Card, CardContent } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Separator } from '@/shared/components/ui/separator';
@@ -30,6 +30,8 @@ import { useTaskDetails } from '@/shared/components/ShotImageManager/hooks/useTa
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
+import { useShareGeneration } from '@/shared/hooks/useShareGeneration';
+import { useMarkVariantViewed } from '@/shared/hooks/useMarkVariantViewed';
 import { VariantBadge } from '@/shared/components/VariantBadge';
 
 // Stable empty function reference to avoid re-renders from inline () => {}
@@ -57,6 +59,10 @@ interface FinalVideoSectionProps {
   onDelete?: (generationId: string) => void;
   /** Whether a delete is in progress */
   isDeleting?: boolean;
+  /** Read-only mode - hides action buttons (for share pages) */
+  readOnly?: boolean;
+  /** Preloaded parent generation (for share pages - bypasses hook fetching) */
+  preloadedParent?: GenerationRow | null;
 }
 
 export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
@@ -73,6 +79,8 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
   getFinalVideoCount,
   onDelete,
   isDeleting = false,
+  readOnly = false,
+  preloadedParent,
 }) => {
   const isMobile = useIsMobile();
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -80,11 +88,15 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
   // Determine if we're in controlled mode (props provided from parent)
   const isControlled = controlledSelectedParentId !== undefined && onSelectedParentChange !== undefined;
 
+  // In read-only mode with preloadedParent, skip the hook entirely
+  const skipHook = readOnly && preloadedParent !== undefined;
+
   // Always fetch segment outputs data - needed for realtime updates when tasks complete
   // Even in controlled mode, we need fresh data; controlled mode only affects selectedParentId state
+  // Skip when preloadedParent is provided (share page scenario)
   const hookResult = useSegmentOutputsForShot(
-    shotId,
-    projectId,
+    skipHook ? null : shotId, // Pass null to disable the hook
+    skipHook ? '' : projectId,
     undefined,
     controlledSelectedParentId,
     onSelectedParentChange
@@ -92,15 +104,22 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
 
   // Use hook result for parentGenerations (always fresh from cache/realtime)
   // Only use props as fallback if hook hasn't loaded yet
-  const parentGenerations = hookResult.parentGenerations.length > 0
-    ? hookResult.parentGenerations
-    : (parentGenerationsFromProps || []);
-  const selectedParentId = isControlled ? controlledSelectedParentId : hookResult.selectedParentId;
+  // In preloadedParent mode, use the preloaded parent directly
+  const parentGenerations = skipHook && preloadedParent
+    ? [preloadedParent]
+    : (hookResult.parentGenerations.length > 0
+        ? hookResult.parentGenerations
+        : (parentGenerationsFromProps || []));
+  const selectedParentId = skipHook && preloadedParent
+    ? preloadedParent.id
+    : (isControlled ? controlledSelectedParentId : hookResult.selectedParentId);
   const setSelectedParentId = isControlled ? onSelectedParentChange! : hookResult.setSelectedParentId;
-  const segmentProgress = hookResult.segmentProgress.total > 0
-    ? hookResult.segmentProgress
-    : (segmentProgressFromProps || hookResult.segmentProgress);
-  const isLoading = hookResult.isLoading;
+  const segmentProgress = skipHook
+    ? { completed: 0, total: 0 }
+    : (hookResult.segmentProgress.total > 0
+        ? hookResult.segmentProgress
+        : (segmentProgressFromProps || hookResult.segmentProgress));
+  const isLoading = skipHook ? false : hookResult.isLoading;
   
   // Derive selectedParent from parentGenerations (works in both controlled and uncontrolled mode)
   const selectedParent = useMemo(() => {
@@ -116,6 +135,14 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
     !!selectedParentId && hasFinalOutput
   );
   const badgeData = selectedParentId ? getBadgeData(selectedParentId) : null;
+
+  // Mark variants as viewed (for clearing "new" badge)
+  const { markAllViewed } = useMarkVariantViewed();
+  const handleMarkAllVariantsViewed = useCallback(() => {
+    if (selectedParentId) {
+      markAllViewed(selectedParentId);
+    }
+  }, [selectedParentId, markAllViewed]);
 
   // Transform selected parent for VideoItem/Lightbox
   const parentVideoRow = useMemo(() => {
@@ -137,6 +164,14 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
     generationId: selectedParentId,
     onApplySettingsFromTask,
   });
+
+  // Share functionality - pass shotId to fetch input images and settings for final video shares
+  const {
+    handleShare,
+    isCreatingShare,
+    shareCopied,
+    shareSlug,
+  } = useShareGeneration(selectedParentId ?? undefined, taskMapping?.taskId, shotId);
 
   // Check for active join_clips_orchestrator tasks for this shot
   // Include parentGenerations IDs in query key so we can match by parent_generation_id
@@ -314,25 +349,60 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
                   hasUnviewedVariants={badgeData.hasUnviewedVariants}
                   variant="inline"
                   size="md"
+                  onMarkAllViewed={handleMarkAllVariantsViewed}
                 />
               )}
             </h2>
 
-            {/* Join clips button on the right */}
-            {currentProgress.total > 0 && currentProgress.completed === currentProgress.total && onJoinSegmentsClick && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onJoinSegmentsClick}
-              >
-                Join clips
-              </Button>
+            {/* Action buttons on the right - hidden in readOnly mode */}
+            {!readOnly && (
+              <div className="flex items-center gap-2">
+                {/* Share button - only show when there's a final video */}
+                {hasFinalOutput && selectedParentId && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleShare}
+                        disabled={isCreatingShare}
+                        className={shareCopied ? 'bg-green-500/10 border-green-500/50' : ''}
+                      >
+                        {isCreatingShare ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : shareCopied ? (
+                          <Check className="h-4 w-4 text-green-500" />
+                        ) : shareSlug ? (
+                          <Copy className="h-4 w-4" />
+                        ) : (
+                          <Share2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {shareCopied ? 'Link copied!' : shareSlug ? 'Copy share link' : 'Share this video'}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+
+                {/* Join clips button */}
+                {currentProgress.total > 0 && currentProgress.completed === currentProgress.total && onJoinSegmentsClick && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onJoinSegmentsClick}
+                  >
+                    Join clips
+                  </Button>
+                )}
+              </div>
             )}
           </div>
 
-          {/* Output Selector Dropdown (full width on mobile, left-aligned on desktop) */}
-          {parentGenerations.length > 1 && (
+          {/* Output Selector Dropdown (full width on mobile, left-aligned on desktop) - hidden in readOnly mode */}
+          {!readOnly && parentGenerations.length > 1 && (
             <div className="mb-4">
               <Select value={selectedParentId || ''} onValueChange={handleOutputSelect}>
                 <SelectTrigger className="w-full sm:w-auto sm:min-w-[160px] h-8 text-sm">
@@ -441,8 +511,8 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
                   onApplySettingsFromTask={onApplySettingsFromTask || noop}
                   hideActions={true}
                 />
-                {/* Delete button overlay */}
-                {onDelete && (
+                {/* Delete button overlay - hidden in readOnly mode */}
+                {!readOnly && onDelete && (
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -506,6 +576,7 @@ export const FinalVideoSection: React.FC<FinalVideoSectionProps> = ({
           shotId={shotId}
           showTaskDetails={true}
           showVideoTrimEditor={true}
+          readOnly={readOnly}
           taskDetailsData={{
             task,
             isLoading: taskDetailsData?.isLoading ?? false,

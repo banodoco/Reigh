@@ -31,6 +31,8 @@ interface PairRegionProps {
   onClearEnhancedPrompt?: (pairIndex: number) => void;
   /** Hide the pair label (used during tap-to-move selection on tablets) */
   hidePairLabel?: boolean;
+  /** Read-only mode - disables click interactions */
+  readOnly?: boolean;
 }
 
 const PairRegion: React.FC<PairRegionProps> = ({
@@ -54,6 +56,7 @@ const PairRegion: React.FC<PairRegionProps> = ({
   showLabel,
   onClearEnhancedPrompt,
   hidePairLabel = false,
+  readOnly = false,
 }) => {
   const pairColorSchemes = [
     { bg: 'bg-blue-50 dark:bg-blue-950/40', border: 'border-blue-300 dark:border-blue-700', context: 'bg-blue-200/60 dark:bg-blue-800/40', text: 'text-blue-700 dark:text-gray-300', line: 'bg-blue-400 dark:bg-blue-600' },
@@ -124,14 +127,18 @@ const PairRegion: React.FC<PairRegionProps> = ({
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className={`absolute top-1/2 text-[11px] font-light ${colorScheme.text} bg-card/90 dark:bg-gray-800/90 px-2.5 py-1 rounded-full border ${colorScheme.border} z-20 shadow-sm cursor-pointer hover:bg-card dark:hover:bg-gray-800 hover:shadow-md transition-all duration-200`}
+              className={`absolute top-1/2 text-[11px] font-light ${colorScheme.text} bg-card/90 dark:bg-gray-800/90 px-2.5 py-1 rounded-full border ${colorScheme.border} z-20 shadow-sm ${
+                readOnly
+                  ? 'cursor-default'
+                  : 'cursor-pointer hover:bg-card dark:hover:bg-gray-800 hover:shadow-md'
+              } transition-all duration-200`}
               style={{
                 left: `${(startPercent + endPercent) / 2}%`,
                 transform: 'translate(-50%, -50%)',
                 // Only animate hover effects, NOT position (left) to prevent jitter
                 transition: 'background-color 0.2s ease-out, box-shadow 0.2s ease-out, border-color 0.2s ease-out, color 0.2s ease-out',
               }}
-              onClick={(e) => {
+              onClick={readOnly ? undefined : (e) => {
                 e.stopPropagation();
                 onPairClick?.(index, {
                   index,
@@ -150,9 +157,11 @@ const PairRegion: React.FC<PairRegionProps> = ({
             </div>
           </TooltipTrigger>
           <TooltipContent>
-            <div 
-              className="max-w-xs cursor-pointer hover:bg-accent/50 p-2 -m-2 rounded transition-colors"
-              onClick={(e) => {
+            <div
+              className={`max-w-xs p-2 -m-2 rounded transition-colors ${
+                readOnly ? '' : 'cursor-pointer hover:bg-accent/50'
+              }`}
+              onClick={readOnly ? undefined : (e) => {
                 e.stopPropagation();
                 onPairClick?.(index, {
                   index,

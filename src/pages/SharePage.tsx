@@ -3,11 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { SharedGenerationView } from '@/tools/travel-between-images/components/SharedGenerationView';
 import { Button } from '@/shared/components/ui/button';
-import { Home } from 'lucide-react';
+import { Home, Palette } from 'lucide-react';
 
+import { VideoTravelSettings } from '@/tools/travel-between-images/settings';
+import { GenerationRow } from '@/types/shots';
+
+// Data from get_shared_shot_data RPC - raw settings in same format as VideoTravelSettings
 interface SharedData {
+  shot_id: string;
+  shot_name: string;
   generation: any;
-  task: any;
+  images: GenerationRow[];
+  settings: VideoTravelSettings;  // Raw settings, same format as useShotSettings
   creator_id: string | null;
   view_count: number;
   creator_username?: string | null;
@@ -50,22 +57,21 @@ const SharePage: React.FC = () => {
   useEffect(() => {
     if (!shareData) return;
 
-    const generation = shareData.generation;
-    const task = shareData.task;
+    const { generation, settings } = shareData;
 
     // Set page title
-    const title = generation?.variantName 
-      ? `${generation.variantName} | Reigh` 
+    const title = generation?.name
+      ? `${generation.name} | Reigh`
       : 'Shared Generation | Reigh';
     document.title = title;
 
     // Get meta description from prompt
-    const description = task?.params?.prompt 
-      ? `${task.params.prompt.substring(0, 150)}...`
+    const description = settings?.prompt
+      ? `${settings.prompt.substring(0, 150)}...`
       : 'Check out this AI-generated video created with Reigh';
 
     // Get OG image (use thumbnail or video)
-    const ogImage = generation?.thumbUrl || generation?.location || '/banodoco-gold.png';
+    const ogImage = generation?.thumbnail_url || generation?.location || '/banodoco-gold.png';
 
     // Update or create meta tags
     const updateMetaTag = (property: string, content: string, isProperty = true) => {
@@ -108,15 +114,20 @@ const SharePage: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Fetch shared generation data
+      // Fetch live shared data via RPC (returns live shot data when available)
       const { data, error: fetchError } = await supabase
-        .from('shared_generations')
-        .select('*')
-        .eq('share_slug', shareId)
-        .single();
+        .rpc('get_shared_shot_data', { share_slug_param: shareId });
 
-      if (fetchError || !data) {
-        console.error('[SharePage] Failed to load share:', fetchError);
+      if (fetchError) {
+        console.error('[LiveShareDebug] Failed to load share:', fetchError);
+        setError('Share not found or no longer available');
+        setLoading(false);
+        return;
+      }
+
+      // Check for error response from RPC
+      if (data?.error) {
+        console.error('[LiveShareDebug] Share not found:', data.error);
         setError('Share not found or no longer available');
         setLoading(false);
         return;
@@ -126,30 +137,43 @@ const SharePage: React.FC = () => {
       supabase.rpc('increment_share_view_count', {
         share_slug_param: shareId
       }).then(() => {
-        console.log('[SharePage] View count incremented');
+        console.log('[LiveShareDebug] View count incremented');
       }).catch((err) => {
-        console.warn('[SharePage] Failed to increment view count:', err);
+        console.warn('[LiveShareDebug] Failed to increment view count:', err);
       });
 
+      console.log('[LiveShareDebug] Loaded share data:', {
+        shotId: data.shot_id,
+        shotName: data.shot_name,
+        imagesCount: data.images?.length,
+        generationMode: data.settings?.generationMode,
+        settings: data.settings,
+        firstImage: data.images?.[0],
+      });
+
+      // RPC returns same format as useAllShotGenerations
       setShareData({
-        generation: data.cached_generation_data,
-        task: data.cached_task_data,
+        shot_id: data.shot_id,
+        shot_name: data.shot_name,
+        generation: data.generation,
+        images: data.images || [],
+        settings: data.settings,
         creator_id: data.creator_id,
         view_count: data.view_count,
-        creator_username: (data as any).creator_username ?? null,
-        creator_name: (data as any).creator_name ?? null,
-        creator_avatar_url: (data as any).creator_avatar_url ?? null,
+        creator_username: data.creator_username ?? null,
+        creator_name: data.creator_name ?? null,
+        creator_avatar_url: data.creator_avatar_url ?? null,
       });
 
-      // Use denormalized fields if present; otherwise leave nulls
+      // Set creator info
       setCreator({
-        name: (data as any).creator_name ?? null,
-        username: (data as any).creator_username ?? null,
-        avatar_url: (data as any).creator_avatar_url ?? null,
+        name: data.creator_name ?? null,
+        username: data.creator_username ?? null,
+        avatar_url: data.creator_avatar_url ?? null,
       });
 
     } catch (err) {
-      console.error('[SharePage] Unexpected error:', err);
+      console.error('[LiveShareDebug] Unexpected error:', err);
       setError('Failed to load shared generation');
     } finally {
       setLoading(false);
@@ -249,11 +273,12 @@ const SharePage: React.FC = () => {
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <button 
+            <button
               onClick={() => navigate('/')}
-              className="text-2xl font-bold hover:opacity-80 transition-opacity"
+              className="group flex items-center justify-center w-12 h-12 bg-gradient-to-br from-wes-pink via-wes-lavender to-wes-dusty-blue dark:bg-none dark:border-2 rounded-sm shadow-[-3px_3px_0_0_rgba(0,0,0,0.15)] dark:shadow-[-3px_3px_0_0_rgba(90,90,80,0.4)] hover:shadow-[-1px_1px_0_0_rgba(0,0,0,0.15)] dark:hover:shadow-[-1px_1px_0_0_rgba(180,160,100,0.4)] hover:translate-x-[1px] hover:translate-y-[1px] transition-all duration-300"
+              aria-label="Go to homepage"
             >
-              Reigh
+              <Palette className="h-6 w-6 text-white dark:text-[#a098a8] group-hover:rotate-12 transition-all duration-300 drop-shadow-lg dark:drop-shadow-none" />
             </button>
             
             <div className="flex items-center gap-4">

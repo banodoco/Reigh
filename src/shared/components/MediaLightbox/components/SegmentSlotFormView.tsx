@@ -28,6 +28,8 @@ export interface SegmentSlotFormViewProps {
   onNavNext: () => void;
   hasPrevious: boolean;
   hasNext: boolean;
+  /** Read-only mode - hides the form and shows info only */
+  readOnly?: boolean;
 }
 
 export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
@@ -37,6 +39,7 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
   onNavNext,
   hasPrevious,
   hasNext,
+  readOnly = false,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -395,7 +398,7 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
         {/* Floating Navigation Arrows - positioned relative to this wrapper */}
         <NavigationArrows
           showNavigation={true}
-          readOnly={false}
+          readOnly={readOnly}
           onPrevious={onNavPrev}
           onNext={onNavNext}
           hasPrevious={hasPrevious}
@@ -427,34 +430,43 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
           <X className="h-4 w-4" />
         </Button>
 
-        {/* Segment Settings Form */}
+        {/* Segment Settings Form - hidden in readOnly mode */}
         <div className="p-4">
-          <SegmentSettingsForm
-            {...formProps}
-            onSubmit={handleSubmit}
-            isSubmitting={isSubmitting}
-            onFrameCountChange={handleFrameCountChange}
-            enhancePromptEnabled={effectiveEnhanceEnabled}
-            onEnhancePromptChange={setEnhancePromptEnabled}
-          />
+          {readOnly ? (
+            <div className="text-center text-muted-foreground py-8">
+              <p className="text-sm">Segment {segmentSlotMode.currentIndex + 1}</p>
+              <p className="text-xs mt-1">No video generated yet</p>
+            </div>
+          ) : (
+            <>
+              <SegmentSettingsForm
+                {...formProps}
+                onSubmit={handleSubmit}
+                isSubmitting={isSubmitting}
+                onFrameCountChange={handleFrameCountChange}
+                enhancePromptEnabled={effectiveEnhanceEnabled}
+                onEnhancePromptChange={setEnhancePromptEnabled}
+              />
 
-          {/* Show warning if missing context */}
-          {!segmentSlotMode.parentGenerationId && !segmentSlotMode.shotId && (
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              Cannot generate: Missing shot context. Please save your shot first.
-            </p>
-          )}
+              {/* Show warning if missing context */}
+              {!segmentSlotMode.parentGenerationId && !segmentSlotMode.shotId && (
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  Cannot generate: Missing shot context. Please save your shot first.
+                </p>
+              )}
 
-          {/* Navigation to constituent images */}
-          {segmentSlotMode.onNavigateToImage && (
-            <ConstituentImageNavigation
-              startImageId={segmentSlotMode.pairData.startImage?.id}
-              endImageId={segmentSlotMode.pairData.endImage?.id}
-              startImageUrl={startImageUrl}
-              endImageUrl={endImageUrl}
-              onNavigateToImage={segmentSlotMode.onNavigateToImage}
-              variant="inline"
-            />
+              {/* Navigation to constituent images */}
+              {segmentSlotMode.onNavigateToImage && (
+                <ConstituentImageNavigation
+                  startImageId={segmentSlotMode.pairData.startImage?.id}
+                  endImageId={segmentSlotMode.pairData.endImage?.id}
+                  startImageUrl={startImageUrl}
+                  endImageUrl={endImageUrl}
+                  onNavigateToImage={segmentSlotMode.onNavigateToImage}
+                  variant="inline"
+                />
+              )}
+            </>
           )}
         </div>
       </div>

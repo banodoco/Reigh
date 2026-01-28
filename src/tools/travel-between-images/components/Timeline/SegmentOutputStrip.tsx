@@ -33,7 +33,7 @@ interface PairInfo {
 
 interface SegmentOutputStripProps {
   shotId: string;
-  projectId: string;
+  projectId?: string | null;  // Optional for readOnly mode
   projectAspectRatio?: string;
   pairInfo: PairInfo[];
   fullMin: number;
@@ -59,6 +59,10 @@ interface SegmentOutputStripProps {
     imageFrame: number;
     endFrame: number;
   };
+  /** Preloaded generations for readOnly mode (bypasses database queries) */
+  preloadedGenerations?: GenerationRow[];
+  /** Read-only mode - disables interactions */
+  readOnly?: boolean;
 }
 
 export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
@@ -78,6 +82,8 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
   pairDataByIndex,
   onSegmentFrameCountChange,
   singleImageMode,
+  preloadedGenerations,
+  readOnly = false,
 }) => {
   // ===== ALL HOOKS MUST BE CALLED UNCONDITIONALLY AT THE TOP =====
   const isMobile = useIsMobile();
@@ -140,10 +146,11 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
     isLoading,
   } = useSegmentOutputsForShot(
     shotId,
-    projectId,
+    projectId || null,
     localShotGenPositions,
     controlledSelectedParentId,
-    onSelectedParentChange
+    onSelectedParentChange,
+    preloadedGenerations
   );
 
   // Get the active segment's video URL (must be after segmentSlots is defined)
@@ -652,6 +659,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
                     scrubbingContainerRef={isActiveScrubbing ? scrubbing.containerRef : undefined}
                     scrubbingContainerProps={isActiveScrubbing ? scrubbing.containerProps : undefined}
                     scrubbingProgress={isActiveScrubbing ? scrubbing.progress : undefined}
+                    readOnly={readOnly}
                   />
                 );
               })}

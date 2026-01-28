@@ -275,6 +275,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
           onPromoteToGeneration={onPromoteToGeneration}
           isPromoting={isPromoting}
           onDeleteVariant={onDeleteVariant}
+          readOnly={readOnly}
         />
       </div>
     );

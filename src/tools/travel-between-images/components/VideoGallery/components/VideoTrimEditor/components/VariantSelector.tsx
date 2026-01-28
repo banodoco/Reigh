@@ -96,6 +96,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   isPromoting = false,
   onLoadVariantSettings,
   onDeleteVariant,
+  readOnly = false,
 }) => {
   const [isMakingPrimary, setIsMakingPrimary] = useState(false);
   const [localIsPromoting, setLocalIsPromoting] = useState(false);
@@ -284,7 +285,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
           {/* Row 1: Label + Action buttons */}
           <div className="flex items-center justify-between gap-2">
             <span className="text-sm font-medium text-muted-foreground">Variants ({variants.length})</span>
-            {/* Action buttons */}
+            {/* Action buttons - hidden in readOnly mode */}
+            {!readOnly && (
             <div className="flex items-center gap-1">
               {/* Make new image button */}
               {onPromoteToGeneration && (
@@ -345,6 +347,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                 </div>
               ) : null}
             </div>
+            )}
           </div>
 
           {/* Row 2 (mobile) / same row (desktop): Relationship filter buttons */}
@@ -557,11 +560,31 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                 </TooltipTrigger>
                 <TooltipContent side="top" className="z-[100001] max-w-md p-0">
                   <div className="p-2 space-y-2">
-                    {/* Header with label, time, id copy, delete button */}
+                    {/* Header with label, status badges, id copy, delete button */}
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-sm">{label}</p>
-                        <span className="text-[10px] text-muted-foreground">{getTimeAgo(variant.created_at)}</span>
+                        {/* Status badges */}
+                        {isPrimary && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-green-500/20 text-green-400 border border-green-500/30">
+                            Primary
+                          </span>
+                        )}
+                        {isActive && !isPrimary && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                            Viewing
+                          </span>
+                        )}
+                        {isParent && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                            Parent of current
+                          </span>
+                        )}
+                        {isChild && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                            Child of current
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1">
                         {/* Copy ID button */}
@@ -581,8 +604,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                         >
                           {copiedVariantId === variant.id ? 'copied' : 'id'}
                         </button>
-                        {/* Delete button - only for non-primary variants */}
-                        {onDeleteVariant && !isPrimary && (
+                        {/* Delete button - only for non-primary variants, hidden in readOnly mode */}
+                        {!readOnly && onDeleteVariant && !isPrimary && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -600,14 +623,6 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                           </button>
                         )}
                       </div>
-                    </div>
-
-                    {/* Status indicators */}
-                    <div className="flex flex-wrap gap-1.5 text-[10px]">
-                      {isPrimary && <span className="text-green-400">Primary version</span>}
-                      {isActive && !isPrimary && <span className="text-muted-foreground">Currently viewing</span>}
-                      {isParent && <span className="text-blue-400">Current is based on this</span>}
-                      {isChild && <span className="text-purple-400">Based on current</span>}
                     </div>
 
                     {/* Full task details using SharedTaskDetails */}
@@ -640,8 +655,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                       </div>
                     )}
 
-                    {/* Action buttons row - Make Primary and/or Load Settings */}
-                    {((!isPrimary && onMakePrimary) || (onLoadVariantSettings && variant.params)) && (
+                    {/* Action buttons row - Make Primary and/or Load Settings - hidden in readOnly mode */}
+                    {!readOnly && ((!isPrimary && onMakePrimary) || (onLoadVariantSettings && variant.params)) && (
                       <div className="flex gap-1.5">
                         {/* Make Primary button - only for non-primary variants */}
                         {!isPrimary && onMakePrimary && (

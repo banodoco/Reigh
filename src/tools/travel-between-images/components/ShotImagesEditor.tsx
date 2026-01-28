@@ -232,6 +232,21 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   selectedOutputId,
   onSelectedOutputChange,
 }) => {
+  // Debug: Log structure video props in readOnly mode
+  if (readOnly) {
+    console.log('[ShotImagesEditor:ReadOnly] Structure video props:', {
+      hasStructureVideoPath: !!propStructureVideoPath,
+      structureVideoPath: propStructureVideoPath?.substring(0, 50),
+      hasMetadata: !!propStructureVideoMetadata,
+      treatment: propStructureVideoTreatment,
+      motionStrength: propStructureVideoMotionStrength,
+      structureType: propStructureVideoType,
+      hasOnStructureVideoChange: !!propOnStructureVideoChange,
+      // Condition evaluation
+      conditionResult: !!(selectedShotId && (projectId || readOnly) && propOnStructureVideoChange && (propStructureVideoPath || !readOnly)),
+    });
+  }
+
   // Navigation for deep-linking to segment slots from TasksPane
   const location = useLocation();
   const navigate = useNavigate();
@@ -584,6 +599,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   
   // Fetch segment outputs for preview
   // Uses controlled state if provided so batch mode respects FinalVideoSection selection
+  // In readOnly mode with preloadedImages, pass them to bypass database queries
   const {
     segmentSlots,
     selectedParentId,
@@ -594,7 +610,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     projectId || '',
     undefined, // localShotGenPositions not needed here
     selectedOutputId,
-    onSelectedOutputChange
+    onSelectedOutputChange,
+    readOnly ? preloadedImages : undefined // Pass preloaded generations for readOnly mode
   );
 
   // [BatchModeSelection] Debug: trace controlled state flow
@@ -609,6 +626,12 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     // Context
     generationMode,
     selectedShotId: selectedShotId?.substring(0, 8),
+    // ReadOnly mode context
+    readOnly,
+    hasPreloadedImages: !!preloadedImages,
+    preloadedImagesCount: preloadedImages?.length || 0,
+    preloadedVideoCount: preloadedImages?.filter(img => img.type?.includes('video')).length || 0,
+    preloadedWithParentCount: preloadedImages?.filter(img => img.parent_generation_id).length || 0,
   });
 
   // Get optimistic pending handler for immediate UI feedback when generate is clicked
@@ -863,7 +886,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   
   // Log data source for debugging
   console.log('[UnifiedDataFlow] ShotImagesEditor data source:', {
-    selectedShotId: selectedShotId.substring(0, 8),
+    selectedShotId: selectedShotId?.substring(0, 8) ?? 'none',
     usingPreloadedImages: !!preloadedImages,
     dataSource: preloadedImages ? 'two-phase (from ShotEditor)' : 'legacy (useEnhancedShotPositions)',
     imageCount: shotGenerations.length,
@@ -1903,16 +1926,16 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
     const result = getImagesForMode(generationMode);
     
     console.log('[UnifiedDataFlow] ShotImagesEditor images memoization:', {
-      selectedShotId: selectedShotId.substring(0, 8),
+      selectedShotId: selectedShotId?.substring(0, 8) ?? 'none',
       generationMode,
       usingPreloaded: !!preloadedImages,
       totalImages: result.length,
       positioned: result.filter((img: any) => img.timeline_frame != null && img.timeline_frame !== -1).length,
       unpositioned: result.filter((img: any) => img.timeline_frame == null || img.timeline_frame === -1).length,
     });
-    
+
     console.log('[DataTrace] 📤 ShotImagesEditor → passing to Timeline/Manager:', {
-      shotId: selectedShotId.substring(0, 8),
+      shotId: selectedShotId?.substring(0, 8) ?? 'none',
       mode: generationMode,
       total: result.length,
       willBeDisplayed: result.length,
@@ -2717,7 +2740,8 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
                 </div>
                 
                 {/* Batch mode structure video (hidden in readOnly when no video exists) */}
-                {selectedShotId && projectId && propOnStructureVideoChange && (propStructureVideoPath || !readOnly) && (
+                {/* In readOnly mode, allow showing without projectId if path exists */}
+                {selectedShotId && (projectId || readOnly) && propOnStructureVideoChange && (propStructureVideoPath || !readOnly) && (
                   <>
                     <div className="mb-4 mt-6">
                       <SectionHeader title="Camera Guidance Video" theme="green" />

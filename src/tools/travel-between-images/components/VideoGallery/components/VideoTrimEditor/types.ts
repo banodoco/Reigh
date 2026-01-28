@@ -141,6 +141,8 @@ export interface VariantSelectorProps {
   onLoadVariantSettings?: (variantParams: Record<string, any>) => void;
   /** Handler to delete a variant (not available for primary variant) */
   onDeleteVariant?: (variantId: string) => Promise<void>;
+  /** Read-only mode - hides action buttons (Make Primary, Promote, Delete) */
+  readOnly?: boolean;
 }
 
 /**

@@ -54,6 +54,8 @@ interface InlineSegmentVideoProps {
   };
   /** Current scrubbing progress (0-1) for visual feedback */
   scrubbingProgress?: number;
+  /** Read-only mode - show empty placeholder instead of generate CTA */
+  readOnly?: boolean;
 }
 
 export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
@@ -77,6 +79,7 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
   scrubbingContainerRef,
   scrubbingContainerProps,
   scrubbingProgress,
+  readOnly = false,
 }) => {
   const [isHovering, setIsHovering] = useState(false);
   const [hoverPosition, setHoverPosition] = useState({ x: 0, y: 0 });
@@ -274,6 +277,23 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
             <span className="text-[10px] font-medium">Pending</span>
           </div>
         </button>
+      );
+    }
+
+    // In readOnly mode, show empty container instead of generate CTA
+    if (readOnly) {
+      return (
+        <div
+          className={cn(
+            "border-2 border-dashed",
+            roundedClass,
+            layout === 'flow'
+              ? "bg-muted/30 border-muted-foreground/20"
+              : "bg-muted/20 border-border/30",
+            flowContainerClasses
+          )}
+          style={adjustedPositionStyle}
+        />
       );
     }
 

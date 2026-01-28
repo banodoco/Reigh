@@ -192,6 +192,8 @@ interface TimelineContainerProps {
   onSelectedOutputChange?: (id: string | null) => void;
   // Callback when segment frame count changes (for instant timeline updates)
   onSegmentFrameCountChange?: (pairShotGenerationId: string, frameCount: number) => void;
+  // Preloaded video outputs for readOnly mode (bypasses database query)
+  videoOutputs?: GenerationRow[];
 }
 
 const TimelineContainer: React.FC<TimelineContainerProps> = ({
@@ -245,6 +247,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
   selectedOutputId,
   onSelectedOutputChange,
   onSegmentFrameCountChange,
+  videoOutputs,
 }) => {
   // [ZoomDebug] Track component mounts to detect unwanted remounts
   const mountCountRef = useRef(0);
@@ -1064,7 +1067,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
       <div className="relative">
         {/* Fixed top controls overlay - Zoom and Structure controls */}
         {/* Show when: there's a structure video OR when showing the uploader (no video, not readOnly) */}
-        {shotId && projectId && onStructureVideoChange && (structureVideoPath || !readOnly) && (
+        {/* In readOnly mode, allow without projectId */}
+        {shotId && (projectId || readOnly) && onStructureVideoChange && (structureVideoPath || !readOnly) && (
         <div
           className="absolute left-0 z-30 flex items-end justify-between pointer-events-none px-8"
           style={{ 
@@ -1281,10 +1285,13 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         >
 
         {/* Segment output strip - shows generated segments above timeline */}
-        {shotId && projectId && !readOnly && (
+        {/* In readOnly mode, use preloaded data; otherwise require projectId for queries */}
+        {shotId && (projectId || (readOnly && videoOutputs)) && (
           <SegmentOutputStrip
             shotId={shotId}
             projectId={projectId}
+            preloadedGenerations={videoOutputs}
+            readOnly={readOnly}
             projectAspectRatio={projectAspectRatio}
             pairInfo={pairInfo}
             fullMin={fullMin}
@@ -1354,7 +1361,8 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
         )}
 
         {/* Structure video strip(s) - supports both multi-video and legacy single-video */}
-        {shotId && projectId && (
+        {/* In readOnly mode, allow rendering without projectId */}
+        {shotId && (projectId || readOnly) && (
           // NEW: Use GuidanceVideosContainer when array interface is available
           structureVideos && onUpdateStructureVideo && onRemoveStructureVideo ? (
             <GuidanceVideosContainer
@@ -1652,11 +1660,12 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
                 defaultNegativePrompt={defaultNegativePrompt}
                 showLabel={showPairLabels}
                 hidePairLabel={
-                  !!tapToMove.selectedItemId || 
+                  !!tapToMove.selectedItemId ||
                   (isFileOver && dropTargetFrame !== null && dropTargetFrame > actualStartFrame && dropTargetFrame < actualEndFrame) ||
                   (dragState.isDragging && currentDragFrame !== null && currentDragFrame > actualStartFrame && currentDragFrame < actualEndFrame)
                 }
                 onClearEnhancedPrompt={onClearEnhancedPrompt}
+                readOnly={readOnly}
               />
             );
           })}
@@ -1831,7 +1840,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             
             if (itemsWithoutPositions.length > 0) {
               console.log(`[TimelineVisibility] ⏳ SKIPPING ${itemsWithoutPositions.length} items without positions:`, {
-                shotId: shotId.substring(0, 8),
+                shotId: shotId?.substring(0, 8) ?? 'none',
                 skippedIds: itemsWithoutPositions.map(img => img.id?.substring(0, 8)),
                 renderingCount: itemsWithPositions.length,
                 timestamp: Date.now()
@@ -1839,7 +1848,7 @@ const TimelineContainer: React.FC<TimelineContainerProps> = ({
             }
             
             console.log(`[TimelineVisibility] 🎬 RENDERING ${itemsWithPositions.length}/${images.length} timeline items:`, {
-              shotId: shotId.substring(0, 8),
+              shotId: shotId?.substring(0, 8) ?? 'none',
               currentPositionsSize: currentPositions.size,
               timestamp: Date.now()
             });

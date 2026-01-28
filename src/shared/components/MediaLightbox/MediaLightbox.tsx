@@ -2366,6 +2366,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
                 onNavNext={handleSlotNavNext}
                 hasPrevious={hasPrevious}
                 hasNext={hasNext}
+                readOnly={readOnly}
               />
             ) : shouldShowSidePanelWithTrim ? (
               // Tablet/Desktop layout with side panel
