@@ -331,6 +331,8 @@ export const useRepositionMode = ({
     }
     
     // Clear canvas with transparent background
+    // Note: We keep it transparent here so mask generation can use alpha channel.
+    // The green fill happens later when preparing the image for upload.
     transformedCtx.clearRect(0, 0, sourceWidth, sourceHeight);
     
     // Apply transform and draw image
@@ -435,12 +437,32 @@ export const useRepositionMode = ({
       }
       
       maskCtx.putImageData(maskImageData, 0, 0);
-      
+
       console.log('[Reposition] Generated transformed image and mask');
-      
+
+      // Create final image with green background to prevent anti-aliased edge artifacts
+      // The transparent canvas is needed for mask generation (alpha channel), but for the
+      // uploaded image we need a solid background so edge pixels blend properly instead
+      // of appearing as a dark border.
+      const finalImageCanvas = document.createElement('canvas');
+      finalImageCanvas.width = outputWidth;
+      finalImageCanvas.height = outputHeight;
+      const finalImageCtx = finalImageCanvas.getContext('2d');
+
+      if (!finalImageCtx) {
+        throw new Error('Could not create final image canvas context');
+      }
+
+      // Fill with green first (matches expected fill area color)
+      finalImageCtx.fillStyle = '#00FF00';
+      finalImageCtx.fillRect(0, 0, outputWidth, outputHeight);
+
+      // Draw transformed image on top - anti-aliased edges will blend with green
+      finalImageCtx.drawImage(transformedCanvas, 0, 0);
+
       // Convert canvases to blobs and upload
       const transformedBlob = await new Promise<Blob>((resolve, reject) => {
-        transformedCanvas.toBlob(blob => {
+        finalImageCanvas.toBlob(blob => {
           if (blob) resolve(blob);
           else reject(new Error('Failed to create transformed image blob'));
         }, 'image/png');

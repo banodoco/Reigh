@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-// Import gifenc from esm.sh for Deno compatibility
-import { GIFEncoder, quantize, applyPalette } from "https://esm.sh/gifenc@1.0.3"
+// Import gifenc - use default export and destructure
+import gifenc from "https://esm.sh/gifenc@1.0.3"
+const { GIFEncoder, quantize, applyPalette } = gifenc
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

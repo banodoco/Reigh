@@ -1,9 +1,5 @@
--- Migration: demote_orphaned_video_variants RPC
--- Purpose: Detect and demote video variants whose source images have changed
---
--- When timeline images change (replaced, reordered, deleted), existing videos can become
--- "orphaned" - they no longer match the current source images. This RPC detects mismatches
--- by comparing the stored input_image_generation_ids with current shot_generations state.
+-- Fix: Use ->> instead of -> for JSONB text extraction
+-- The original migration used -> which returns JSONB, but we need text to cast to UUID
 
 CREATE OR REPLACE FUNCTION demote_orphaned_video_variants(p_shot_id UUID)
 RETURNS INTEGER AS $$
@@ -70,10 +66,3 @@ BEGIN
   RETURN demoted_count;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Grant execute permission to authenticated users
-GRANT EXECUTE ON FUNCTION demote_orphaned_video_variants(UUID) TO authenticated;
-
--- Add comment for documentation
-COMMENT ON FUNCTION demote_orphaned_video_variants(UUID) IS
-  'Demotes primary video variants when their source images have changed. Returns count of demoted variants.';

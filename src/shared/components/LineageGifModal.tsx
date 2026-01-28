@@ -17,7 +17,7 @@ import { Button } from '@/shared/components/ui/button';
 import { Progress } from '@/shared/components/ui/progress';
 import { useLineageChain } from '@/shared/hooks/useLineageChain';
 import {
-  createLineageGifRaw,
+  createLineageGif,
   downloadBlob,
   type CreateGifProgress,
 } from '@/shared/utils/createLineageGif';
@@ -99,7 +99,7 @@ export const LineageGifModal: React.FC<LineageGifModalProps> = ({
       try {
         const imageUrls = chain.map((item) => item.imageUrl);
 
-        const blob = await createLineageGifRaw(imageUrls, { frameDelay: 800 }, (progress) => {
+        const blob = await createLineageGif(imageUrls, { frameDelay: 800 }, (progress) => {
           setState({ status: 'generating', progress });
         });
 
