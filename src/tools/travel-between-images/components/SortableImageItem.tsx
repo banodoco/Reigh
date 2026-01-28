@@ -3,7 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GenerationRow } from '@/types/shots';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Copy, Check, Pencil } from 'lucide-react';
+import { Trash2, Copy, Check } from 'lucide-react';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
@@ -256,51 +256,52 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
       
       {(!isMobile || !isDragDisabled) && (
         <>
-          {/* Edit Image trigger */}
-          {onInpaintClick && (
-            <Button
-              variant="secondary"
-              size="icon"
-              className="absolute bottom-1 left-1 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                e.nativeEvent.stopImmediatePropagation();
-                onInpaintClick();
-              }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                e.nativeEvent.stopImmediatePropagation();
-              }}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                e.nativeEvent.stopImmediatePropagation();
-              }}
-              title="Edit image"
-            >
-              <Pencil className="h-3 w-3" />
-            </Button>
-          )}
-          
-          {onDuplicate && timeline_frame !== undefined && (
-            <>
-          {/* Variant Count + NEW badge - top left */}
+          {/* Variant Count + NEW badge - bottom, above time */}
           <VariantBadge
             derivedCount={(image as any).derivedCount}
             unviewedVariantCount={(image as any).unviewedVariantCount}
             hasUnviewedVariants={(image as any).hasUnviewedVariants}
             variant="overlay"
             size="md"
+            position="bottom-5 left-1/2 -translate-x-1/2"
             onMarkAllViewed={handleMarkAllVariantsViewed}
           />
-              
+
+          {/* Action buttons - top center, side by side */}
+          <div className="absolute top-1 left-1/2 -translate-x-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            {onDuplicate && timeline_frame !== undefined && (
               <Button
-              variant="secondary"
+                variant="secondary"
+                size="icon"
+                className="h-6 w-6 p-0 rounded-full"
+                onClick={handleDuplicateClick}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                }}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                }}
+                disabled={duplicatingImageId === image.id || image.id?.startsWith('temp-')}
+                title={image.id?.startsWith('temp-') ? "Please wait..." : "Duplicate image"}
+              >
+                {duplicatingImageId === image.id ? (
+                  <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
+                ) : duplicateSuccessImageId === image.id ? (
+                  <Check className="h-3 w-3" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
+              </Button>
+            )}
+            <Button
+              variant="destructive"
               size="icon"
-              className="absolute top-1 right-[2rem] h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
-              onClick={handleDuplicateClick}
+              className="h-6 w-6 p-0 rounded-full"
+              onClick={handleDeleteClick}
               onMouseDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -311,39 +312,12 @@ const SortableImageItemComponent: React.FC<SortableImageItemProps> = ({
                 e.stopPropagation();
                 e.nativeEvent.stopImmediatePropagation();
               }}
-              disabled={duplicatingImageId === image.id || image.id?.startsWith('temp-')}
-              title={image.id?.startsWith('temp-') ? "Please wait..." : "Duplicate image"}
+              disabled={image.id?.startsWith('temp-')}
+              title={image.id?.startsWith('temp-') ? "Please wait..." : "Remove from timeline"}
             >
-              {duplicatingImageId === image.id ? (
-                <div className="h-3 w-3 animate-spin rounded-full border-b-2 border-white"></div>
-              ) : duplicateSuccessImageId === image.id ? (
-                <Check className="h-3 w-3" />
-              ) : (
-                <Copy className="h-3 w-3" />
-              )}
+              <Trash2 className="h-3 w-3" />
             </Button>
-            </>
-          )}
-          <Button
-            variant="destructive"
-            size="icon"
-            className="absolute top-1 right-1 h-6 w-6 p-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
-            onClick={handleDeleteClick}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              e.nativeEvent.stopImmediatePropagation();
-            }}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              e.nativeEvent.stopImmediatePropagation();
-            }}
-            disabled={image.id?.startsWith('temp-')}
-            title={image.id?.startsWith('temp-') ? "Please wait..." : "Remove from timeline"}
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
+          </div>
         </>
       )}
     </div>
