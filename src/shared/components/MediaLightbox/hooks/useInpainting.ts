@@ -1882,6 +1882,25 @@ export const useInpainting = ({
     if (!isInpaintMode && !isAnnotateMode) return;
     if (editMode === 'text' && !isDraggingShape) return;
 
+    // Check if the pointer button was released outside the canvas and user returned
+    // e.evt.buttons === 0 means no buttons are pressed
+    if ((isDrawing || isDraggingShape) && e.evt.buttons === 0) {
+      console.log('[Inpaint] Pointer returned with no button pressed - canceling drawing/drag');
+      if (isDrawing) {
+        setIsDrawing(false);
+        hasInitializedCanvasRef.current = false;
+        lastDrawnPointRef.current = null;
+        setCurrentStroke([]);
+      }
+      if (isDraggingShape) {
+        setIsDraggingShape(false);
+        setDragOffset(null);
+        setDraggingCornerIndex(null);
+        selectedShapeRef.current = null;
+      }
+      return;
+    }
+
     const { x, y } = point;
 
     // Handle dragging selected shape
@@ -2148,6 +2167,38 @@ export const useInpainting = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isInpaintMode, isAnnotateMode, selectedShapeId, handleDeleteSelected]);
+
+  // Global pointerup listener to catch pointer release outside canvas
+  // Prevents "stuck" drawing state when dragging off the edge of the screen
+  useEffect(() => {
+    if (!isDrawing && !isDraggingShape) return;
+
+    const handleGlobalPointerUp = () => {
+      if (isDrawing) {
+        console.log('[Inpaint] Global pointerup - releasing stuck drawing state');
+        setIsDrawing(false);
+        hasInitializedCanvasRef.current = false;
+        lastDrawnPointRef.current = null;
+        setCurrentStroke([]);
+      }
+      if (isDraggingShape) {
+        console.log('[Inpaint] Global pointerup - releasing stuck drag state');
+        setIsDraggingShape(false);
+        setDragOffset(null);
+        setDraggingCornerIndex(null);
+        selectedShapeRef.current = null;
+      }
+    };
+
+    // Listen on window to catch events outside the canvas
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointercancel', handleGlobalPointerUp);
+
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+      window.removeEventListener('pointercancel', handleGlobalPointerUp);
+    };
+  }, [isDrawing, isDraggingShape]);
 
   // Redraw when strokes change (but not during active drag - that's handled manually)
   useEffect(() => {
