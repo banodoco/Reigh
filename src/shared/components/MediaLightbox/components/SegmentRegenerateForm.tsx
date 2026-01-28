@@ -193,9 +193,16 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   // Compute effective enhance state (user's explicit choice, or locked-in default)
   const effectiveEnhanceEnabled = enhancePromptEnabled ?? defaultEnhanceEnabled;
 
-  // Use ref to ensure submit handler always reads current state (avoids race condition)
+  // Ref for submit handler - updated synchronously on toggle, not waiting for React re-render
   const effectiveEnhanceEnabledRef = useRef(effectiveEnhanceEnabled);
+  // Keep in sync during normal renders
   effectiveEnhanceEnabledRef.current = effectiveEnhanceEnabled;
+
+  // Wrapper to update ref synchronously when user toggles (before React re-renders)
+  const handleEnhancePromptChange = useCallback((value: boolean) => {
+    effectiveEnhanceEnabledRef.current = value; // Update ref immediately
+    setEnhancePromptEnabled(value); // Then schedule React state update
+  }, []);
 
   // Reset enhance state ONLY when pair actually changes to a different value
   useEffect(() => {
@@ -508,7 +515,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
       isSubmitting={isSubmitting}
       onFrameCountChange={handleFrameCountChange}
       enhancePromptEnabled={effectiveEnhanceEnabled}
-      onEnhancePromptChange={setEnhancePromptEnabled}
+      onEnhancePromptChange={handleEnhancePromptChange}
       edgeExtendAmount={6}
     />
   );

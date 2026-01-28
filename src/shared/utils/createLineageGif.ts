@@ -52,8 +52,6 @@ export async function createLineageGif(
     throw new Error('No images provided for GIF creation');
   }
 
-  console.log('[createLineageGif] Starting with', imageUrls.length, 'images');
-
   onProgress?.({
     stage: 'loading',
     current: 0,
@@ -68,11 +66,8 @@ export async function createLineageGif(
 
   for (let i = 0; i < imageUrls.length; i++) {
     try {
-      console.log(`[createLineageGif] Fetching image ${i + 1}/${imageUrls.length}`);
-
       const response = await fetch(imageUrls[i]);
       if (!response.ok) {
-        console.error(`[createLineageGif] Failed to fetch image ${i}: ${response.status}`);
         continue;
       }
 
@@ -83,8 +78,6 @@ export async function createLineageGif(
       const img = await loadImageFromBlobUrl(blobUrl);
       images.push(img);
 
-      console.log(`[createLineageGif] Image ${i + 1} loaded: ${img.width}x${img.height}`);
-
       onProgress?.({
         stage: 'loading',
         current: i + 1,
@@ -92,12 +85,11 @@ export async function createLineageGif(
         message: `Loading images ${i + 1}/${imageUrls.length}`,
       });
     } catch (err) {
-      console.error(`[createLineageGif] Error loading image ${i}:`, err);
+      // Skip failed images
     }
   }
 
   if (images.length === 0) {
-    // Clean up any blob URLs
     blobUrls.forEach(url => URL.revokeObjectURL(url));
     throw new Error('No images could be loaded');
   }
@@ -106,8 +98,6 @@ export async function createLineageGif(
   const firstImage = images[0];
   const aspectRatio = firstImage.width / firstImage.height;
   const height = Math.round(width / aspectRatio);
-
-  console.log(`[createLineageGif] Output size: ${width}x${height}, ${images.length} frames`);
 
   // Create canvas for rendering frames
   const canvas = document.createElement('canvas');
@@ -119,8 +109,6 @@ export async function createLineageGif(
     blobUrls.forEach(url => URL.revokeObjectURL(url));
     throw new Error('Could not get canvas context');
   }
-
-  console.log('[createLineageGif] Canvas created:', canvas.width, 'x', canvas.height);
 
   // Initialize GIF encoder
   const gif = GIFEncoder();
@@ -164,34 +152,19 @@ export async function createLineageGif(
     // Draw image to canvas
     ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
 
-    console.log(`[createLineageGif] Frame ${i + 1} drawn at (${drawX}, ${drawY}) size ${drawWidth}x${drawHeight}`);
-
-    // Get image data - this should work since we're using blob URLs (same-origin)
+    // Get image data
     const imageData = ctx.getImageData(0, 0, width, height);
     const { data } = imageData;
 
-    console.log(`[createLineageGif] Frame ${i + 1} imageData: ${imageData.width}x${imageData.height}, ${data.length} bytes`);
-
-    // Debug: check first few pixels to verify data isn't all zeros/gray
-    const firstPixelR = data[0], firstPixelG = data[1], firstPixelB = data[2], firstPixelA = data[3];
-    const midIndex = Math.floor(data.length / 2);
-    const midPixelR = data[midIndex], midPixelG = data[midIndex + 1], midPixelB = data[midIndex + 2];
-    console.log(`[createLineageGif] Frame ${i + 1} sample pixels - first: rgba(${firstPixelR},${firstPixelG},${firstPixelB},${firstPixelA}), mid: rgb(${midPixelR},${midPixelG},${midPixelB})`);
-
-    // gifenc expects RGBA data directly from canvas, using 'rgba4444' format for alpha support
-    // Quantize colors to 256-color palette
+    // gifenc expects RGBA data directly from canvas
     const palette = quantize(data, 256, { format: 'rgba4444' });
     const indexedPixels = applyPalette(data, palette, 'rgba4444');
-
-    console.log(`[createLineageGif] Frame ${i + 1} palette size: ${palette.length}, indexed pixels: ${indexedPixels.length}, expected: ${width * height}`);
 
     // Add frame with specified delay (gifenc uses centiseconds)
     gif.writeFrame(indexedPixels, width, height, {
       palette,
       delay: frameDelay / 10,
     });
-
-    console.log(`[createLineageGif] Encoded frame ${i + 1}/${images.length}`);
 
     onProgress?.({
       stage: 'encoding',
@@ -209,8 +182,6 @@ export async function createLineageGif(
 
   const gifBytes = gif.bytes();
   const blob = new Blob([gifBytes], { type: 'image/gif' });
-
-  console.log(`[createLineageGif] GIF generated: ${blob.size} bytes`);
 
   onProgress?.({
     stage: 'complete',

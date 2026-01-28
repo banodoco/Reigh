@@ -18,7 +18,7 @@ import { usePrefetchTaskData, usePrefetchTaskById } from '@/shared/hooks/useUnif
 import { usePublicLoras } from '@/shared/hooks/useResources';
 import { SharedTaskDetails } from '@/tools/travel-between-images/components/SharedTaskDetails';
 import { LineageGifModal } from '@/shared/components/LineageGifModal';
-import { checkHasLineage } from '@/shared/hooks/useLineageChain';
+import { getLineageDepth } from '@/shared/hooks/useLineageChain';
 import type { VariantSelectorProps, GenerationVariant } from '../types';
 
 const ITEMS_PER_PAGE = 20;
@@ -109,17 +109,40 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   const [deletingVariantId, setDeletingVariantId] = useState<string | null>(null);
   const [copiedVariantId, setCopiedVariantId] = useState<string | null>(null);
   const [lineageGifVariantId, setLineageGifVariantId] = useState<string | null>(null);
-  const [variantLineageStatus, setVariantLineageStatus] = useState<Record<string, boolean>>({});
+  // Store lineage depth for each variant (only show GIF button when depth >= 5)
+  const [variantLineageDepth, setVariantLineageDepth] = useState<Record<string, number>>({});
   const isMobile = useIsMobile();
   const { data: availableLoras } = usePublicLoras();
+
+  // Track which variant IDs we've already checked for lineage depth
+  // Lineage depth is checked lazily on hover (see handleVariantMouseEnter)
+  const checkedLineageIdsRef = React.useRef<Set<string>>(new Set());
 
   // Prefetch task data on hover (desktop only)
   // For variants, we need to prefetch the source_task_id directly (if available)
   // since that's what MediaLightbox will look up when viewing the variant
   const prefetchTaskData = usePrefetchTaskData();
   const prefetchTaskById = usePrefetchTaskById();
+
+  // Check lineage depth lazily on hover (only for variants not yet checked)
+  const checkLineageDepthOnHover = useCallback(async (variantId: string) => {
+    // Skip if already checked or currently being checked
+    if (checkedLineageIdsRef.current.has(variantId)) return;
+    checkedLineageIdsRef.current.add(variantId);
+
+    try {
+      const depth = await getLineageDepth(variantId);
+      setVariantLineageDepth(prev => ({ ...prev, [variantId]: depth }));
+    } catch {
+      setVariantLineageDepth(prev => ({ ...prev, [variantId]: 0 }));
+    }
+  }, []);
+
   const handleVariantMouseEnter = useCallback((variant: GenerationVariant) => {
     if (isMobile) return;
+
+    // Check lineage depth lazily when hovering
+    checkLineageDepthOnHover(variant.id);
 
     const variantParams = variant.params as Record<string, any> | undefined;
     const sourceTaskId = variantParams?.source_task_id ||
@@ -139,7 +162,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
       console.log('[VariantPrefetch] No source_task_id, prefetching via generation:', variant.generation_id.substring(0, 8));
       prefetchTaskData(variant.generation_id);
     }
-  }, [isMobile, prefetchTaskData, prefetchTaskById]);
+  }, [isMobile, prefetchTaskData, prefetchTaskById, checkLineageDepthOnHover]);
 
   // Calculate variant relationships based on source_variant_id in params
   const { parentVariants, childVariants, relationshipMap } = useMemo(() => {
@@ -236,42 +259,6 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   React.useEffect(() => {
     setCurrentPage(0);
   }, [relationshipFilter]);
-
-  // Check for lineage on each variant (via params.source_variant_id)
-  // This allows showing the "Lineage GIF" button for variants with edit history
-  // Use a ref to track which IDs we've started checking to avoid redundant queries
-  const checkedLineageIdsRef = React.useRef<Set<string>>(new Set());
-
-  React.useEffect(() => {
-    const checkLineageForVariants = async () => {
-      const variantIds = variants.map(v => v.id);
-      const uncheckedIds = variantIds.filter(id => !checkedLineageIdsRef.current.has(id));
-
-      if (uncheckedIds.length === 0) return;
-
-      // Mark as checking immediately to prevent duplicate requests
-      uncheckedIds.forEach(id => checkedLineageIdsRef.current.add(id));
-
-      const results: Record<string, boolean> = {};
-
-      await Promise.all(
-        uncheckedIds.map(async (variantId) => {
-          try {
-            const hasLineage = await checkHasLineage(variantId);
-            results[variantId] = hasLineage;
-          } catch {
-            results[variantId] = false;
-          }
-        })
-      );
-
-      setVariantLineageStatus(prev => ({ ...prev, ...results }));
-    };
-
-    if (variants.length > 0) {
-      checkLineageForVariants();
-    }
-  }, [variants]);
 
   const hasRelationships = parentVariants.size > 0 || childVariants.size > 0;
 
@@ -628,40 +615,73 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                         )}
                       </div>
                       <div className="flex items-center gap-1">
-                        {/* Copy ID button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigator.clipboard.writeText(variant.id).catch(() => {});
-                            setCopiedVariantId(variant.id);
-                            setTimeout(() => setCopiedVariantId(null), 2000);
-                          }}
-                          className={cn(
-                            "px-1.5 py-0.5 rounded text-[10px] transition-colors",
-                            copiedVariantId === variant.id
-                              ? "text-green-400 bg-green-400/10"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                          )}
-                        >
-                          {copiedVariantId === variant.id ? 'copied' : 'id'}
-                        </button>
+                        {/* Copy ID button with tooltip */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(variant.id).catch(() => {});
+                                setCopiedVariantId(variant.id);
+                                setTimeout(() => setCopiedVariantId(null), 2000);
+                              }}
+                              className={cn(
+                                "px-1.5 py-0.5 rounded text-[10px] transition-colors",
+                                copiedVariantId === variant.id
+                                  ? "text-green-400 bg-green-400/10"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                              )}
+                            >
+                              {copiedVariantId === variant.id ? 'copied' : 'id'}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="text-xs">
+                            Copy variant ID to clipboard
+                          </TooltipContent>
+                        </Tooltip>
+                        {/* Lineage GIF button - only shown when lineage depth >= 5 */}
+                        {(variantLineageDepth[variant.id] || 0) >= 5 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setLineageGifVariantId(variant.id);
+                                }}
+                                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                              >
+                                <GitBranch className="w-3.5 h-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                              Show lineage GIF ({variantLineageDepth[variant.id]} ancestors)
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                         {/* Delete button - only for non-primary variants, hidden in readOnly mode */}
                         {!readOnly && onDeleteVariant && !isPrimary && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeletingVariantId(variant.id);
-                              onDeleteVariant(variant.id).finally(() => setDeletingVariantId(null));
-                            }}
-                            disabled={deletingVariantId === variant.id}
-                            className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                          >
-                            {deletingVariantId === variant.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-3.5 h-3.5" />
-                            )}
-                          </button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeletingVariantId(variant.id);
+                                  onDeleteVariant(variant.id).finally(() => setDeletingVariantId(null));
+                                }}
+                                disabled={deletingVariantId === variant.id}
+                                className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                              >
+                                {deletingVariantId === variant.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="text-xs">
+                              Delete this variant
+                            </TooltipContent>
+                          </Tooltip>
                         )}
                       </div>
                     </div>
@@ -698,14 +718,6 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                     )}
 
                     {/* Action buttons row - Make Primary and/or Load Settings - hidden in readOnly mode */}
-                    {console.log('[LoadVariantSettings] Action buttons check:', {
-                      variantId: variant.id.substring(0, 8),
-                      readOnly,
-                      isPrimary,
-                      hasOnLoadVariantSettings: !!onLoadVariantSettings,
-                      hasParams: !!variant.params,
-                      createdFrom: variant.params?.created_from,
-                    })}
                     {!readOnly && ((!isPrimary && onMakePrimary) || (onLoadVariantSettings && variant.params)) && (
                       <div className="flex gap-1.5">
                         {/* Make Primary button - only for non-primary variants */}
@@ -734,7 +746,6 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              console.log('[LoadVariantSettings] Load settings clicked for variant:', variant.id);
                               onLoadVariantSettings(variant.params as Record<string, any>);
                               setLoadedSettingsVariantId(variant.id);
                               setTimeout(() => setLoadedSettingsVariantId(null), 2000);
@@ -759,21 +770,6 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                           </Button>
                         )}
                       </div>
-                    )}
-                    {/* Lineage GIF button - only shown if the variant has lineage (source_variant_id is set) */}
-                    {variantLineageStatus[variant.id] && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setLineageGifVariantId(variant.id);
-                        }}
-                        className="h-6 text-xs gap-1 w-full mt-1.5"
-                      >
-                        <GitBranch className="w-3 h-3" />
-                        Show Lineage GIF
-                      </Button>
                     )}
                   </div>
                 </TooltipContent>

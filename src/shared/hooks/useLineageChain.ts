@@ -101,22 +101,46 @@ export function useLineageChain(variantId: string | null): LineageChainResult {
 }
 
 /**
- * Check if a variant has lineage (has a source_variant_id in params).
+ * Count the lineage chain length for a variant.
+ * Returns the number of ancestors (0 if no lineage, 1+ if has ancestors).
  * This fetches directly without caching - use sparingly for initial checks.
  */
-export async function checkHasLineage(variantId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('generation_variants')
-    .select('params')
-    .eq('id', variantId)
-    .single();
+export async function getLineageDepth(variantId: string): Promise<number> {
+  let depth = 0;
+  let currentId: string | null = variantId;
+  const visited = new Set<string>();
 
-  if (error || !data) {
-    return false;
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId);
+
+    const { data, error } = await supabase
+      .from('generation_variants')
+      .select('params')
+      .eq('id', currentId)
+      .single();
+
+    if (error || !data) {
+      break;
+    }
+
+    const params = data.params as Record<string, any> | null;
+    currentId = params?.source_variant_id || null;
+
+    if (currentId) {
+      depth++;
+    }
   }
 
-  const params = data.params as Record<string, any> | null;
-  return !!params?.source_variant_id;
+  return depth;
+}
+
+/**
+ * Check if a variant has lineage (has a source_variant_id in params).
+ * @deprecated Use getLineageDepth instead for more control
+ */
+export async function checkHasLineage(variantId: string): Promise<boolean> {
+  const depth = await getLineageDepth(variantId);
+  return depth > 0;
 }
 
 export default useLineageChain;
