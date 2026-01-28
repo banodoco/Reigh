@@ -62,11 +62,12 @@ export const parseTaskParamsForDisplay = (params: unknown): { parsed: Record<str
  */
 export const extractShotId = (task: Task): string | null => {
   const params = task.params as Record<string, any>;
-  
+
   // Try different locations where shot_id might be stored based on task type
   return (
     params?.orchestrator_details?.shot_id ||           // travel_orchestrator, wan_2_2_i2v
     params?.full_orchestrator_payload?.shot_id ||      // travel_stitch, wan_2_2_i2v fallback
+    params?.individual_segment_params?.shot_id ||      // individual_travel_segment
     params?.shot_id ||                                 // direct shot_id
     null
   );

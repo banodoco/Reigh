@@ -650,16 +650,17 @@ const JoinClipsPage: React.FC = () => {
     })));
   }, [loraManager.selectedLoras, joinSettings, settingsLoaded]);
   
-  // Fetch all videos
+  // Fetch all videos - only parent generations created from Join Clips page
+  // (excludes child generations and join clips created from ShotEditor)
   const generationsQuery = useGenerations(
-    selectedProjectId, 
+    selectedProjectId,
     1,
     100,
     !!selectedProjectId,
     {
       toolType: 'join-clips',
       mediaType: 'video',
-      includeChildren: true  // Include child generations (e.g., when join-clips outputs are linked to source clips)
+      // Don't include children - we only want parent generations from this page
     },
     {
       disablePolling: true
@@ -1413,6 +1414,8 @@ const JoinClipsPage: React.FC = () => {
         // Motion settings for UI state restoration
         motion_mode: motionMode,
         selected_phase_preset_id: selectedPhasePresetId,
+        // Mark as created from Join Clips page for gallery filtering
+        tool_type: 'join-clips',
       };
       
       console.log('[JoinClipsDebug] Creating task with params:', taskParams);

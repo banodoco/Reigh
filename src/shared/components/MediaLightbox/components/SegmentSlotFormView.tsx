@@ -164,9 +164,18 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
     // Prioritize existing enhanced prompt if available, otherwise use base prompt
     const promptToEnhance = enhancedPrompt?.trim() || effectiveSettings.prompt?.trim() || '';
 
+    // Log the enhance decision
+    console.log('[EnhancedPromptSave] 🔍 Submit handler called:', {
+      effectiveEnhanceEnabled,
+      hasPromptToEnhance: !!promptToEnhance,
+      promptToEnhancePreview: promptToEnhance?.substring(0, 50) || '(empty)',
+      pairShotGenerationId: pairShotGenerationId?.substring(0, 8) || '(none)',
+      existingEnhancedPrompt: enhancedPrompt?.substring(0, 50) || '(none)',
+    });
+
     // If enhance is enabled, use background submission pattern
     if (effectiveEnhanceEnabled && promptToEnhance) {
-      console.log('[SegmentSlotFormView] 🚀 Starting background submission with prompt enhancement');
+      console.log('[EnhancedPromptSave] 🚀 Starting background submission with prompt enhancement');
 
       // Add placeholder for immediate feedback
       const taskLabel = `Segment ${segmentSlotMode.currentIndex + 1}`;
@@ -218,14 +227,25 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
 
           // 3. Store enhanced prompt in metadata
           if (pairShotGenerationId && enhancedPromptResult !== promptToEnhance) {
-            const { data: current } = await supabase
+            console.log('[EnhancedPromptSave] 📥 Fetching current metadata for pairShotGenerationId:', pairShotGenerationId.substring(0, 8));
+            const { data: current, error: fetchError } = await supabase
               .from('shot_generations')
               .select('metadata')
               .eq('id', pairShotGenerationId)
               .single();
 
+            if (fetchError) {
+              console.error('[EnhancedPromptSave] ❌ Error fetching current metadata:', fetchError);
+            }
+
             const currentMetadata = (current?.metadata as Record<string, any>) || {};
-            await supabase
+            console.log('[EnhancedPromptSave] 📝 Saving enhanced_prompt to metadata:', {
+              pairShotGenerationId: pairShotGenerationId.substring(0, 8),
+              enhancedPromptPreview: enhancedPromptResult.substring(0, 50) + '...',
+              basePromptPreview: (effectiveSettings.prompt?.trim() || '').substring(0, 50) + '...',
+            });
+
+            const { error: updateError } = await supabase
               .from('shot_generations')
               .update({
                 metadata: {
@@ -237,7 +257,18 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
               })
               .eq('id', pairShotGenerationId);
 
+            if (updateError) {
+              console.error('[EnhancedPromptSave] ❌ Error saving enhanced_prompt to metadata:', updateError);
+            } else {
+              console.log('[EnhancedPromptSave] ✅ Enhanced prompt saved to metadata successfully');
+            }
+
             queryClient.invalidateQueries({ queryKey: ['pair-metadata', pairShotGenerationId] });
+          } else {
+            console.log('[EnhancedPromptSave] ⏭️ Skipping save:', {
+              hasPairShotGenerationId: !!pairShotGenerationId,
+              enhancedPromptMatchesInput: enhancedPromptResult === promptToEnhance,
+            });
           }
 
           // 4. Build task params with original prompt as base_prompt, enhanced as separate field

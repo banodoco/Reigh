@@ -392,8 +392,8 @@ function buildJoinClipsPayload(
   return {
     orchestrator_details: orchestratorDetails,
     parent_generation_id: params.parent_generation_id,
-    // Always set tool_type for join-clips so generations are correctly tagged
-    tool_type: params.tool_type || 'join-clips',
+    // Only include tool_type if explicitly passed (Join Clips page passes it, ShotEditor doesn't)
+    ...(params.tool_type && { tool_type: params.tool_type }),
   };
 }
 
