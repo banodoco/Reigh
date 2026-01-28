@@ -178,19 +178,12 @@ export async function createLineageGif(
     const midPixelR = data[midIndex], midPixelG = data[midIndex + 1], midPixelB = data[midIndex + 2];
     console.log(`[createLineageGif] Frame ${i + 1} sample pixels - first: rgba(${firstPixelR},${firstPixelG},${firstPixelB},${firstPixelA}), mid: rgb(${midPixelR},${midPixelG},${midPixelB})`);
 
-    // Convert RGBA to RGB array for gifenc
-    const rgbData = new Uint8Array(width * height * 3);
-    for (let j = 0; j < width * height; j++) {
-      rgbData[j * 3] = data[j * 4];
-      rgbData[j * 3 + 1] = data[j * 4 + 1];
-      rgbData[j * 3 + 2] = data[j * 4 + 2];
-    }
-
+    // gifenc expects RGBA data directly from canvas, using 'rgba4444' format for alpha support
     // Quantize colors to 256-color palette
-    const palette = quantize(rgbData, 256);
-    const indexedPixels = applyPalette(rgbData, palette);
+    const palette = quantize(data, 256, { format: 'rgba4444' });
+    const indexedPixels = applyPalette(data, palette, 'rgba4444');
 
-    console.log(`[createLineageGif] Frame ${i + 1} palette size: ${palette.length}, indexed pixels: ${indexedPixels.length}`);
+    console.log(`[createLineageGif] Frame ${i + 1} palette size: ${palette.length}, indexed pixels: ${indexedPixels.length}, expected: ${width * height}`);
 
     // Add frame with specified delay (gifenc uses centiseconds)
     gif.writeFrame(indexedPixels, width, height, {
