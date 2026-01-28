@@ -30,21 +30,20 @@ declare const Deno: any;
  *
  *   // Quick counts for scaling math (service role only)
  *   totals: {
- *     // Core counts
- *     queued_only: number,        // Immediately claimable tasks (legacy, same as claimable_now)
- *     active_only: number,        // Tasks being processed
- *     queued_plus_active: number, // Total workload
+ *     // Core counts (capacity-limited)
+ *     queued_only: number,             // Immediately claimable tasks (capacity-limited)
+ *     active_only: number,             // Tasks being processed
+ *     queued_plus_active: number,      // Total workload
  *
  *     // Breakdown for smarter scaling decisions (service role only)
- *     claimable_now: number,           // Can be claimed immediately
  *     blocked_by_capacity: number,     // Blocked by user's 5-task limit (will free up)
  *     blocked_by_deps: number,         // Blocked by incomplete dependencies
  *     blocked_by_settings: number,     // Blocked because user has cloud disabled
- *     potentially_claimable: number,   // claimable_now + blocked_by_capacity (for scaling)
+ *     potentially_claimable: number,   // queued_only + blocked_by_capacity (for scaling)
  *   },
  *
  *   // Detailed task arrays (limited to 100 for service role, 50 for user)
- *   // Note: queued_tasks only includes immediately claimable tasks (matches claimable_now)
+ *   // Note: queued_tasks only includes immediately claimable tasks (matches queued_only criteria)
  *   queued_tasks: [{...}],
  *   active_tasks: [{...}],
  *
@@ -119,13 +118,18 @@ serve(async (req) => {
       // SERVICE ROLE PATH: Global task statistics across all users
       // ═══════════════════════════════════════════════════════════════
 
-      // ESSENTIAL: Get counts from RPC functions (3 parallel calls)
-      const [countQueuedPlusActive, breakdownResult, userStatsResult] = await Promise.all([
+      // ESSENTIAL: Get counts from RPC functions (4 parallel calls)
+      const [countQueuedOnly, countQueuedPlusActive, breakdownResult, userStatsResult] = await Promise.all([
+        supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: false, p_run_type: runType }),
         supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: true, p_run_type: runType }),
         supabaseAdmin.rpc('count_queued_tasks_breakdown_service_role', { p_run_type: runType }),
         supabaseAdmin.rpc('per_user_capacity_stats_service_role')
       ]);
 
+      if (countQueuedOnly.error) {
+        console.error("Service role count (queued only) error:", countQueuedOnly.error);
+        throw countQueuedOnly.error;
+      }
       if (countQueuedPlusActive.error) {
         console.error("Service role count (queued+active) error:", countQueuedPlusActive.error);
         throw countQueuedPlusActive.error;
@@ -135,7 +139,13 @@ serve(async (req) => {
         throw breakdownResult.error;
       }
 
-      // Extract breakdown (RPC returns a single row)
+      // Legacy capacity-limited counts (for backward compatibility and claim logic)
+      const queued_only = countQueuedOnly.data ?? 0;
+      const queued_plus_active = countQueuedPlusActive.data ?? 0;
+      const active_only = Math.max(0, queued_plus_active - queued_only);
+
+      // Extract breakdown for scaling decisions (RPC returns a single row)
+      // Note: breakdown counts are per-task eligibility, not capacity-limited
       const breakdown = breakdownResult.data?.[0] ?? {
         claimable_now: 0,
         blocked_by_capacity: 0,
@@ -144,16 +154,12 @@ serve(async (req) => {
         total_queued: 0
       };
 
-      const claimable_now = breakdown.claimable_now ?? 0;
       const blocked_by_capacity = breakdown.blocked_by_capacity ?? 0;
       const blocked_by_deps = breakdown.blocked_by_deps ?? 0;
       const blocked_by_settings = breakdown.blocked_by_settings ?? 0;
-      const potentially_claimable = claimable_now + blocked_by_capacity;
-
-      // Legacy fields for backward compatibility
-      const queued_only = claimable_now;
-      const queued_plus_active = countQueuedPlusActive.data ?? 0;
-      const active_only = Math.max(0, queued_plus_active - queued_only);
+      // For scaling: tasks that will become claimable as capacity frees up
+      // Use queued_only (capacity-limited) + tasks explicitly blocked by capacity
+      const potentially_claimable = queued_only + blocked_by_capacity;
 
       // Format user stats
       const user_stats = Array.isArray(userStatsResult.data)
@@ -302,15 +308,12 @@ serve(async (req) => {
 
       // Debug logging (only when debug=true)
       if (debug) {
-        console.log(`[TASK-COUNTS] [${runType || 'ALL'}] claimable=${claimable_now}, blocked_capacity=${blocked_by_capacity}, blocked_deps=${blocked_by_deps}, blocked_settings=${blocked_by_settings}`);
+        console.log(`[TASK-COUNTS] [${runType || 'ALL'}] queued_only=${queued_only}, blocked_capacity=${blocked_by_capacity}, blocked_deps=${blocked_by_deps}, blocked_settings=${blocked_by_settings}`);
         console.log(`[TASK-COUNTS] [${runType || 'ALL'}] potentially_claimable=${potentially_claimable}, active=${active_only}`);
         console.log(`[TASK-COUNTS] [${runType || 'ALL'}] arrays: ${queued_tasks.length} queued, ${active_tasks.length} active`);
         console.log(`[TASK-COUNTS] [${runType || 'ALL'}] users with tasks: ${user_stats.filter(u => u.in_progress_tasks > 0 || u.queued_tasks > 0).length}`);
 
-        // Validation warnings
-        if (queued_tasks.length !== claimable_now) {
-          console.warn(`[TASK-COUNTS] [VALIDATION] queued_tasks array (${queued_tasks.length}) != claimable_now (${claimable_now}) - possible race condition or limit`);
-        }
+        // Validation warnings (array may differ due to 100-task limit or race conditions)
         if (active_tasks.length !== active_only) {
           console.warn(`[TASK-COUNTS] [VALIDATION] active_tasks array (${active_tasks.length}) != active_only (${active_only})`);
         }
@@ -326,16 +329,15 @@ serve(async (req) => {
         timestamp: new Date().toISOString(),
         run_type_filter: runType,
         totals: {
-          // Legacy fields (for backward compatibility)
-          queued_only,
-          active_only,
-          queued_plus_active,
-          // New breakdown for smarter scaling
-          claimable_now,
-          blocked_by_capacity,
-          blocked_by_deps,
-          blocked_by_settings,
-          potentially_claimable  // claimable_now + blocked_by_capacity (for scaling)
+          // Core counts (capacity-limited, for claim logic)
+          queued_only,              // Immediately claimable (capacity-limited)
+          active_only,              // Currently being processed
+          queued_plus_active,       // Total workload
+          // Breakdown for smarter scaling decisions
+          blocked_by_capacity,      // Will free up as tasks complete
+          blocked_by_deps,          // Waiting on dependencies (uncertain)
+          blocked_by_settings,      // User has cloud disabled (won't become claimable)
+          potentially_claimable     // queued_only + blocked_by_capacity (for scaling)
         },
         queued_tasks,
         active_tasks,

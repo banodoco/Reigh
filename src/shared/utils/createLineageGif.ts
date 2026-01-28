@@ -25,27 +25,40 @@ export interface CreateGifProgress {
 
 /**
  * Load an image from URL and return an HTMLImageElement.
- * Handles CORS by setting crossOrigin attribute.
+ * Fetches as blob first to avoid CORS issues with canvas pixel reading.
  */
 async function loadImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    // Set crossOrigin to allow canvas operations on the image
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      console.log('[createLineageGif] Image loaded:', {
-        url: url.substring(0, 50) + '...',
-        width: img.width,
-        height: img.height,
-      });
-      resolve(img);
-    };
-    img.onerror = (e) => {
-      console.error('[createLineageGif] Failed to load image:', url);
-      reject(new Error(`Failed to load image: ${url}`));
-    };
-    img.src = url;
-  });
+  try {
+    // Fetch image as blob to avoid CORS tainted canvas issues
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        console.log('[createLineageGif] Image loaded:', {
+          url: url.substring(0, 50) + '...',
+          width: img.width,
+          height: img.height,
+        });
+        // Clean up blob URL after image loads
+        URL.revokeObjectURL(blobUrl);
+        resolve(img);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        reject(new Error(`Failed to create image from blob: ${url}`));
+      };
+      img.src = blobUrl;
+    });
+  } catch (err) {
+    console.error('[createLineageGif] Failed to fetch image:', url, err);
+    throw new Error(`Failed to load image: ${url}`);
+  }
 }
 
 /**
