@@ -1377,7 +1377,8 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     segmentSlotMode,
     variantParamsToLoad,
     setVariantParamsToLoad,
-    onSegmentFrameCountChange,
+    // In segment slot mode, the callback comes via segmentSlotMode; otherwise via prop
+    onSegmentFrameCountChange: segmentSlotMode?.onFrameCountChange ?? onSegmentFrameCountChange,
     currentFrameCount,
   });
 
