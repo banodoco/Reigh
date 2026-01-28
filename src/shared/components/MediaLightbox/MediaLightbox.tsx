@@ -1018,6 +1018,114 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     loraManager: img2imgLoraManager,
   } = img2imgHook;
 
+  // Load variant settings for image editing tasks
+  // When variantParamsToLoad is set and it's an image edit task, load the settings into the form
+  useEffect(() => {
+    if (!variantParamsToLoad || isVideo) return;
+
+    const taskType = variantParamsToLoad.task_type as string | undefined;
+
+    // Check if it's an image edit task type
+    const imageEditTaskTypes = [
+      'z_image_turbo_i2i',
+      'image_inpaint',
+      'qwen_image_edit',
+      'magic_edit',
+      'kontext_image_edit',
+      'flux_image_edit',
+      'annotated_image_edit',
+    ];
+
+    if (!taskType || !imageEditTaskTypes.includes(taskType)) {
+      // Not an image edit task, let video handling deal with it
+      return;
+    }
+
+    console.log('[MediaLightbox] Loading image edit variant settings:', {
+      taskType,
+      prompt: variantParamsToLoad.prompt?.substring(0, 50),
+      hasLoras: !!variantParamsToLoad.loras?.length,
+      qwenEditModel: variantParamsToLoad.qwen_edit_model,
+      strength: variantParamsToLoad.strength,
+    });
+
+    // Determine edit mode from task type
+    let targetEditMode: 'text' | 'inpaint' | 'annotate' | 'img2img' = 'text';
+    if (taskType === 'z_image_turbo_i2i') {
+      targetEditMode = 'img2img';
+    } else if (taskType === 'image_inpaint') {
+      targetEditMode = 'inpaint';
+    } else if (taskType === 'annotated_image_edit') {
+      targetEditMode = 'annotate';
+    }
+    // magic_edit, qwen_image_edit, kontext_image_edit, flux_image_edit → 'text'
+
+    // Enter edit mode and set the correct sub-mode
+    handleEnterMagicEditMode();
+    setEditMode(targetEditMode);
+
+    // Load prompt
+    if (variantParamsToLoad.prompt) {
+      if (targetEditMode === 'img2img') {
+        setImg2imgPrompt(variantParamsToLoad.prompt);
+      } else {
+        setInpaintPrompt(variantParamsToLoad.prompt);
+      }
+    }
+
+    // Load img2img strength
+    if (targetEditMode === 'img2img' && typeof variantParamsToLoad.strength === 'number') {
+      setImg2imgStrength(variantParamsToLoad.strength);
+    }
+
+    // Load qwen edit model
+    if (variantParamsToLoad.qwen_edit_model && setQwenEditModel) {
+      setQwenEditModel(variantParamsToLoad.qwen_edit_model);
+    }
+
+    // Load LoRAs
+    if (variantParamsToLoad.loras && Array.isArray(variantParamsToLoad.loras)) {
+      const loraManager = targetEditMode === 'img2img' ? img2imgLoraManager : editLoraManager;
+      if (loraManager) {
+        // Clear existing LoRAs first
+        loraManager.selectedLoras.forEach(lora => loraManager.handleRemoveLora(lora.id));
+        // Add new LoRAs
+        variantParamsToLoad.loras.forEach((lora: { url: string; strength: number }) => {
+          // Find matching LoRA in available list
+          const matchingLora = availableLoras?.find(l => l.URL === lora.url);
+          if (matchingLora) {
+            loraManager.handleAddLora({
+              ...matchingLora,
+              strength: lora.strength,
+            });
+          }
+        });
+      }
+    }
+
+    // Load number of generations
+    if (typeof variantParamsToLoad.numImages === 'number') {
+      setInpaintNumGenerations(variantParamsToLoad.numImages);
+    }
+
+    // Clear the params after loading
+    setVariantParamsToLoad(null);
+  }, [
+    variantParamsToLoad,
+    isVideo,
+    handleEnterMagicEditMode,
+    setEditMode,
+    setInpaintPrompt,
+    setImg2imgPrompt,
+    setImg2imgStrength,
+    setQwenEditModel,
+    setInpaintNumGenerations,
+    setVariantParamsToLoad,
+    img2imgLoraManager,
+    editLoraManager,
+    availableLoras,
+  ]);
+
   // Layout mode hook
   const layoutHook = useLayoutMode({
     isMobile,
