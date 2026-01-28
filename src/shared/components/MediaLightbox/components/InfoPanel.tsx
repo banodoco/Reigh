@@ -63,6 +63,9 @@ export interface InfoPanelProps {
   // Variant deletion
   onDeleteVariant?: (variantId: string) => Promise<void>;
 
+  // Load variant settings into edit form
+  onLoadVariantSettings?: (variantParams: Record<string, any>) => void;
+
   /** Task ID for copy functionality (fallback when not in taskDetailsData) */
   taskId?: string | null;
 }
@@ -107,6 +110,8 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
   isPromoting,
   // Variant deletion
   onDeleteVariant,
+  // Load variant settings
+  onLoadVariantSettings,
   // Task ID fallback
   taskId: taskIdProp,
 }) => {
@@ -275,6 +280,7 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
           onPromoteToGeneration={onPromoteToGeneration}
           isPromoting={isPromoting}
           onDeleteVariant={onDeleteVariant}
+          onLoadVariantSettings={onLoadVariantSettings}
           readOnly={readOnly}
         />
       </div>
