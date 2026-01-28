@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/shared/components/ui/button';
+import { Copy, Check } from 'lucide-react';
 import { TaskDetailsProps, getVariantConfig, parseTaskParams, deriveInputImages, derivePrompt } from './taskDetailsConfig';
 import { getDisplayNameFromUrl } from '../../utils/loraDisplayUtils';
 
@@ -22,6 +23,14 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
 }) => {
   const config = getVariantConfig(variant, isMobile, inputImages.length);
   const [videoLoaded, setVideoLoaded] = useState(false);
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [copiedNegativePrompt, setCopiedNegativePrompt] = useState(false);
+
+  const handleCopyPrompt = async (text: string, setStateFn: (val: boolean) => void) => {
+    await navigator.clipboard.writeText(text);
+    setStateFn(true);
+    setTimeout(() => setStateFn(false), 2000);
+  };
   
   const parsedParams = useMemo(() => parseTaskParams(task?.params), [task?.params]);
   const derivedImages = useMemo(() => deriveInputImages(parsedParams), [parsedParams]);
@@ -139,20 +148,6 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
     <div className={`p-3 bg-muted/30 rounded-lg border ${showPhaseContentInRightColumn ? 'w-full grid grid-cols-1 lg:grid-cols-2 gap-4' : ''} ${!showPhaseContentInRightColumn && variant === 'panel' ? '' : variant === 'modal' && isMobile ? 'w-full' : !showPhaseContentInRightColumn ? 'w-[360px]' : ''}`}>
       {/* Main Content Column */}
       <div className={showPhaseContentInRightColumn ? 'space-y-4 min-w-0' : 'space-y-4'}>
-        
-        {/* Segment Indicator */}
-        {isSegmentTask && (
-          <div className="space-y-1 pb-3 border-b border-muted-foreground/20">
-            <div className="flex items-center gap-2">
-              <span className={`${config.textSize} font-medium text-primary`}>
-                Segment {segmentIndex + 1}
-              </span>
-              {isFirstSegment && <span className={`${config.textSize} text-muted-foreground`}>(First)</span>}
-              {isLastSegment && <span className={`${config.textSize} text-muted-foreground`}>(Last)</span>}
-            </div>
-          </div>
-        )}
-        
         {/* Guidance Images */}
         {effectiveInputImages.length > 0 && (
           <div className="space-y-1.5">
@@ -220,7 +215,18 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
         {/* Prompts */}
         <div className="space-y-3 pt-1">
           <div className="space-y-1">
-            <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt{enhancePrompt ? ' (enhanced)' : ''}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt{enhancePrompt ? ' (enhanced)' : ''}</p>
+              {prompt && (
+                <button
+                  onClick={() => handleCopyPrompt(prompt, setCopiedPrompt)}
+                  className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  title="Copy prompt"
+                >
+                  {copiedPrompt ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              )}
+            </div>
             <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap preserve-case`}>
               {prompt ? (showFullPrompt || prompt.length <= config.promptLength ? prompt : prompt.slice(0, config.promptLength) + '...') : 'None'}
             </p>
@@ -232,7 +238,16 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
           </div>
           {negativePrompt && negativePrompt !== 'N/A' && (
             <div className="space-y-1">
-              <p className={`${config.textSize} font-medium text-muted-foreground`}>Negative Prompt</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className={`${config.textSize} font-medium text-muted-foreground`}>Negative Prompt</p>
+                <button
+                  onClick={() => handleCopyPrompt(negativePrompt, setCopiedNegativePrompt)}
+                  className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  title="Copy negative prompt"
+                >
+                  {copiedNegativePrompt ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
               <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap preserve-case`}>
                 {showFullNegativePrompt || negativePrompt.length <= config.negativePromptLength ? negativePrompt : negativePrompt.slice(0, config.negativePromptLength) + '...'}
               </p>
