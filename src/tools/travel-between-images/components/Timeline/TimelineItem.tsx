@@ -410,8 +410,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
             src={shouldLoad ? displayImageUrl : '/placeholder.svg'}
             alt={`Time ${framesToSeconds(displayFrame)}`}
             className={cn(
-              "w-full h-full object-cover transition-all duration-200",
-              // Progressive loading visual states
+              "w-full h-full object-cover",
+              // Progressive loading visual states - no transition to avoid flicker on tap
               progressiveEnabled && isThumbShowing && "opacity-95",
               progressiveEnabled && isFullLoaded && "opacity-100"
             )}
