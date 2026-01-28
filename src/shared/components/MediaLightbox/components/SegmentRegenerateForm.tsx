@@ -193,6 +193,10 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   // Compute effective enhance state (user's explicit choice, or locked-in default)
   const effectiveEnhanceEnabled = enhancePromptEnabled ?? defaultEnhanceEnabled;
 
+  // Use ref to ensure submit handler always reads current state (avoids race condition)
+  const effectiveEnhanceEnabledRef = useRef(effectiveEnhanceEnabled);
+  effectiveEnhanceEnabledRef.current = effectiveEnhanceEnabled;
+
   // Reset enhance state ONLY when pair actually changes to a different value
   useEffect(() => {
     if (prevPairRef.current !== undefined && prevPairRef.current !== pairShotGenerationId) {
@@ -271,9 +275,15 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
     // Prioritize existing enhanced prompt if available, otherwise use base prompt
     const promptToEnhance = enhancedPrompt?.trim() || effectiveSettings.prompt?.trim() || '';
 
-    // Log the enhance decision
+    // Read current enhance state from ref (avoids stale closure issue)
+    const shouldEnhance = effectiveEnhanceEnabledRef.current;
+
+    // Log the enhance decision (detailed for debugging)
     console.log('[EnhancedPromptSave] 🔍 Submit handler called:', {
-      effectiveEnhanceEnabled,
+      shouldEnhance, // actual value used (from ref, always current)
+      effectiveEnhanceEnabled, // closure value (may be stale if race condition)
+      enhancePromptEnabled, // user's explicit choice (null = not set, false = explicitly off, true = explicitly on)
+      defaultEnhanceEnabled, // default based on whether enhanced prompt exists
       hasPromptToEnhance: !!promptToEnhance,
       promptToEnhancePreview: promptToEnhance?.substring(0, 50) || '(empty)',
       pairShotGenerationId: pairShotGenerationId?.substring(0, 8) || '(none)',
@@ -281,7 +291,7 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
     });
 
     // If enhance is enabled, use background submission pattern
-    if (effectiveEnhanceEnabled && promptToEnhance) {
+    if (shouldEnhance && promptToEnhance) {
       console.log('[EnhancedPromptSave] 🚀 Starting background submission with prompt enhancement');
 
       // Add placeholder for immediate feedback
@@ -481,7 +491,10 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
     pairShotGenerationId,
     projectResolution,
     toast,
+    // Note: effectiveEnhanceEnabled kept in deps for logging, but actual behavior uses ref
     effectiveEnhanceEnabled,
+    enhancePromptEnabled,
+    defaultEnhanceEnabled,
     addIncomingTask,
     removeIncomingTask,
     taskStatusCounts,

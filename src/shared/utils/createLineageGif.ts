@@ -113,12 +113,14 @@ export async function createLineageGif(
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
   if (!ctx) {
     blobUrls.forEach(url => URL.revokeObjectURL(url));
     throw new Error('Could not get canvas context');
   }
+
+  console.log('[createLineageGif] Canvas created:', canvas.width, 'x', canvas.height);
 
   // Initialize GIF encoder
   const gif = GIFEncoder();
@@ -162,9 +164,19 @@ export async function createLineageGif(
     // Draw image to canvas
     ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
 
+    console.log(`[createLineageGif] Frame ${i + 1} drawn at (${drawX}, ${drawY}) size ${drawWidth}x${drawHeight}`);
+
     // Get image data - this should work since we're using blob URLs (same-origin)
     const imageData = ctx.getImageData(0, 0, width, height);
     const { data } = imageData;
+
+    console.log(`[createLineageGif] Frame ${i + 1} imageData: ${imageData.width}x${imageData.height}, ${data.length} bytes`);
+
+    // Debug: check first few pixels to verify data isn't all zeros/gray
+    const firstPixelR = data[0], firstPixelG = data[1], firstPixelB = data[2], firstPixelA = data[3];
+    const midIndex = Math.floor(data.length / 2);
+    const midPixelR = data[midIndex], midPixelG = data[midIndex + 1], midPixelB = data[midIndex + 2];
+    console.log(`[createLineageGif] Frame ${i + 1} sample pixels - first: rgba(${firstPixelR},${firstPixelG},${firstPixelB},${firstPixelA}), mid: rgb(${midPixelR},${midPixelG},${midPixelB})`);
 
     // Convert RGBA to RGB array for gifenc
     const rgbData = new Uint8Array(width * height * 3);
@@ -177,6 +189,8 @@ export async function createLineageGif(
     // Quantize colors to 256-color palette
     const palette = quantize(rgbData, 256);
     const indexedPixels = applyPalette(rgbData, palette);
+
+    console.log(`[createLineageGif] Frame ${i + 1} palette size: ${palette.length}, indexed pixels: ${indexedPixels.length}`);
 
     // Add frame with specified delay (gifenc uses centiseconds)
     gif.writeFrame(indexedPixels, width, height, {
