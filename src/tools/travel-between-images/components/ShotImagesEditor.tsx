@@ -247,6 +247,9 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
   // This is forwarded via onDragStateChange but we also need it locally for useEnhancedShotPositions
   const [isDragInProgress, setIsDragInProgress] = useState(false);
 
+  // Query client for cache invalidation (segment deletion)
+  const queryClient = useQueryClient();
+
   // Single image endpoint state - stores the end frame for single-image duration control
   // Initialized to batchVideoFrames when there's 1 image
   const [singleImageEndFrame, setSingleImageEndFrame] = useState<number | undefined>(undefined);
@@ -695,7 +698,6 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
 
   // Segment deletion state
   const [deletingSegmentId, setDeletingSegmentId] = useState<string | null>(null);
-  const queryClient = useQueryClient();
 
   // Ref for synchronous overlay control (React state updates are async, causing flash)
   const transitionOverlayRef = useRef<HTMLDivElement>(null);
