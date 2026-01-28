@@ -13,6 +13,7 @@ import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { Skeleton } from '@/shared/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/shared/components/ui/tooltip';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/shared/components/ui/hover-card';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { usePrefetchTaskData, usePrefetchTaskById } from '@/shared/hooks/useUnifiedGenerations';
 import { usePublicLoras } from '@/shared/hooks/useResources';
@@ -580,13 +581,14 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
               return <React.Fragment key={variant.id}>{buttonContent}</React.Fragment>;
             }
 
-            // On desktop, use Tooltip for hover info
+            // On desktop, use HoverCard for rich interactive content
+            // HoverCard has closeDelay which gives users time to move mouse to the content
             return (
-              <Tooltip key={variant.id}>
-                <TooltipTrigger asChild>
+              <HoverCard key={variant.id} openDelay={200} closeDelay={400}>
+                <HoverCardTrigger asChild>
                   {buttonContent}
-                </TooltipTrigger>
-                <TooltipContent side="top" className="z-[100001] max-w-md p-0">
+                </HoverCardTrigger>
+                <HoverCardContent side="top" usePortal className="z-[100001] max-w-md p-0 w-auto">
                   <div className="p-2 space-y-2">
                     {/* Header with label, status badges, id copy, delete button */}
                     <div className="flex items-center justify-between gap-2">
@@ -772,8 +774,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                       </div>
                     )}
                   </div>
-                </TooltipContent>
-              </Tooltip>
+                </HoverCardContent>
+              </HoverCard>
             );
           })}
         </div>
