@@ -413,32 +413,76 @@ export const useRepositionMode = ({
       // Start with white (all areas to be inpainted)
       maskCtx.fillStyle = 'white';
       maskCtx.fillRect(0, 0, outputWidth, outputHeight);
-      
+
       // Draw black where the image exists (from alpha channel of transformed image)
       const transformedImageData = transformedCtx.getImageData(0, 0, outputWidth, outputHeight);
       const maskImageData = maskCtx.getImageData(0, 0, outputWidth, outputHeight);
-      
+
+      // First pass: create initial mask based on alpha threshold
+      // Use a higher threshold (200) to be more aggressive about marking edge pixels for inpainting
       for (let i = 0; i < transformedImageData.data.length; i += 4) {
         const alpha = transformedImageData.data[i + 3];
-        
-        // If pixel has alpha > 128, it's part of the image - mark as black in mask (don't inpaint)
-        if (alpha > 128) {
+
+        // If pixel has alpha > 200, it's solidly part of the image - mark as black in mask (don't inpaint)
+        // Semi-transparent edge pixels (alpha 1-200) will be white (inpainted)
+        if (alpha > 200) {
           maskImageData.data[i] = 0;     // R
           maskImageData.data[i + 1] = 0; // G
           maskImageData.data[i + 2] = 0; // B
           maskImageData.data[i + 3] = 255; // A
         } else {
-          // Transparent pixel - mark as white in mask (inpaint this area)
+          // Transparent/semi-transparent pixel - mark as white in mask (inpaint this area)
           maskImageData.data[i] = 255;     // R
           maskImageData.data[i + 1] = 255; // G
           maskImageData.data[i + 2] = 255; // B
           maskImageData.data[i + 3] = 255; // A
         }
       }
-      
+
+      // Second pass: dilate the white (inpaint) region by a few pixels
+      // This ensures we eat into the image slightly to eliminate any anti-aliased edge artifacts
+      const DILATE_PIXELS = 3; // Grow white region by 3 pixels into the image
+      const tempMaskData = new Uint8ClampedArray(maskImageData.data);
+
+      for (let y = 0; y < outputHeight; y++) {
+        for (let x = 0; x < outputWidth; x++) {
+          const idx = (y * outputWidth + x) * 4;
+
+          // If this pixel is black (image area), check if any neighbor within DILATE_PIXELS is white
+          if (tempMaskData[idx] === 0) {
+            let shouldDilate = false;
+
+            // Check neighbors in a square region
+            for (let dy = -DILATE_PIXELS; dy <= DILATE_PIXELS && !shouldDilate; dy++) {
+              for (let dx = -DILATE_PIXELS; dx <= DILATE_PIXELS && !shouldDilate; dx++) {
+                const nx = x + dx;
+                const ny = y + dy;
+
+                // Skip out of bounds
+                if (nx < 0 || nx >= outputWidth || ny < 0 || ny >= outputHeight) continue;
+
+                const neighborIdx = (ny * outputWidth + nx) * 4;
+                // If neighbor is white (inpaint area), dilate this pixel
+                if (tempMaskData[neighborIdx] === 255) {
+                  shouldDilate = true;
+                }
+              }
+            }
+
+            if (shouldDilate) {
+              // Convert this pixel from black (keep) to white (inpaint)
+              maskImageData.data[idx] = 255;     // R
+              maskImageData.data[idx + 1] = 255; // G
+              maskImageData.data[idx + 2] = 255; // B
+              maskImageData.data[idx + 3] = 255; // A
+            }
+          }
+        }
+      }
+
       maskCtx.putImageData(maskImageData, 0, 0);
 
-      console.log('[Reposition] Generated transformed image and mask');
+      console.log('[Reposition] Generated transformed image and mask with dilated edges (alpha threshold: 200, dilation: 3px)');
 
       // Create final image with green background to prevent anti-aliased edge artifacts
       // The transparent canvas is needed for mask generation (alpha channel), but for the
