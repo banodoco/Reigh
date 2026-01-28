@@ -496,7 +496,7 @@ serve(async (req) => {
     }
 
     if (error_details !== undefined) {
-      updatePayload.error_details = error_details;
+      updatePayload.error_message = error_details;
     }
 
     // When requeuing, clear worker assignment
