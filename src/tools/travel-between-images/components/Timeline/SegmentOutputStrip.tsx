@@ -14,6 +14,7 @@ import { useSegmentOutputsForShot } from '../../hooks/useSegmentOutputsForShot';
 import { InlineSegmentVideo } from './InlineSegmentVideo';
 import { useIsMobile } from '@/shared/hooks/use-mobile';
 import { usePendingSegmentTasks } from '@/shared/hooks/usePendingSegmentTasks';
+import { useSourceImageChanges } from '@/shared/hooks/useSourceImageChanges';
 import { useVideoScrubbing } from '@/shared/hooks/useVideoScrubbing';
 import { GenerationRow } from '@/types/shots';
 import { TIMELINE_HORIZONTAL_PADDING, TIMELINE_PADDING_OFFSET } from './constants';
@@ -166,6 +167,43 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
 
   // Check for pending segment tasks (Queued/In Progress)
   const { hasPendingTask } = usePendingSegmentTasks(shotId, projectId);
+
+  // Build segment info for source image change detection
+  const segmentSourceInfo = useMemo(() => {
+    return segmentSlots
+      .filter(slot => slot.type === 'child')
+      .map(slot => {
+        if (slot.type !== 'child') return null;
+        const child = slot.child;
+        const params = child.params as Record<string, any> | null;
+        const individualParams = params?.individual_segment_params || {};
+        const orchDetails = params?.orchestrator_details || {};
+        const childOrder = child.child_order ?? slot.index;
+
+        // Get generation IDs - check multiple locations (individual params, top-level, orchestrator arrays)
+        const orchGenIds = orchDetails.input_image_generation_ids || [];
+        const startGenId = individualParams.start_image_generation_id
+          || params?.start_image_generation_id
+          || orchGenIds[childOrder]
+          || null;
+        const endGenId = individualParams.end_image_generation_id
+          || params?.end_image_generation_id
+          || orchGenIds[childOrder + 1]
+          || null;
+
+        return {
+          segmentId: child.id,
+          childOrder,
+          params: params || {},
+          startGenId,
+          endGenId,
+        };
+      })
+      .filter((info): info is NonNullable<typeof info> => info !== null);
+  }, [segmentSlots]);
+
+  // Check for recent source image changes (shows warning for 5 minutes after change)
+  const { hasRecentMismatch } = useSourceImageChanges(segmentSourceInfo, !readOnly);
   
   // Log when segmentSlots changes (to track what's being displayed)
   React.useEffect(() => {
@@ -639,6 +677,14 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
 
                 const isActiveScrubbing = activeScrubbingIndex === index;
 
+                // Check if source images have recent changes (for warning indicator)
+                const segmentId = slot.type === 'child' ? slot.child.id : null;
+                const hasSourceChanged = segmentId ? hasRecentMismatch(segmentId) : false;
+
+                if (hasSourceChanged) {
+                  console.log('[SourceChange] 🎯 Passing hasSourceChanged=true to InlineSegmentVideo seg=' + segmentId?.substring(0, 8));
+                }
+
                 return (
                   <InlineSegmentVideo
                     key={slot.type === 'child' ? slot.child.id : `placeholder-${index}`}
@@ -653,6 +699,7 @@ export const SegmentOutputStrip: React.FC<SegmentOutputStripProps> = ({
                     onDelete={handleDeleteSegment}
                     isDeleting={slot.type === 'child' && slot.child.id === deletingSegmentId}
                     isPending={hasPendingTask(slot.pairShotGenerationId)}
+                    hasSourceChanged={hasSourceChanged}
                     // Scrubbing props - when active, this segment controls the preview
                     isScrubbingActive={isActiveScrubbing}
                     onScrubbingStart={(rect: DOMRect) => handleScrubbingStart(index, rect)}

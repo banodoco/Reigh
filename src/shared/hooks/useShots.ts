@@ -1660,10 +1660,13 @@ export const useUpdateShotImageOrder = () => {
         shotId: data.shotId?.substring(0, 8),
         updatesCount: data.updates.length,
       });
-      
+
       // Don't invalidate all-shot-generations - the optimistic update already applied the changes
       // and realtime will confirm. Invalidating here causes flicker.
       queryClient.invalidateQueries({ queryKey: ['shot-generations-meta', data.shotId] });
+      // Invalidate source image change detection for video warning indicators
+      console.log('[SourceChange] 🔄 Invalidating source-slot-generations query (image reorder)');
+      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === 'source-slot-generations' });
     }
   });
 };

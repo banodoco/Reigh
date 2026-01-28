@@ -386,6 +386,26 @@ export function useSegmentOutputsForShot(
 
       console.log('[useSegmentOutputsForShot] Found children:', data?.length || 0);
 
+      // [DemoteOrphaned] Log children with their location state to track demotion
+      if (data && data.length > 0) {
+        const childrenWithLocationInfo = data.map((child: any) => ({
+          id: child.id.substring(0, 8),
+          hasLocation: !!child.location,
+          location: child.location?.substring(0, 40),
+          primaryVariantId: child.primary_variant_id?.substring(0, 8),
+          childOrder: child.child_order,
+          pairShotGenId: child.pair_shot_generation_id?.substring(0, 8),
+          storedStartImageId: child.params?.individual_segment_params?.start_image_generation_id?.substring(0, 8),
+        }));
+        console.log('[DemoteOrphaned] 📥 Fetched children location state:', {
+          parentId: selectedParentId?.substring(0, 8),
+          childrenCount: data.length,
+          withLocation: childrenWithLocationInfo.filter((c: any) => c.hasLocation).length,
+          withoutLocation: childrenWithLocationInfo.filter((c: any) => !c.hasLocation).length,
+          children: childrenWithLocationInfo,
+        });
+      }
+
       return (data || []).map(transformToGenerationRow);
     },
     enabled: !!selectedParentId && !preloadedGenerations,
@@ -613,6 +633,29 @@ export function useSegmentOutputsForShot(
   const segmentProgress = useMemo(() => {
     const completed = segmentSlots.filter(s => s.type === 'child' && (s.child as any).location).length;
     const total = segmentSlots.length;
+
+    // [DemoteOrphaned] Log demoted videos (have slot but no location)
+    const demotedVideos = segmentSlots.filter(s => s.type === 'child' && !(s.child as any).location);
+    if (demotedVideos.length > 0) {
+      console.log('[DemoteOrphaned] 👻 Found demoted videos in slots (have slot assignment but no location):', {
+        demotedCount: demotedVideos.length,
+        demoted: demotedVideos.map(s => {
+          if (s.type === 'child') {
+            const child = s.child;
+            const pairIds = getPairIdentifiers(child as any, child.params as any);
+            return {
+              videoId: child.id.substring(0, 8),
+              slotIndex: s.index,
+              location: child.location,
+              pairShotGenId: pairIds.pairShotGenId?.substring(0, 8),
+              storedStartImageId: pairIds.startGenId?.substring(0, 8),
+            };
+          }
+          return null;
+        }).filter(Boolean),
+      });
+    }
+
     return { completed, total };
   }, [segmentSlots]);
   

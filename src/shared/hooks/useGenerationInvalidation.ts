@@ -278,6 +278,13 @@ export async function invalidateVariantChange(
   queryClient.invalidateQueries({
     predicate: (query) => query.queryKey[0] === 'segment-child-generations'
   });
+
+  // 7. Invalidate source image change detection (for video warning indicators)
+  // This ensures warnings appear immediately when source images change
+  console.log('[SourceChange] 🔄 Invalidating source-slot-generations query (variant change)');
+  queryClient.invalidateQueries({
+    predicate: (query) => query.queryKey[0] === 'source-slot-generations'
+  });
 }
 
 /**

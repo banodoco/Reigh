@@ -8,7 +8,8 @@
 
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Play, Loader2, ImageOff, Sparkles, Trash2 } from 'lucide-react';
+import { Play, Loader2, ImageOff, Sparkles, Trash2, AlertTriangle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/components/ui/tooltip';
 import { SegmentSlot } from '../../hooks/useSegmentOutputsForShot';
 import { getDisplayUrl } from '@/shared/lib/utils';
 import { useVariantBadges } from '@/shared/hooks/useVariantBadges';
@@ -39,6 +40,8 @@ interface InlineSegmentVideoProps {
   isDeleting?: boolean;
   /** Whether a task is pending (Queued/In Progress) for this segment */
   isPending?: boolean;
+  /** Whether the source image has recently changed (shows warning indicator) */
+  hasSourceChanged?: boolean;
   // Scrubbing props - for external preview control
   /** Whether this segment is actively being scrubbed */
   isScrubbingActive?: boolean;
@@ -73,6 +76,7 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
   onDelete,
   isDeleting = false,
   isPending = false,
+  hasSourceChanged = false,
   // Scrubbing props
   isScrubbingActive = false,
   onScrubbingStart,
@@ -504,7 +508,28 @@ export const InlineSegmentVideo: React.FC<InlineSegmentVideoProps> = ({
             <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
           </div>
         )}
-        
+
+        {/* Source changed warning - shows when source image variant changed recently */}
+        {hasSourceChanged && !isPending && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div
+                className="absolute bottom-1 left-1 z-20 flex items-center justify-center bg-amber-500/90 hover:bg-amber-600/95 p-1 rounded-md shadow-sm cursor-default transition-colors"
+                ref={(el) => {
+                  if (el) {
+                    console.log('[SourceChange] 🔶 WARNING RENDERED seg=' + generationId?.substring(0, 8));
+                  }
+                }}
+              >
+                <AlertTriangle className="w-3 h-3 text-white" />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs">
+              <p>Source image has changed since this video was created. Consider regenerating.</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+
         {/* Hover highlight border */}
         {isHovering && (
           <div className="absolute inset-0 ring-2 ring-primary ring-inset pointer-events-none" />
