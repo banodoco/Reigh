@@ -169,95 +169,59 @@ export const InfoPanel: React.FC<InfoPanelProps> = ({
     });
   };
 
-  // Render the header
+  // Render the header - consistent single row layout for both mobile and desktop
   const renderHeader = () => (
     <div className={cn(
       "flex-shrink-0 border-b border-border bg-background",
-      isMobile ? "sticky top-0 z-[80] p-3" : "p-4"
+      isMobile ? "sticky top-0 z-[80] px-3 py-2" : "p-4"
     )}>
-      {/* Mobile: stack rows for better spacing */}
-      {isMobile ? (
-        <div className="flex flex-col gap-2">
-          {/* Row 1: Close button */}
-          <div className="flex items-center justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0 hover:bg-muted"
+      {/* Single row: ID + variants on left, toggle + close on right */}
+      <div className={cn(
+        "flex items-center justify-between",
+        isMobile ? "gap-2" : "gap-3"
+      )}>
+        {/* Left side - copy id + variants link */}
+        <div className="flex items-center gap-2">
+          {taskId && (
+            <button
+              onClick={handleCopyId}
+              className={cn(
+                "px-2 py-1 text-xs rounded transition-colors touch-manipulation",
+                idCopied
+                  ? "text-green-400 bg-green-400/10"
+                  : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
+              )}
             >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          {/* Row 2: ID + variant link on left, Info/Edit toggle on right */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {taskId && (
-                <button
-                  onClick={handleCopyId}
-                  className={cn(
-                    "px-2 py-1 text-xs rounded transition-colors touch-manipulation active:scale-95",
-                    idCopied
-                      ? "text-green-400 bg-green-400/10"
-                      : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700 active:bg-zinc-600"
-                  )}
-                >
-                  {idCopied ? 'copied' : 'id'}
-                </button>
-              )}
-              {hasVariants && (
-                <button
-                  onClick={() => variantsSectionRef?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors touch-manipulation"
-                >
-                  <span>variants ({variants.length})</span>
-                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                  </svg>
-                </button>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {renderImageToggle()}
-              {renderVideoToggle()}
-            </div>
-          </div>
+              {idCopied ? 'copied' : 'id'}
+            </button>
+          )}
+          {hasVariants && (
+            <button
+              onClick={() => variantsSectionRef?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors touch-manipulation"
+            >
+              <span>{variants.length} variants</span>
+              <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+              </svg>
+            </button>
+          )}
         </div>
-      ) : (
-        /* Desktop: single row */
-        <div className="flex items-center justify-between">
-          {/* Left side - copy id */}
-          <div className="flex items-center gap-2">
-            {taskId && (
-              <button
-                onClick={handleCopyId}
-                className={cn(
-                  "px-2 py-1 text-xs rounded transition-colors touch-manipulation",
-                  idCopied
-                    ? "text-green-400"
-                    : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"
-                )}
-              >
-                {idCopied ? 'copied' : 'id'}
-              </button>
-            )}
-          </div>
 
-          {/* Right side - toggles and close button */}
-          <div className="flex items-center gap-3">
-            {renderImageToggle()}
-            {renderVideoToggle()}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0 hover:bg-muted"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+        {/* Right side - toggles and close button */}
+        <div className="flex items-center gap-3">
+          {renderImageToggle()}
+          {renderVideoToggle()}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className={cn("p-0 hover:bg-muted", isMobile ? "h-7 w-7" : "h-8 w-8")}
+          >
+            <X className={cn(isMobile ? "h-3.5 w-3.5" : "h-4 w-4")} />
+          </Button>
         </div>
-      )}
+      </div>
     </div>
   );
 

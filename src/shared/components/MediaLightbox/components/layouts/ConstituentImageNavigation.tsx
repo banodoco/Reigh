@@ -111,10 +111,11 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
   }
 
   // Overlay variant for positioning on top of video
-  // Position at bottom-8 md:bottom-16 to match AdjacentSegmentNavigation's top-8 md:top-16
+  // Position above WorkflowControlsBar (which is at bottom-8 md:bottom-16)
+  // Mobile: very close to edge (bottom-4), Desktop: more spacing (bottom-28)
   return (
     <div
-      className="absolute bottom-8 md:bottom-16 left-1/2 transform -translate-x-1/2 z-[60] select-none"
+      className="absolute bottom-4 md:bottom-28 left-1/2 transform -translate-x-1/2 z-[70] select-none"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-3">

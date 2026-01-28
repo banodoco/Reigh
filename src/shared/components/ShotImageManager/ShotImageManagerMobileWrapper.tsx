@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ShotImageManagerProps } from './types';
 import { ShotImageManagerMobile } from './ShotImageManagerMobile';
 import MediaLightbox from '../MediaLightbox';
+import type { AdjacentSegmentsData } from '../MediaLightbox/types';
 import { useTaskDetails } from './hooks/useTaskDetails';
 import { useDeviceDetection } from '@/shared/hooks/useDeviceDetection';
 import { SegmentSlot } from '@/tools/travel-between-images/hooks/useSegmentOutputsForShot';
 import { usePrefetchTaskData } from '@/shared/hooks/useUnifiedGenerations';
+import { getDisplayUrl } from '@/shared/lib/utils';
 
 interface ShotImageManagerMobileWrapperProps extends ShotImageManagerProps {
   selection: any;
@@ -21,6 +23,12 @@ interface ShotImageManagerMobileWrapperProps extends ShotImageManagerProps {
   onSegmentClick?: (slotIndex: number) => void;
   /** Check if a pair_shot_generation_id has a pending task */
   hasPendingTask?: (pairShotGenerationId: string | null | undefined) => boolean;
+  /** Request to open lightbox for specific image (from segment constituent navigation) */
+  pendingImageToOpen?: string | null;
+  /** Callback to clear the pending image request after handling */
+  onClearPendingImageToOpen?: () => void;
+  /** Callback to signal start of lightbox transition (keeps overlay visible during navigation) */
+  onStartLightboxTransition?: () => void;
 }
 
 export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapperProps> = ({
@@ -35,6 +43,9 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
   segmentSlots,
   onSegmentClick,
   hasPendingTask,
+  pendingImageToOpen,
+  onClearPendingImageToOpen,
+  onStartLightboxTransition,
   ...props
 }) => {
   // State for showing success tick after adding to shot (positioned)
@@ -60,7 +71,109 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
       return () => clearTimeout(timer);
     }
   }, [showTickForSecondaryImageId]);
-  
+
+  // Handle pendingImageToOpen - navigate from segment video back to constituent image
+  useEffect(() => {
+    if (!pendingImageToOpen) return;
+
+    console.log('[ConstituentImageNav] Mobile: Looking for image to open:', pendingImageToOpen.substring(0, 8));
+
+    // Find the image in current images by ID
+    const imageIndex = lightbox.currentImages.findIndex(
+      (img: any) => img.id === pendingImageToOpen || img.generation_id === pendingImageToOpen
+    );
+
+    if (imageIndex !== -1) {
+      console.log('[ConstituentImageNav] Mobile: Found image at index', imageIndex);
+      lightbox.setLightboxIndex(imageIndex);
+    } else {
+      console.log('[ConstituentImageNav] Mobile: Image not found in current images:', pendingImageToOpen.substring(0, 8));
+    }
+
+    // Clear the pending request
+    onClearPendingImageToOpen?.();
+  }, [pendingImageToOpen, lightbox.currentImages, lightbox.setLightboxIndex, onClearPendingImageToOpen]);
+
+  // Build adjacent segments data for the current lightbox image
+  // This enables navigation to videos that start/end with the current image
+  const adjacentSegmentsData: AdjacentSegmentsData | undefined = useMemo(() => {
+    // Only available when viewing images in batch mode with segment slots
+    if (!segmentSlots || segmentSlots.length === 0 || !props.onPairClick || lightbox.lightboxIndex === null) {
+      return undefined;
+    }
+
+    const currentImage = lightbox.currentImages[lightbox.lightboxIndex];
+    if (!currentImage) return undefined;
+
+    // Use position-based matching instead of ID-based matching
+    // The image's position in the timeline is its index in the images array
+    const imagePosition = lightbox.lightboxIndex;
+
+    // Build prev segment info (ends with current image)
+    let prev: AdjacentSegmentsData['prev'] = undefined;
+    if (imagePosition > 0 && imagePosition - 1 < segmentSlots.length) {
+      const prevSlot = segmentSlots[imagePosition - 1];
+      if (prevSlot) {
+        const startImage = lightbox.currentImages[imagePosition - 1];
+        const endImage = currentImage;
+
+        prev = {
+          pairIndex: prevSlot.index,
+          hasVideo: prevSlot.type === 'child' && !!prevSlot.child?.location,
+          startImageUrl: getDisplayUrl((startImage as any)?.thumbUrl || (startImage as any)?.imageUrl),
+          endImageUrl: getDisplayUrl((endImage as any)?.thumbUrl || (endImage as any)?.imageUrl),
+        };
+      }
+    }
+
+    // Build next segment info (starts with current image)
+    let next: AdjacentSegmentsData['next'] = undefined;
+    if (imagePosition < segmentSlots.length) {
+      const nextSlot = segmentSlots[imagePosition];
+      if (nextSlot) {
+        const endImage = lightbox.currentImages[imagePosition + 1];
+
+        next = {
+          pairIndex: nextSlot.index,
+          hasVideo: nextSlot.type === 'child' && !!nextSlot.child?.location,
+          startImageUrl: getDisplayUrl((currentImage as any)?.thumbUrl || (currentImage as any)?.imageUrl),
+          endImageUrl: endImage ? getDisplayUrl((endImage as any)?.thumbUrl || (endImage as any)?.imageUrl) : undefined,
+        };
+      }
+    }
+
+    console.log('[SegmentNavDebug] ShotImageManagerMobile position-based matching:', {
+      imagePosition,
+      totalImages: lightbox.currentImages.length,
+      totalSegmentSlots: segmentSlots.length,
+      hasPrev: !!prev,
+      hasNext: !!next,
+      prevHasVideo: prev?.hasVideo,
+      nextHasVideo: next?.hasVideo,
+    });
+
+    if (!prev && !next) return undefined;
+
+    return {
+      prev,
+      next,
+      onNavigateToSegment: (pairIndex: number) => {
+        console.log('[LightboxTransition] ShotImageManagerMobile onNavigateToSegment: Showing overlay');
+        // Show overlay via parent callback (handles both ref and body class)
+        onStartLightboxTransition?.();
+
+        // Use double-rAF to ensure overlay is painted before state changes
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            console.log('[LightboxTransition] Mobile: Overlay painted, now triggering state changes');
+            lightbox.setLightboxIndex(null);
+            props.onPairClick!(pairIndex);
+          });
+        });
+      },
+    };
+  }, [segmentSlots, props.onPairClick, lightbox.lightboxIndex, lightbox.currentImages, lightbox.setLightboxIndex, onStartLightboxTransition]);
+
   // Debug: Log props received
   console.log('[ShotSelectorDebug] ShotImageManagerMobileWrapper received props', {
     component: 'ShotImageManagerMobileWrapper',
@@ -254,6 +367,7 @@ export const ShotImageManagerMobileWrapper: React.FC<ShotImageManagerMobileWrapp
             onMagicEdit={props.onMagicEdit}
             showTaskDetails={true}
             taskDetailsData={taskDetailsData}
+            adjacentSegments={adjacentSegmentsData}
             onNavigateToGeneration={(generationId: string) => {
               console.log('[ShotImageManager:Mobile] 📍 Navigate to generation', {
                 generationId: generationId.substring(0, 8),
