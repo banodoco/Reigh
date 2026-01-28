@@ -2,18 +2,16 @@
  * createLineageGif
  *
  * Creates an animated GIF from an array of image URLs.
- * Uses the gifenc library for efficient client-side GIF encoding.
+ * Uses a server-side edge function to avoid CORS issues with canvas pixel reading.
  */
 
-import { GIFEncoder, quantize, applyPalette } from 'gifenc';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface CreateGifOptions {
   /** Milliseconds between frames (default: 800) */
   frameDelay?: number;
   /** Output width in pixels (default: 512) */
   width?: number;
-  /** Output height in pixels - if not specified, calculated from aspect ratio */
-  height?: number;
 }
 
 export interface CreateGifProgress {
@@ -24,85 +22,8 @@ export interface CreateGifProgress {
 }
 
 /**
- * Load an image from URL and return an HTMLImageElement.
- * Fetches as blob first to avoid CORS issues with canvas pixel reading.
- */
-async function loadImage(url: string): Promise<HTMLImageElement> {
-  try {
-    // Fetch image as blob to avoid CORS tainted canvas issues
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-    const blob = await response.blob();
-    const blobUrl = URL.createObjectURL(blob);
-
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        console.log('[createLineageGif] Image loaded:', {
-          url: url.substring(0, 50) + '...',
-          width: img.width,
-          height: img.height,
-        });
-        // Clean up blob URL after image loads
-        URL.revokeObjectURL(blobUrl);
-        resolve(img);
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(blobUrl);
-        reject(new Error(`Failed to create image from blob: ${url}`));
-      };
-      img.src = blobUrl;
-    });
-  } catch (err) {
-    console.error('[createLineageGif] Failed to fetch image:', url, err);
-    throw new Error(`Failed to load image: ${url}`);
-  }
-}
-
-/**
- * Draw an image to a canvas, scaling to fit the target dimensions while maintaining aspect ratio.
- * Centers the image and fills any gaps with black.
- */
-function drawImageToCanvas(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  width: number,
-  height: number
-): void {
-  // Fill background with black
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(0, 0, width, height);
-
-  // Calculate scaling to fit while maintaining aspect ratio
-  const imgAspect = img.width / img.height;
-  const targetAspect = width / height;
-
-  let drawWidth: number;
-  let drawHeight: number;
-  let drawX: number;
-  let drawY: number;
-
-  if (imgAspect > targetAspect) {
-    // Image is wider - fit to width
-    drawWidth = width;
-    drawHeight = width / imgAspect;
-    drawX = 0;
-    drawY = (height - drawHeight) / 2;
-  } else {
-    // Image is taller - fit to height
-    drawHeight = height;
-    drawWidth = height * imgAspect;
-    drawX = (width - drawWidth) / 2;
-    drawY = 0;
-  }
-
-  ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-}
-
-/**
  * Create an animated GIF from an array of image URLs.
+ * This calls a server-side edge function to avoid CORS issues.
  *
  * @param imageUrls - Array of image URLs to include in the GIF
  * @param options - Configuration options
@@ -115,127 +36,149 @@ export async function createLineageGif(
   onProgress?: (progress: CreateGifProgress) => void
 ): Promise<Blob> {
   const { frameDelay = 800, width = 512 } = options;
-  let { height } = options;
 
   if (imageUrls.length === 0) {
     throw new Error('No images provided for GIF creation');
   }
 
-  // Report loading stage
+  // Report that we're starting
   onProgress?.({
     stage: 'loading',
     current: 0,
     total: imageUrls.length,
-    message: 'Loading images...',
+    message: 'Sending images to server...',
   });
 
-  // Load all images in parallel, tracking count separately since they complete out of order
-  let loadedCount = 0;
-  const loadPromises = imageUrls.map((url) =>
-    loadImage(url).then((img) => {
-      loadedCount++;
-      onProgress?.({
-        stage: 'loading',
-        current: loadedCount,
-        total: imageUrls.length,
-        message: `Loading images ${loadedCount}/${imageUrls.length}`,
-      });
-      return img;
-    })
-  );
+  console.log('[createLineageGif] Calling edge function with', imageUrls.length, 'images');
 
-  const images = await Promise.all(loadPromises);
+  // Call the edge function
+  const { data, error } = await supabase.functions.invoke('generate-lineage-gif', {
+    body: {
+      imageUrls,
+      frameDelay,
+      width,
+    },
+  });
 
-  // If height not specified, calculate from first image's aspect ratio
-  if (!height && images[0]) {
-    const aspect = images[0].width / images[0].height;
-    height = Math.round(width / aspect);
-  }
-  height = height || 512;
-
-  // Create canvas for rendering frames
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-
-  if (!ctx) {
-    throw new Error('Could not get canvas context');
+  if (error) {
+    console.error('[createLineageGif] Edge function error:', error);
+    throw new Error(`Failed to generate GIF: ${error.message}`);
   }
 
-  // Initialize GIF encoder
-  const gif = GIFEncoder();
+  // The response should be a Blob (binary GIF data)
+  // supabase.functions.invoke returns data as the parsed response
+  // For binary data, we need to handle it differently
 
-  // Report encoding stage
   onProgress?.({
     stage: 'encoding',
-    current: 0,
-    total: images.length,
-    message: 'Encoding frames...',
+    current: imageUrls.length,
+    total: imageUrls.length,
+    message: 'Processing on server...',
   });
 
-  // Process each image
-  for (let i = 0; i < images.length; i++) {
-    const img = images[i];
-
-    // Validate image has dimensions
-    if (!img.width || !img.height) {
-      console.warn('[createLineageGif] Image has no dimensions, skipping:', i);
-      continue;
-    }
-
-    // Draw image to canvas
-    drawImageToCanvas(ctx, img, width, height);
-
-    // Get image data (will throw if canvas is tainted by CORS)
-    let imageData: ImageData;
-    try {
-      imageData = ctx.getImageData(0, 0, width, height);
-    } catch (err) {
-      console.error('[createLineageGif] CORS error getting image data for frame', i, err);
-      throw new Error(`CORS error: Cannot process image. The image server may not allow cross-origin access.`);
-    }
-    const { data } = imageData;
-
-    // Convert RGBA to RGB array for gifenc
-    const rgbData = new Uint8Array((width * height * 3));
-    for (let j = 0; j < width * height; j++) {
-      rgbData[j * 3] = data[j * 4];
-      rgbData[j * 3 + 1] = data[j * 4 + 1];
-      rgbData[j * 3 + 2] = data[j * 4 + 2];
-    }
-
-    // Quantize colors to 256-color palette
-    const palette = quantize(rgbData, 256);
-    const indexedPixels = applyPalette(rgbData, palette);
-
-    // Add frame with specified delay (gifenc uses centiseconds)
-    gif.writeFrame(indexedPixels, width, height, {
-      palette,
-      delay: frameDelay / 10, // Convert ms to centiseconds
-    });
-
+  // If data is already a Blob, use it directly
+  if (data instanceof Blob) {
     onProgress?.({
-      stage: 'encoding',
-      current: i + 1,
-      total: images.length,
-      message: `Encoding frames ${i + 1}/${images.length}`,
+      stage: 'complete',
+      current: imageUrls.length,
+      total: imageUrls.length,
+      message: 'Complete!',
     });
+    return data;
   }
 
-  // Finish encoding
-  gif.finish();
+  // If data is an ArrayBuffer, convert to Blob
+  if (data instanceof ArrayBuffer) {
+    const blob = new Blob([data], { type: 'image/gif' });
+    onProgress?.({
+      stage: 'complete',
+      current: imageUrls.length,
+      total: imageUrls.length,
+      message: 'Complete!',
+    });
+    return blob;
+  }
 
-  // Get the GIF data as a Blob
-  const bytes = gif.bytes();
-  const blob = new Blob([bytes], { type: 'image/gif' });
+  // If we got JSON error response
+  if (data && typeof data === 'object' && 'error' in data) {
+    throw new Error(data.error as string);
+  }
+
+  // Unexpected response type - try to handle it
+  console.error('[createLineageGif] Unexpected response type:', typeof data, data);
+  throw new Error('Unexpected response from server');
+}
+
+/**
+ * Create an animated GIF using the raw fetch API for binary response.
+ * This is an alternative if supabase.functions.invoke doesn't handle binary well.
+ */
+export async function createLineageGifRaw(
+  imageUrls: string[],
+  options: CreateGifOptions = {},
+  onProgress?: (progress: CreateGifProgress) => void
+): Promise<Blob> {
+  const { frameDelay = 800, width = 512 } = options;
+
+  if (imageUrls.length === 0) {
+    throw new Error('No images provided for GIF creation');
+  }
+
+  onProgress?.({
+    stage: 'loading',
+    current: 0,
+    total: imageUrls.length,
+    message: 'Sending images to server...',
+  });
+
+  // Get the Supabase URL and anon key
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase configuration missing');
+  }
+
+  const functionUrl = `${supabaseUrl}/functions/v1/generate-lineage-gif`;
+
+  console.log('[createLineageGif] Calling edge function at', functionUrl);
+
+  const response = await fetch(functionUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${supabaseAnonKey}`,
+    },
+    body: JSON.stringify({
+      imageUrls,
+      frameDelay,
+      width,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[createLineageGif] Edge function error:', response.status, errorText);
+    throw new Error(`Failed to generate GIF: ${response.status} ${errorText}`);
+  }
+
+  onProgress?.({
+    stage: 'encoding',
+    current: imageUrls.length,
+    total: imageUrls.length,
+    message: 'Processing on server...',
+  });
+
+  const blob = await response.blob();
 
   onProgress?.({
     stage: 'complete',
-    current: images.length,
-    total: images.length,
+    current: imageUrls.length,
+    total: imageUrls.length,
     message: 'Complete!',
   });
+
+  console.log('[createLineageGif] GIF received:', blob.size, 'bytes');
 
   return blob;
 }
