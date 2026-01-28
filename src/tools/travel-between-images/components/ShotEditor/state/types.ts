@@ -197,6 +197,9 @@ export interface ShotEditorProps {
   
   // Mutable ref to expose name click handler to parent (for floating header)
   nameClickRef?: React.MutableRefObject<(() => void) | null>;
+
+  // Whether the floating sticky header is visible (hide main header when true)
+  isSticky?: boolean;
   
   // CTA state from parent (for rendering CTA in both positions)
   variantName?: string;

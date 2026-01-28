@@ -27,6 +27,8 @@ interface HeaderProps {
   projectAspectRatio?: string;
   projectId?: string;
   centerSectionRef?: React.RefObject<HTMLDivElement>;
+  /** Hide header when floating sticky header is visible */
+  isSticky?: boolean;
 }
 
 // Internal component - not memoized to allow hooks
@@ -49,6 +51,7 @@ const HeaderComponent: React.FC<HeaderProps> = ({
   projectAspectRatio,
   projectId,
   centerSectionRef,
+  isSticky = false,
 }) => {
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
@@ -135,7 +138,13 @@ const HeaderComponent: React.FC<HeaderProps> = ({
   }, []);
 
   return (
-    <div className="flex-shrink-0 space-y-1 sm:space-y-1 pb-2 sm:pb-1">
+    <div
+      className="flex-shrink-0 space-y-1 sm:space-y-1 pb-2 sm:pb-1 transition-opacity duration-200"
+      style={{
+        opacity: isSticky ? 0 : 1,
+        pointerEvents: isSticky ? 'none' : 'auto'
+      }}
+    >
       {/* Desktop layout */}
       <div className="hidden sm:flex justify-between items-center gap-y-2 px-2">
         {/* Back button on the left - fixed width container */}

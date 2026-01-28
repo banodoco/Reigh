@@ -1785,6 +1785,7 @@ const VideoTravelToolPage: React.FC = () => {
               onDragStateChange={setIsDraggingInTimeline}
               headerContainerRef={headerCallbackRef}
               nameClickRef={nameClickRef}
+              isSticky={stickyHeader.isSticky}
             />
               </>
             ) : (isNewlyCreatedShot || hashLoadingGrace) ? (

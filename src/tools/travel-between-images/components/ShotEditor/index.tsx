@@ -146,6 +146,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   getFinalVideoCount,
   invalidateVideoCountsCache,
   onDragStateChange,
+  isSticky,
 }) => {
   // [RefactorMetrics] Track render count for baseline measurements
   useRenderCount('ShotEditor');
@@ -2342,6 +2343,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
         projectAspectRatio={effectiveAspectRatio}
         projectId={projectId}
         centerSectionRef={centerSectionRef}
+        isSticky={isSticky}
       />
       </div>
 
