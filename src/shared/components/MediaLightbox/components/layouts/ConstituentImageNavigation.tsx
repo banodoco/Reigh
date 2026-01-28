@@ -62,34 +62,56 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
     imageUrl,
     label,
     onClick,
+    showPlaceholder = false,
   }: {
     imageId?: string;
     imageUrl?: string;
     label: string;
     onClick: (e: React.MouseEvent) => void;
+    showPlaceholder?: boolean;
   }) => {
     const isInline = variant === 'inline';
     const buttonSize = isInline ? 'w-10 h-10' : 'w-9 h-9 md:w-10 md:h-10';
     const buttonRounding = isInline ? 'rounded-lg' : 'rounded-md';
     const hoverRing = isInline ? 'hover:ring-primary/50' : 'hover:ring-white/40';
     const focusRing = isInline ? 'focus:ring-primary/50' : 'focus:ring-white/50';
+    const isDisabled = !imageId;
+
+    // For overlay variant, show a subtle placeholder when image is missing
+    // This keeps the layout balanced when only one image exists
+    if (isDisabled && showPlaceholder && !isInline) {
+      return (
+        <div
+          className={cn(
+            'relative overflow-hidden shadow-md',
+            buttonSize,
+            buttonRounding,
+            'bg-black/40 border border-white/30'
+          )}
+        >
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Image className="w-4 h-4 text-white/40" />
+          </div>
+        </div>
+      );
+    }
 
     const button = (
       <button
         onClick={onClick}
-        disabled={!imageId}
-        title={`View ${label.toLowerCase()}`}
+        disabled={isDisabled}
+        title={imageId ? `View ${label.toLowerCase()}` : undefined}
         className={cn(
           'relative overflow-hidden transition-all',
           buttonSize,
           buttonRounding,
           !isInline && 'shadow-md',
-          'hover:scale-105',
-          !isInline && 'hover:shadow-lg',
-          `hover:ring-2 ${hoverRing}`,
+          !isDisabled && 'hover:scale-105',
+          !isInline && !isDisabled && 'hover:shadow-lg',
+          !isDisabled && `hover:ring-2 ${hoverRing}`,
           `focus:outline-none focus:ring-2 ${focusRing}`,
-          !imageId && (isInline ? 'opacity-40' : 'opacity-30'),
-          !imageId && 'cursor-not-allowed pointer-events-none'
+          isDisabled && (isInline ? 'opacity-40' : 'opacity-30'),
+          isDisabled && 'cursor-not-allowed pointer-events-none'
         )}
       >
         {imageUrl && (
@@ -159,6 +181,12 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
 
   // Overlay variant for positioning on top of video
   // Same level as other bottom controls (bottom-4)
+  // Show placeholder when one image exists but not the other (keeps layout balanced)
+  const hasStart = !!startImageId;
+  const hasEnd = !!endImageId;
+  const showStartPlaceholder = !hasStart && hasEnd;
+  const showEndPlaceholder = hasStart && !hasEnd;
+
   return (
     <div
       className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-[70] select-none"
@@ -170,12 +198,14 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
           imageUrl={startImageUrl}
           label="Start image"
           onClick={handleStartClick}
+          showPlaceholder={showStartPlaceholder}
         />
         <ImageButton
           imageId={endImageId}
           imageUrl={endImageUrl}
           label="End image"
           onClick={handleEndClick}
+          showPlaceholder={showEndPlaceholder}
         />
       </div>
     </div>

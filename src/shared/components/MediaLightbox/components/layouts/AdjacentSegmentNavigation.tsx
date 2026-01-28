@@ -47,24 +47,46 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
     }
   };
 
+  // Check if we should show placeholders (when one segment exists but not the other)
+  const showPrevPlaceholder = !prev && !!next;
+  const showNextPlaceholder = !!prev && !next;
+
   // Shared segment button component
   const SegmentButton = ({
     segment,
     label,
     onClick,
+    showPlaceholder = false,
   }: {
     segment: typeof prev | typeof next;
     label: string;
     onClick: (e: React.MouseEvent) => void;
+    showPlaceholder?: boolean;
   }) => {
+    // Show a subtle placeholder when segment is missing but the other exists
+    if (!segment && showPlaceholder) {
+      return (
+        <div
+          className={cn(
+            'relative w-9 h-9 md:w-10 md:h-10 rounded-md overflow-hidden shadow-md',
+            'bg-black/40 border border-white/30'
+          )}
+        >
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Video className="w-4 h-4 text-white/40" />
+          </div>
+        </div>
+      );
+    }
+
     const button = (
       <button
         onClick={onClick}
         disabled={!segment}
-        title={label}
+        title={segment ? label : undefined}
         className={cn(
           'relative w-9 h-9 md:w-10 md:h-10 rounded-md overflow-hidden shadow-md transition-all',
-          'hover:scale-105 hover:shadow-lg hover:ring-2 hover:ring-white/40',
+          segment && 'hover:scale-105 hover:shadow-lg hover:ring-2 hover:ring-white/40',
           'focus:outline-none focus:ring-2 focus:ring-white/50',
           !segment && 'opacity-30 cursor-not-allowed pointer-events-none'
         )}
@@ -154,11 +176,13 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
         segment={prev}
         label="Previous video segment"
         onClick={handlePrevClick}
+        showPlaceholder={showPrevPlaceholder}
       />
       <SegmentButton
         segment={next}
         label="Next video segment"
         onClick={handleNextClick}
+        showPlaceholder={showNextPlaceholder}
       />
     </div>
   );

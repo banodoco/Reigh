@@ -172,6 +172,14 @@ export interface SegmentSettingsFormProps {
   onUpdateSegmentStructureVideo?: (updates: Partial<StructureVideoConfigWithMetadata>) => void;
   /** Callback to remove this segment's structure video */
   onRemoveSegmentStructureVideo?: () => void;
+
+  // Navigation to constituent images
+  /** Shot generation ID for the start image (for navigation) */
+  startImageShotGenerationId?: string;
+  /** Shot generation ID for the end image (for navigation) */
+  endImageShotGenerationId?: string;
+  /** Callback to navigate to a constituent image by shot_generation.id */
+  onNavigateToImage?: (shotGenerationId: string) => void;
 }
 
 // =============================================================================
@@ -516,6 +524,10 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
   onAddSegmentStructureVideo,
   onUpdateSegmentStructureVideo,
   onRemoveSegmentStructureVideo,
+  // Navigation to constituent images
+  startImageShotGenerationId,
+  endImageShotGenerationId,
+  onNavigateToImage,
 }) => {
   // UI state
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -868,14 +880,20 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
             {/* Start Image */}
             <div className="relative aspect-video">
               {startImageUrl && (
-                <div className="w-full h-full relative bg-muted/30 rounded-lg overflow-hidden border border-border/50">
+                <button
+                  type="button"
+                  onClick={() => startImageShotGenerationId && onNavigateToImage?.(startImageShotGenerationId)}
+                  disabled={!onNavigateToImage || !startImageShotGenerationId}
+                  className="w-full h-full relative bg-muted/30 rounded-lg overflow-hidden border border-border/50 transition-all hover:ring-2 hover:ring-primary/50 hover:scale-[1.02] disabled:hover:ring-0 disabled:hover:scale-100 disabled:cursor-default"
+                  title={onNavigateToImage && startImageShotGenerationId ? "View start image" : undefined}
+                >
                   <img
                     src={startImageUrl}
                     alt="Start frame"
                     className="absolute inset-0 w-full h-full object-cover"
                   />
                   <span className="absolute bottom-0.5 left-0.5 text-[10px] bg-black/60 text-white px-1 rounded">Start</span>
-                </div>
+                </button>
               )}
             </div>
 
@@ -902,14 +920,20 @@ export const SegmentSettingsForm: React.FC<SegmentSettingsFormProps> = ({
             {/* End Image */}
             <div className="relative aspect-video">
               {endImageUrl && (
-                <div className="w-full h-full relative bg-muted/30 rounded-lg overflow-hidden border border-border/50">
+                <button
+                  type="button"
+                  onClick={() => endImageShotGenerationId && onNavigateToImage?.(endImageShotGenerationId)}
+                  disabled={!onNavigateToImage || !endImageShotGenerationId}
+                  className="w-full h-full relative bg-muted/30 rounded-lg overflow-hidden border border-border/50 transition-all hover:ring-2 hover:ring-primary/50 hover:scale-[1.02] disabled:hover:ring-0 disabled:hover:scale-100 disabled:cursor-default"
+                  title={onNavigateToImage && endImageShotGenerationId ? "View end image" : undefined}
+                >
                   <img
                     src={endImageUrl}
                     alt="End frame"
                     className="absolute inset-0 w-full h-full object-cover"
                   />
                   <span className="absolute bottom-0.5 right-0.5 text-[10px] bg-black/60 text-white px-1 rounded">End</span>
-                </div>
+                </button>
               )}
             </div>
           </div>

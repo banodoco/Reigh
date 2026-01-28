@@ -70,6 +70,14 @@ export interface UseSegmentSettingsFormOptions extends UseSegmentSettingsOptions
   onUpdateSegmentStructureVideo?: (updates: Partial<StructureVideoConfigWithMetadata>) => void;
   /** Callback to remove this segment's structure video */
   onRemoveSegmentStructureVideo?: () => void;
+
+  // Navigation to constituent images
+  /** Shot generation ID for the start image (for navigation) */
+  startImageShotGenerationId?: string;
+  /** Shot generation ID for the end image (for navigation) */
+  endImageShotGenerationId?: string;
+  /** Callback to navigate to a constituent image by shot_generation.id */
+  onNavigateToImage?: (shotGenerationId: string) => void;
 }
 
 export interface UseSegmentSettingsFormReturn {
@@ -155,6 +163,10 @@ export function useSegmentSettingsForm(
     onAddSegmentStructureVideo,
     onUpdateSegmentStructureVideo,
     onRemoveSegmentStructureVideo,
+    // Navigation
+    startImageShotGenerationId,
+    endImageShotGenerationId,
+    onNavigateToImage,
   } = options;
 
   // Get all segment settings data
@@ -227,6 +239,11 @@ export function useSegmentSettingsForm(
     onAddSegmentStructureVideo,
     onUpdateSegmentStructureVideo,
     onRemoveSegmentStructureVideo,
+
+    // Navigation to constituent images
+    startImageShotGenerationId,
+    endImageShotGenerationId,
+    onNavigateToImage,
   }), [
     settings,
     updateSettings,
@@ -257,6 +274,9 @@ export function useSegmentSettingsForm(
     onAddSegmentStructureVideo,
     onUpdateSegmentStructureVideo,
     onRemoveSegmentStructureVideo,
+    startImageShotGenerationId,
+    endImageShotGenerationId,
+    onNavigateToImage,
   ]);
 
   return {

@@ -207,6 +207,8 @@ interface MediaLightboxProps {
     endGenerationId?: string;
     /** Shot generation ID for looking up per-pair metadata (prompt overrides, etc.) */
     startShotGenerationId?: string;
+    /** Shot generation ID for the end image (for navigation) */
+    endShotGenerationId?: string;
     /** Active child generation ID for this slot (use for regeneration to create variant on correct child) */
     activeChildGenerationId?: string;
   };

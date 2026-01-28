@@ -74,6 +74,11 @@ export interface SegmentRegenerateFormProps {
     uni3cEndPercent?: number;
   }) => Promise<void>;
 
+  /** Shot generation ID for the end image (for navigation) */
+  endImageShotGenerationId?: string;
+  /** Callback to navigate to a constituent image by shot_generation.id */
+  onNavigateToImage?: (shotGenerationId: string) => void;
+
   /** Whether the segment currently has a primary variant.
    * When false (orphaned), new generations will default to becoming the primary variant. */
   hasPrimaryVariant?: boolean;
@@ -111,6 +116,9 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   structureVideoUrl,
   structureVideoFrameRange,
   onUpdateStructureVideoDefaults,
+  // Navigation to constituent images
+  endImageShotGenerationId,
+  onNavigateToImage,
   // Whether segment has a primary variant (for defaulting makePrimaryVariant)
   hasPrimaryVariant = true,
   // Per-segment structure video management
@@ -167,6 +175,10 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
     onAddSegmentStructureVideo,
     onUpdateSegmentStructureVideo,
     onRemoveSegmentStructureVideo,
+    // Navigation to constituent images
+    startImageShotGenerationId: pairShotGenerationId,
+    endImageShotGenerationId,
+    onNavigateToImage,
   });
 
   // Extract enhanced prompt from form props

@@ -25,6 +25,7 @@ export interface CurrentSegmentImages {
   startGenerationId?: string;
   endGenerationId?: string;
   startShotGenerationId?: string;
+  endShotGenerationId?: string;
   activeChildGenerationId?: string;
 }
 
@@ -421,6 +422,9 @@ export function useVideoRegenerateMode({
       onRemoveSegmentStructureVideo: segmentSlotMode?.onRemoveSegmentStructureVideo,
       // Whether segment has a primary variant (null primaryVariant = orphaned segment)
       hasPrimaryVariant: !!primaryVariant,
+      // Navigation to constituent images
+      endImageShotGenerationId: segmentSlotMode?.pairData?.endImage?.id || currentSegmentImages?.endShotGenerationId,
+      onNavigateToImage: segmentSlotMode?.onNavigateToImage,
     };
   }, [
     canRegenerate,

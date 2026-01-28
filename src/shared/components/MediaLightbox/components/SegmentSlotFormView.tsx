@@ -19,7 +19,6 @@ import { useTaskStatusCounts } from '@/shared/hooks/useTasks';
 import { supabase } from '@/integrations/supabase/client';
 import type { SegmentSlotModeData } from '../types';
 import { NavigationArrows } from './NavigationArrows';
-import { ConstituentImageNavigation } from './layouts/ConstituentImageNavigation';
 
 export interface SegmentSlotFormViewProps {
   segmentSlotMode: SegmentSlotModeData;
@@ -92,6 +91,10 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
     onAddSegmentStructureVideo: segmentSlotMode.onAddSegmentStructureVideo,
     onUpdateSegmentStructureVideo: segmentSlotMode.onUpdateSegmentStructureVideo,
     onRemoveSegmentStructureVideo: segmentSlotMode.onRemoveSegmentStructureVideo,
+    // Navigation to constituent images
+    startImageShotGenerationId: pairShotGenerationId,
+    endImageShotGenerationId: segmentSlotMode.pairData.endImage?.id,
+    onNavigateToImage: segmentSlotMode.onNavigateToImage,
   });
 
   // Extract enhanced prompt from form props
@@ -453,18 +456,6 @@ export const SegmentSlotFormView: React.FC<SegmentSlotFormViewProps> = ({
                 <p className="text-xs text-muted-foreground text-center mt-2">
                   Cannot generate: Missing shot context. Please save your shot first.
                 </p>
-              )}
-
-              {/* Navigation to constituent images */}
-              {segmentSlotMode.onNavigateToImage && (
-                <ConstituentImageNavigation
-                  startImageId={segmentSlotMode.pairData.startImage?.id}
-                  endImageId={segmentSlotMode.pairData.endImage?.id}
-                  startImageUrl={startImageUrl}
-                  endImageUrl={endImageUrl}
-                  onNavigateToImage={segmentSlotMode.onNavigateToImage}
-                  variant="inline"
-                />
               )}
             </>
           )}
