@@ -444,6 +444,7 @@ export const ControlsPanel: React.FC<ControlsPanelProps> = (props) => {
       onPromoteToGeneration={onPromoteToGeneration}
       isPromoting={isPromoting}
       onDeleteVariant={onDeleteVariant}
+      taskId={taskId}
     />
   );
 };
