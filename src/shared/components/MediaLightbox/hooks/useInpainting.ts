@@ -6,7 +6,7 @@ import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { createImageInpaintTask } from '@/shared/lib/tasks/imageInpaint';
 import { createAnnotatedImageEditTask } from '@/shared/lib/tasks/annotatedImageEdit';
 import { supabase } from '@/integrations/supabase/client';
-import type { EditAdvancedSettings } from './useGenerationEditSettings';
+import type { EditAdvancedSettings, QwenEditModel } from './useGenerationEditSettings';
 import { convertToHiresFixApiParams } from './useGenerationEditSettings';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { StrokeOverlayHandle } from '../components/StrokeOverlay';
@@ -40,6 +40,8 @@ export interface UseInpaintingProps {
   createAsGeneration?: boolean;
   // Advanced settings for hires fix
   advancedSettings?: EditAdvancedSettings;
+  // Qwen edit model selection
+  qwenEditModel?: QwenEditModel;
   // Image URL for canvas-based rendering (single canvas approach)
   imageUrl?: string;
   // Thumbnail URL for progressive loading
@@ -119,6 +121,7 @@ export const useInpainting = ({
   activeVariantLocation,
   createAsGeneration,
   advancedSettings,
+  qwenEditModel,
   imageUrl,
   thumbnailUrl,
   initialEditMode,
@@ -2295,6 +2298,7 @@ export const useInpainting = ({
         create_as_generation: createAsGeneration,
         source_variant_id: activeVariantId || undefined,
         hires_fix: convertToHiresFixApiParams(advancedSettings),
+        qwen_edit_model: qwenEditModel,
       });
 
       console.log('[Inpaint] ✅ Task created successfully');
@@ -2314,7 +2318,7 @@ export const useInpainting = ({
     } finally {
       setIsGeneratingInpaint(false);
     }
-  }, [selectedProjectId, isVideo, inpaintStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, activeVariantLocation, activeVariantId, createAsGeneration, advancedSettings]);
+  }, [selectedProjectId, isVideo, inpaintStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, activeVariantLocation, activeVariantId, createAsGeneration, advancedSettings, qwenEditModel]);
 
   // Generate annotated edit - uses Konva's native export for reliable mask generation
   const handleGenerateAnnotatedEdit = useCallback(async () => {
@@ -2390,6 +2394,7 @@ export const useInpainting = ({
         create_as_generation: createAsGeneration,
         source_variant_id: activeVariantId || undefined,
         hires_fix: convertToHiresFixApiParams(advancedSettings),
+        qwen_edit_model: qwenEditModel,
       });
 
       console.log('[AnnotateEdit] ✅ Task created successfully');
@@ -2409,7 +2414,7 @@ export const useInpainting = ({
     } finally {
       setIsGeneratingInpaint(false);
     }
-  }, [selectedProjectId, isVideo, annotationStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, activeVariantLocation, activeVariantId, createAsGeneration, advancedSettings]);
+  }, [selectedProjectId, isVideo, annotationStrokes, inpaintPrompt, inpaintNumGenerations, media, handleExitInpaintMode, shotId, toolTypeOverride, loras, activeVariantLocation, activeVariantId, createAsGeneration, advancedSettings, qwenEditModel]);
 
   // Get delete button position for selected shape
   const getDeleteButtonPosition = useCallback((): { x: number; y: number } | null => {

@@ -15,6 +15,8 @@ export interface CreateImageInpaintTaskParams {
   source_variant_id?: string; // Track which variant was the source if editing from a variant
   // Advanced hires fix settings
   hires_fix?: HiresFixApiParams;
+  // Qwen edit model selection (e.g., 'qwen-edit', 'qwen-edit-2509', 'qwen-edit-2511')
+  qwen_edit_model?: string;
 }
 
 /**
@@ -38,6 +40,7 @@ export async function createImageInpaintTask(params: CreateImageInpaintTaskParam
     create_as_generation,
     source_variant_id,
     hires_fix,
+    qwen_edit_model,
   } = params;
 
   console.log('[ImageInpaint] Creating inpaint tasks:', {
@@ -88,6 +91,7 @@ export async function createImageInpaintTask(params: CreateImageInpaintTaskParam
       ...(create_as_generation ? { create_as_generation: true } : {}), // If true, create a new generation instead of a variant
       ...(source_variant_id ? { source_variant_id } : {}), // Track source variant if editing from a variant
       ...hiresFixParams, // Include hires fix settings if provided
+      ...(qwen_edit_model ? { qwen_edit_model } : {}), // Model selection for cloud inpaint
     },
   }));
 

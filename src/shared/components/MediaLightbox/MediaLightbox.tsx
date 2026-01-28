@@ -799,6 +799,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     activeVariantLocation: activeVariant?.location, // Use variant's image URL when editing a variant
     createAsGeneration, // If true, create a new generation instead of a variant
     advancedSettings, // Pass advanced settings for hires fix
+    qwenEditModel, // Pass model selection for inpaint/annotate modes
     // Canvas-based rendering URLs (for single canvas approach on mobile)
     // Use activeVariant.location if available, otherwise effectiveImageUrl
     imageUrl: !isVideo ? (activeVariant?.location || effectiveImageUrl) : undefined,
