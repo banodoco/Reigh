@@ -6,7 +6,7 @@ import { uploadImageToStorage } from '@/shared/lib/imageUploader';
 import { createImageInpaintTask } from '@/shared/lib/tasks/imageInpaint';
 import { supabase } from '@/integrations/supabase/client';
 import { invalidateVariantChange } from '@/shared/hooks/useGenerationInvalidation';
-import type { EditAdvancedSettings } from './useGenerationEditSettings';
+import type { EditAdvancedSettings, QwenEditModel } from './useGenerationEditSettings';
 import { convertToHiresFixApiParams } from './useGenerationEditSettings';
 
 export interface ImageTransform {
@@ -43,6 +43,8 @@ export interface UseRepositionModeProps {
   activeVariantId?: string | null;
   // Active variant's params - for loading saved transform data
   activeVariantParams?: Record<string, any> | null;
+  // Qwen edit model selection
+  qwenEditModel?: QwenEditModel;
 }
 
 export interface UseRepositionModeReturn {
@@ -110,6 +112,7 @@ export const useRepositionMode = ({
   activeVariantLocation,
   activeVariantId,
   activeVariantParams,
+  qwenEditModel,
 }: UseRepositionModeProps): UseRepositionModeReturn => {
   const queryClient = useQueryClient();
   const [transform, setTransform] = useState<ImageTransform>(DEFAULT_TRANSFORM);
@@ -550,6 +553,7 @@ export const useRepositionMode = ({
         create_as_generation: createAsGeneration, // If true, create a new generation instead of a variant
         source_variant_id: activeVariantId || undefined, // Track which variant was the source if editing from a variant
         hires_fix: convertToHiresFixApiParams(advancedSettings), // Pass hires fix settings if enabled
+        qwen_edit_model: qwenEditModel,
       });
       
       console.log('[Reposition] ✅ Reposition inpaint tasks created successfully');
@@ -583,6 +587,8 @@ export const useRepositionMode = ({
     createTransformedCanvas,
     createAsGeneration,
     advancedSettings,
+    activeVariantId,
+    qwenEditModel,
   ]);
   
   // Save transformed image as a variant (without AI generation)

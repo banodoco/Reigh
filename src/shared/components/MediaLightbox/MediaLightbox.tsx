@@ -960,6 +960,7 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     activeVariantLocation: activeVariant?.location, // Use variant's image URL when editing a variant
     activeVariantId: activeVariant?.id, // Track source variant for lineage
     activeVariantParams: activeVariant?.params as Record<string, any> | null, // For loading saved transform data
+    qwenEditModel, // Pass model selection for reposition mode
   });
   const {
     transform: repositionTransform,
