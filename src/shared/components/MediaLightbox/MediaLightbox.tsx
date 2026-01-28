@@ -757,12 +757,6 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     actualGenerationId,
   });
 
-  // Track pending tasks for this generation (shows in info panel)
-  const { pendingCount: pendingTaskCount } = usePendingGenerationTasks(
-    actualGenerationId,
-    selectedProjectId
-  );
-
   // Fetch available LoRAs - needed by edit modes and img2img
   const { data: availableLoras } = usePublicLoras();
 
@@ -1392,6 +1386,16 @@ const MediaLightbox: React.FC<MediaLightboxProps> = ({
     onSegmentFrameCountChange: segmentSlotMode?.onFrameCountChange ?? onSegmentFrameCountChange,
     currentFrameCount,
   });
+
+  // Track pending tasks for this generation (shows in info panel)
+  // For videos, use pairShotGenerationId to match how segment tasks are tracked
+  const pendingTaskGenerationId = isVideo
+    ? (regenerateFormProps?.pairShotGenerationId || actualGenerationId)
+    : actualGenerationId;
+  const { pendingCount: pendingTaskCount } = usePendingGenerationTasks(
+    pendingTaskGenerationId,
+    selectedProjectId
+  );
 
   // Video edit mode handlers hook - provides enter/exit handlers for video edit modes
   const videoEditModeHandlers = useVideoEditModeHandlers({

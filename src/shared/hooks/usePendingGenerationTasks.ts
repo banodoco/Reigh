@@ -40,6 +40,8 @@ function taskReferencesGeneration(params: any, generationId: string): boolean {
   if (params.generation_id === generationId) return true;
   if (params.input_generation_id === generationId) return true;
   if (params.parent_generation_id === generationId) return true;
+  // Video segment tasks use pair_shot_generation_id
+  if (params.pair_shot_generation_id === generationId) return true;
 
   // Check nested in orchestrator_details
   const orchDetails = params.orchestrator_details;
@@ -47,6 +49,10 @@ function taskReferencesGeneration(params: any, generationId: string): boolean {
     if (orchDetails.based_on === generationId) return true;
     if (orchDetails.source_generation_id === generationId) return true;
     if (orchDetails.parent_generation_id === generationId) return true;
+    // Check pair_shot_generation_ids array
+    if (Array.isArray(orchDetails.pair_shot_generation_ids)) {
+      if (orchDetails.pair_shot_generation_ids.includes(generationId)) return true;
+    }
   }
 
   // Check full_orchestrator_payload
@@ -55,6 +61,12 @@ function taskReferencesGeneration(params: any, generationId: string): boolean {
     if (fullPayload.based_on === generationId) return true;
     if (fullPayload.source_generation_id === generationId) return true;
     if (fullPayload.parent_generation_id === generationId) return true;
+  }
+
+  // Check individual_segment_params (used by individual_travel_segment)
+  const individualParams = params.individual_segment_params;
+  if (individualParams) {
+    if (individualParams.pair_shot_generation_id === generationId) return true;
   }
 
   return false;
