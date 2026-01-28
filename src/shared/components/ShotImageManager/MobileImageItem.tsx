@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/shared/components/ui/button';
-import { Trash2, Copy, Check, Pencil, Maximize2 } from 'lucide-react';
+import { Trash2, Copy, Check, Maximize2 } from 'lucide-react';
 import { cn, getDisplayUrl } from '@/shared/lib/utils';
 import { useProgressiveImage } from '@/shared/hooks/useProgressiveImage';
 import { isProgressiveLoadingEnabled } from '@/shared/settings/progressiveLoading';
@@ -127,13 +127,14 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
           </div>
         )}
 
-        {/* Variant Count + NEW badge - top left */}
+        {/* Variant Count + NEW badge - bottom center, above frame number */}
         <VariantBadge
           derivedCount={(image as any).derivedCount}
           unviewedVariantCount={(image as any).unviewedVariantCount}
           hasUnviewedVariants={(image as any).hasUnviewedVariants}
           variant="overlay"
           size="sm"
+          position="bottom-5 left-1/2 -translate-x-1/2"
           onMarkAllViewed={onMarkAllViewed}
         />
 
@@ -155,28 +156,8 @@ export const MobileImageItem: React.FC<MobileImageItemProps> = ({
           </div>
         )}
 
-        {/* Bottom left - Edit Image button */}
-        <div className="absolute bottom-2 left-2 flex gap-2 items-start opacity-100 transition-opacity">
-          {/* Edit Image button (hidden in readOnly) */}
-          {!readOnly && onInpaintClick && (
-            <Button
-              size="icon"
-              variant="secondary"
-              className="h-8 w-8 bg-card/75 dark:bg-gray-800/75 hover:bg-card/90 dark:hover:bg-gray-800/90"
-              onClick={(e) => {
-                e.stopPropagation();
-                // Open lightbox in unified edit mode
-                onInpaintClick();
-              }}
-              title="Edit image"
-            >
-              <Pencil className="h-3 w-3" />
-            </Button>
-          )}
-        </div>
-
-        {/* Top right - Copy and Delete buttons */}
-        <div className="absolute top-2 right-2 flex gap-2 items-end opacity-100 transition-opacity">
+        {/* Top center - Copy and Delete buttons */}
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 flex gap-2 items-center opacity-100 transition-opacity">
           {/* Duplicate button - hidden when selected */}
           {!readOnly && onDuplicate && !isSelected && (
             <Button
