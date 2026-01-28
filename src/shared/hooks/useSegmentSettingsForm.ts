@@ -114,6 +114,16 @@ export interface UseSegmentSettingsFormReturn {
    * Whether settings have been modified.
    */
   isDirty: boolean;
+
+  /**
+   * Persisted enhance prompt preference (undefined = use default based on enhanced_prompt existence)
+   */
+  persistedEnhancePromptEnabled: boolean | undefined;
+
+  /**
+   * Save the enhance prompt enabled preference to metadata.
+   */
+  saveEnhancePromptEnabled: (enabled: boolean) => Promise<boolean>;
 }
 
 export function useSegmentSettingsForm(
@@ -193,9 +203,6 @@ export function useSegmentSettingsForm(
     enhancedPrompt,
     basePromptForEnhancement,
     onClearEnhancedPrompt: clearEnhancedPrompt,
-    // Persisted enhance prompt toggle preference
-    persistedEnhancePromptEnabled: enhancePromptEnabled,
-    onSaveEnhancePromptEnabled: saveEnhancePromptEnabled,
 
     // Display context
     segmentIndex,
@@ -232,8 +239,6 @@ export function useSegmentSettingsForm(
     enhancedPrompt,
     basePromptForEnhancement,
     clearEnhancedPrompt,
-    enhancePromptEnabled,
-    saveEnhancePromptEnabled,
     segmentIndex,
     startImageUrl,
     endImageUrl,
@@ -262,5 +267,7 @@ export function useSegmentSettingsForm(
     settings,
     isLoading,
     isDirty,
+    persistedEnhancePromptEnabled: enhancePromptEnabled,
+    saveEnhancePromptEnabled,
   };
 }

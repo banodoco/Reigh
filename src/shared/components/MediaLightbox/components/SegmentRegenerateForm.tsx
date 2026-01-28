@@ -128,7 +128,15 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   const { data: taskStatusCounts } = useTaskStatusCounts(projectId ?? undefined);
 
   // Use the combined hook for form props
-  const { formProps, getSettingsForTaskCreation, saveSettings, updateSettings, settings } = useSegmentSettingsForm({
+  const {
+    formProps,
+    getSettingsForTaskCreation,
+    saveSettings,
+    updateSettings,
+    settings,
+    persistedEnhancePromptEnabled,
+    saveEnhancePromptEnabled,
+  } = useSegmentSettingsForm({
     pairShotGenerationId,
     shotId,
     defaults: {
@@ -161,8 +169,8 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
     onRemoveSegmentStructureVideo,
   });
 
-  // Extract enhanced prompt and persisted enhance preference from form props
-  const { enhancedPrompt, persistedEnhancePromptEnabled, onSaveEnhancePromptEnabled } = formProps;
+  // Extract enhanced prompt from form props
+  const { enhancedPrompt } = formProps;
 
   // Enhance prompt toggle state - tracks user's current choice for this session
   // We initialize from persisted value when available
@@ -207,10 +215,8 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
     effectiveEnhanceEnabledRef.current = value; // Update ref immediately
     setEnhancePromptEnabled(value); // Then schedule React state update
     // Persist the preference so it's remembered for this pair
-    if (onSaveEnhancePromptEnabled) {
-      onSaveEnhancePromptEnabled(value);
-    }
-  }, [onSaveEnhancePromptEnabled]);
+    saveEnhancePromptEnabled(value);
+  }, [saveEnhancePromptEnabled]);
 
   // Reset enhance state ONLY when pair actually changes to a different value
   useEffect(() => {

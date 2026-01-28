@@ -964,8 +964,11 @@ export function useSegmentSettings({
       }
 
       const currentMetadata = (current?.metadata as Record<string, any>) || {};
+      // Clear both enhanced_prompt and the user's enhance preference
+      // When clearing, they should go back to the "fresh start" state
+      const { enhance_prompt_enabled: _removed, ...metadataWithoutEnhancePref } = currentMetadata;
       const updatedMetadata = {
-        ...currentMetadata,
+        ...metadataWithoutEnhancePref,
         enhanced_prompt: '', // Clear the enhanced prompt
       };
 
@@ -1071,7 +1074,7 @@ export function useSegmentSettings({
       structureUni3cEndPercent: null as any,
     };
 
-    console.log(`[useSegmentSettings:${instanceId}] 🔄 Clearing segment overrides + enhanced prompt (will use shot defaults):`, {
+    console.log(`[useSegmentSettings:${instanceId}] 🔄 Clearing segment overrides + enhanced prompt + enhance preference (will use shot defaults):`, {
       shotId: shotId?.substring(0, 8) || null,
     });
 

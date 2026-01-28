@@ -632,7 +632,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                                   : "text-muted-foreground hover:text-foreground hover:bg-muted/80 active:scale-95"
                               )}
                             >
-                              {copiedVariantId === variant.id ? '✓' : 'id'}
+                              {copiedVariantId === variant.id ? 'copied' : 'id'}
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="text-xs">
