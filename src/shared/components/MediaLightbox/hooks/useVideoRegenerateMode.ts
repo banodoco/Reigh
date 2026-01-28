@@ -419,6 +419,8 @@ export function useVideoRegenerateMode({
       onAddSegmentStructureVideo: segmentSlotMode?.onAddSegmentStructureVideo,
       onUpdateSegmentStructureVideo: segmentSlotMode?.onUpdateSegmentStructureVideo,
       onRemoveSegmentStructureVideo: segmentSlotMode?.onRemoveSegmentStructureVideo,
+      // Whether segment has a primary variant (null primaryVariant = orphaned segment)
+      hasPrimaryVariant: !!primaryVariant,
     };
   }, [
     canRegenerate,

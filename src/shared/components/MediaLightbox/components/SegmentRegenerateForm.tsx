@@ -74,6 +74,10 @@ export interface SegmentRegenerateFormProps {
     uni3cEndPercent?: number;
   }) => Promise<void>;
 
+  /** Whether the segment currently has a primary variant.
+   * When false (orphaned), new generations will default to becoming the primary variant. */
+  hasPrimaryVariant?: boolean;
+
   // Per-segment structure video management (Timeline Mode only)
   /** Whether in timeline mode (shows structure video upload) vs batch mode (preview only) */
   isTimelineMode?: boolean;
@@ -107,6 +111,8 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   structureVideoUrl,
   structureVideoFrameRange,
   onUpdateStructureVideoDefaults,
+  // Whether segment has a primary variant (for defaulting makePrimaryVariant)
+  hasPrimaryVariant = true,
   // Per-segment structure video management
   isTimelineMode,
   onAddSegmentStructureVideo,
@@ -129,6 +135,8 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
       prompt: '',
       negativePrompt: '',
       numFrames: currentFrameCount ?? initialParams?.num_frames ?? 25,
+      // When segment has no primary variant (orphaned), default to making new generation primary
+      makePrimaryVariant: !hasPrimaryVariant,
     },
     // Form display options
     segmentIndex,

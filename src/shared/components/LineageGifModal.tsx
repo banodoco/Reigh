@@ -25,7 +25,7 @@ import {
 interface LineageGifModalProps {
   open: boolean;
   onClose: () => void;
-  generationId: string | null;
+  variantId: string | null;
 }
 
 type ModalState =
@@ -38,7 +38,7 @@ type ModalState =
 export const LineageGifModal: React.FC<LineageGifModalProps> = ({
   open,
   onClose,
-  generationId,
+  variantId,
 }) => {
   const [state, setState] = useState<ModalState>({ status: 'idle' });
   const gifUrlRef = useRef<string | null>(null);
@@ -46,7 +46,7 @@ export const LineageGifModal: React.FC<LineageGifModalProps> = ({
 
   // Fetch the lineage chain
   const { chain, isLoading: isChainLoading, hasLineage, error: chainError } = useLineageChain(
-    open ? generationId : null
+    open ? variantId : null
   );
 
   // Clean up object URL on unmount

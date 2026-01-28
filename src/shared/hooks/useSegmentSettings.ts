@@ -62,6 +62,9 @@ export interface UseSegmentSettingsOptions {
     negativePrompt: string;
     /** Frame count from timeline positions (source of truth) */
     numFrames?: number;
+    /** Whether new generations should become primary variant.
+     * Default: false. Set to true when segment has no primary variant (orphaned). */
+    makePrimaryVariant?: boolean;
   };
   /** Structure video defaults for this segment (from shot-level config) */
   structureVideoDefaults?: {
@@ -304,8 +307,8 @@ export function useSegmentSettings({
       randomSeed: pairOverrides.randomSeed ?? true,
       seed: pairOverrides.seed,
 
-      // Default for regeneration behavior
-      makePrimaryVariant: false,
+      // Default for regeneration behavior - true when no primary variant exists (orphaned segment)
+      makePrimaryVariant: defaults.makePrimaryVariant ?? false,
 
       // Structure video: only include if segment has override
       structureMotionStrength: pairOverrides.structureMotionStrength,
@@ -1004,7 +1007,7 @@ export function useSegmentSettings({
       numFrames: settings.numFrames,
       randomSeed: true,
       seed: undefined,
-      makePrimaryVariant: false,
+      makePrimaryVariant: defaults.makePrimaryVariant ?? false,
 
       // Clear structure video overrides
       structureMotionStrength: null as any,
@@ -1036,7 +1039,7 @@ export function useSegmentSettings({
     // Clear local state so form falls back to mergedSettings (which shows shot defaults)
     setLocalSettings(null);
     setIsDirty(false);
-  }, [instanceId, shotId, settings.numFrames, clearEnhancedPrompt, pairShotGenerationId, saveSettings]);
+  }, [instanceId, shotId, settings.numFrames, clearEnhancedPrompt, pairShotGenerationId, saveSettings, defaults.makePrimaryVariant]);
 
   // Extract enhanced prompt and base prompt from pair metadata (AI-generated, stored separately)
   const enhancedPrompt = (pairMetadata as Record<string, any> | null)?.enhanced_prompt as string | undefined;

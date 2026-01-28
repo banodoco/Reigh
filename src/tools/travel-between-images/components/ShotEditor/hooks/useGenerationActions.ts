@@ -29,6 +29,7 @@ import {
   persistTimelinePositions
 } from './timelineDropHelpers';
 import { invalidateGenerationsSync } from '@/shared/hooks/useGenerationInvalidation';
+import { useDemoteOrphanedVariants } from '@/shared/hooks/useDemoteOrphanedVariants';
 
 interface UseGenerationActionsProps {
   state: ShotEditorState;
@@ -72,6 +73,9 @@ export const useGenerationActions = ({
   const updateGenerationLocationMutation = useUpdateGenerationLocation();
   const duplicateAsNewGenerationMutation = useDuplicateAsNewGeneration();
   const handleExternalImageDropMutation = useHandleExternalImageDrop();
+
+  // Orphaned variant detection
+  const { demoteOrphanedVariants } = useDemoteOrphanedVariants();
 
   // REMOVED: useTaskQueueNotifier was interfering with RealtimeProvider
   const enqueueTasks = async () => {};
@@ -132,7 +136,10 @@ export const useGenerationActions = ({
   
   const queryClientRef = useRef(queryClient);
   queryClientRef.current = queryClient;
-  
+
+  const demoteOrphanedVariantsRef = useRef(demoteOrphanedVariants);
+  demoteOrphanedVariantsRef.current = demoteOrphanedVariants;
+
   // 🎯 STABILITY FIX: Even though actions from useShotEditorState should be stable,
   // use a ref to be absolutely certain callbacks won't recreate
   const actionsRef = useRef(actions);
@@ -560,6 +567,10 @@ export const useGenerationActions = ({
           projectId: currentProjectId
         });
       }
+
+      // Check for orphaned video variants after image deletion
+      // Videos whose source images have changed will be demoted
+      await demoteOrphanedVariantsRef.current(currentShot.id);
     } catch (error) {
       console.error('[DeleteDebug] ❌ Error during deletion or frame shift:', error);
       // Error handling is done by the mutation itself
@@ -595,6 +606,9 @@ export const useGenerationActions = ({
     try {
       await Promise.all(removePromises);
       console.log('[BATCH_DELETE] Batch removal completed successfully');
+
+      // Check for orphaned video variants after batch deletion
+      await demoteOrphanedVariantsRef.current(currentShot.id);
     } catch (error) {
       toast.error('Failed to remove some images from timeline');
     }

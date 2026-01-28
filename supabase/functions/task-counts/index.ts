@@ -28,14 +28,23 @@ declare const Deno: any;
  *   timestamp: string,
  *   run_type_filter?: 'gpu' | 'api' | null,
  *
- *   // Quick counts for scaling math
+ *   // Quick counts for scaling math (service role only)
  *   totals: {
- *     queued_only: number,        // Tasks waiting to be claimed
- *     active_only: number,         // Tasks being processed
- *     queued_plus_active: number   // Total workload
+ *     // Core counts
+ *     queued_only: number,        // Immediately claimable tasks (legacy, same as claimable_now)
+ *     active_only: number,        // Tasks being processed
+ *     queued_plus_active: number, // Total workload
+ *
+ *     // Breakdown for smarter scaling decisions (service role only)
+ *     claimable_now: number,           // Can be claimed immediately
+ *     blocked_by_capacity: number,     // Blocked by user's 5-task limit (will free up)
+ *     blocked_by_deps: number,         // Blocked by incomplete dependencies
+ *     blocked_by_settings: number,     // Blocked because user has cloud disabled
+ *     potentially_claimable: number,   // claimable_now + blocked_by_capacity (for scaling)
  *   },
  *
  *   // Detailed task arrays (limited to 100 for service role, 50 for user)
+ *   // Note: queued_tasks only includes immediately claimable tasks (matches claimable_now)
  *   queued_tasks: [{...}],
  *   active_tasks: [{...}],
  *
@@ -110,23 +119,39 @@ serve(async (req) => {
       // SERVICE ROLE PATH: Global task statistics across all users
       // ═══════════════════════════════════════════════════════════════
 
-      // ESSENTIAL: Get counts from RPC functions (2 parallel calls)
-      const [countQueuedOnly, countQueuedPlusActive, userStatsResult] = await Promise.all([
-        supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: false, p_run_type: runType }),
+      // ESSENTIAL: Get counts from RPC functions (3 parallel calls)
+      const [countQueuedPlusActive, breakdownResult, userStatsResult] = await Promise.all([
         supabaseAdmin.rpc('count_eligible_tasks_service_role', { p_include_active: true, p_run_type: runType }),
+        supabaseAdmin.rpc('count_queued_tasks_breakdown_service_role', { p_run_type: runType }),
         supabaseAdmin.rpc('per_user_capacity_stats_service_role')
       ]);
 
-      if (countQueuedOnly.error) {
-        console.error("Service role count (queued only) error:", countQueuedOnly.error);
-        throw countQueuedOnly.error;
-      }
       if (countQueuedPlusActive.error) {
         console.error("Service role count (queued+active) error:", countQueuedPlusActive.error);
         throw countQueuedPlusActive.error;
       }
+      if (breakdownResult.error) {
+        console.error("Service role breakdown error:", breakdownResult.error);
+        throw breakdownResult.error;
+      }
 
-      const queued_only = countQueuedOnly.data ?? 0;
+      // Extract breakdown (RPC returns a single row)
+      const breakdown = breakdownResult.data?.[0] ?? {
+        claimable_now: 0,
+        blocked_by_capacity: 0,
+        blocked_by_deps: 0,
+        blocked_by_settings: 0,
+        total_queued: 0
+      };
+
+      const claimable_now = breakdown.claimable_now ?? 0;
+      const blocked_by_capacity = breakdown.blocked_by_capacity ?? 0;
+      const blocked_by_deps = breakdown.blocked_by_deps ?? 0;
+      const blocked_by_settings = breakdown.blocked_by_settings ?? 0;
+      const potentially_claimable = claimable_now + blocked_by_capacity;
+
+      // Legacy fields for backward compatibility
+      const queued_only = claimable_now;
       const queued_plus_active = countQueuedPlusActive.data ?? 0;
       const active_only = Math.max(0, queued_plus_active - queued_only);
 
@@ -155,6 +180,14 @@ serve(async (req) => {
         }
       }
 
+      // Build map of user in-progress counts for capacity filtering
+      const userInProgressMap = new Map<string, number>();
+      if (Array.isArray(userStatsResult.data)) {
+        for (const u of userStatsResult.data) {
+          userInProgressMap.set(u.user_id, u.in_progress_tasks ?? 0);
+        }
+      }
+
       // Fetch detailed task lists (parallel, with limits for performance)
       const [queuedResult, activeResult] = await Promise.all([
         supabaseAdmin
@@ -163,6 +196,7 @@ serve(async (req) => {
             id,
             task_type,
             created_at,
+            dependant_on,
             projects!inner(user_id, users!inner(credits, settings))
           `)
           .eq('status', 'Queued')
@@ -183,11 +217,56 @@ serve(async (req) => {
           .limit(100)
       ]);
 
-      // Filter queued tasks (orchestrator, credits, run_type)
+      // Collect all dependency task IDs to check their completion status
+      const allDepIds = new Set<string>();
+      for (const task of queuedResult.data || []) {
+        if (Array.isArray(task.dependant_on)) {
+          for (const depId of task.dependant_on) {
+            allDepIds.add(depId);
+          }
+        }
+      }
+
+      // Fetch dependency task statuses if any
+      const completedDepIds = new Set<string>();
+      if (allDepIds.size > 0) {
+        const { data: depTasks } = await supabaseAdmin
+          .from('tasks')
+          .select('id, status')
+          .in('id', Array.from(allDepIds));
+
+        if (depTasks) {
+          for (const dep of depTasks) {
+            if (dep.status === 'Complete') {
+              completedDepIds.add(dep.id);
+            }
+          }
+        }
+      }
+
+      // Helper to check if all dependencies are complete
+      const allDepsComplete = (dependant_on: string[] | null): boolean => {
+        if (!dependant_on || dependant_on.length === 0) return true;
+        return dependant_on.every(depId => completedDepIds.has(depId));
+      };
+
+      // Filter queued tasks to match RPC criteria (only claimable tasks)
+      // Criteria: not orchestrator, credits > 0, allows_cloud, deps complete, user not at capacity
       const queued_tasks = (queuedResult.data || [])
         .filter(task => {
+          // Exclude orchestrator tasks
           if (task.task_type?.toLowerCase().includes('orchestrator')) return false;
+          // Exclude no-credits users
           if (task.projects.users.credits <= 0) return false;
+          // Exclude users with cloud disabled
+          const allowsCloud = task.projects.users.settings?.ui?.generationMethods?.inCloud ?? true;
+          if (!allowsCloud) return false;
+          // Exclude tasks with incomplete dependencies
+          if (!allDepsComplete(task.dependant_on)) return false;
+          // Exclude users at capacity (5+ in progress)
+          const userInProgress = userInProgressMap.get(task.projects.user_id) ?? 0;
+          if (userInProgress >= 5) return false;
+          // Apply run_type filter if specified
           if (runType && taskTypeRunTypeMap) {
             const taskRunType = taskTypeRunTypeMap.get(task.task_type);
             if (!taskRunType || taskRunType !== runType) return false;
@@ -223,16 +302,17 @@ serve(async (req) => {
 
       // Debug logging (only when debug=true)
       if (debug) {
-        console.log(`[TASK-COUNTS] [${runType || 'ALL'}] queued=${queued_only}, active=${active_only}, total=${queued_plus_active}`);
+        console.log(`[TASK-COUNTS] [${runType || 'ALL'}] claimable=${claimable_now}, blocked_capacity=${blocked_by_capacity}, blocked_deps=${blocked_by_deps}, blocked_settings=${blocked_by_settings}`);
+        console.log(`[TASK-COUNTS] [${runType || 'ALL'}] potentially_claimable=${potentially_claimable}, active=${active_only}`);
         console.log(`[TASK-COUNTS] [${runType || 'ALL'}] arrays: ${queued_tasks.length} queued, ${active_tasks.length} active`);
         console.log(`[TASK-COUNTS] [${runType || 'ALL'}] users with tasks: ${user_stats.filter(u => u.in_progress_tasks > 0 || u.queued_tasks > 0).length}`);
 
         // Validation warnings
-        if (queued_tasks.length !== queued_only) {
-          console.warn(`[TASK-COUNTS] [VALIDATION] queued_tasks array (${queued_tasks.length}) != count (${queued_only}) - likely due to dependency filtering in RPC`);
+        if (queued_tasks.length !== claimable_now) {
+          console.warn(`[TASK-COUNTS] [VALIDATION] queued_tasks array (${queued_tasks.length}) != claimable_now (${claimable_now}) - possible race condition or limit`);
         }
         if (active_tasks.length !== active_only) {
-          console.warn(`[TASK-COUNTS] [VALIDATION] active_tasks array (${active_tasks.length}) != count (${active_only})`);
+          console.warn(`[TASK-COUNTS] [VALIDATION] active_tasks array (${active_tasks.length}) != active_only (${active_only})`);
         }
       }
 
@@ -246,9 +326,16 @@ serve(async (req) => {
         timestamp: new Date().toISOString(),
         run_type_filter: runType,
         totals: {
+          // Legacy fields (for backward compatibility)
           queued_only,
           active_only,
-          queued_plus_active
+          queued_plus_active,
+          // New breakdown for smarter scaling
+          claimable_now,
+          blocked_by_capacity,
+          blocked_by_deps,
+          blocked_by_settings,
+          potentially_claimable  // claimable_now + blocked_by_capacity (for scaling)
         },
         queued_tasks,
         active_tasks,

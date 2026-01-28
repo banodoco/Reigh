@@ -61,6 +61,7 @@ import { useLoraManager } from '@/shared/hooks/useLoraManager';
 import { useSegmentOutputsForShot } from '../../hooks/useSegmentOutputsForShot';
 import { useIncomingTasks } from '@/shared/contexts/IncomingTasksContext';
 import { useTaskStatusCounts } from '@/shared/hooks/useTasks';
+import { useDemoteOrphanedVariants } from '@/shared/hooks/useDemoteOrphanedVariants';
 
 const ShotEditor: React.FC<ShotEditorProps> = ({
   selectedShotId,
@@ -205,6 +206,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   const { createShot } = useShotCreation();
   const { mutateAsync: addToShotMutation } = useAddImageToShot();
   const { mutateAsync: addToShotWithoutPositionMutation } = useAddImageToShotWithoutPosition();
+
+  // Orphaned variant detection - demotes videos when source images change
+  const { demoteOrphanedVariants } = useDemoteOrphanedVariants();
 
   // 🎯 PERF FIX: Refs for mutation functions to prevent callback recreation
   // React Query mutations change reference on state changes (idle → pending → success)
@@ -1831,6 +1835,9 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
   // 🎯 PERF FIX: Use refs to avoid callback recreation on shot/project changes
   const updateShotImageOrderMutationRef = useRef(updateShotImageOrderMutation);
   updateShotImageOrderMutationRef.current = updateShotImageOrderMutation;
+
+  const demoteOrphanedVariantsRef = useRef(demoteOrphanedVariants);
+  demoteOrphanedVariantsRef.current = demoteOrphanedVariants;
   
   const handleReorderImagesInShot = useCallback((orderedShotGenerationIds: string[], draggedItemId?: string) => {
     // DragDebug: handleReorderImagesInShot called
@@ -1870,6 +1877,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
       projectId: projId,
       updates,
     }, {
+      onSuccess: () => {
+        // Check for orphaned video variants after reorder
+        // Videos whose source images have changed positions will be demoted
+        demoteOrphanedVariantsRef.current(shot.id);
+      },
       onError: (error) => {
         console.error('[ShotEditor] Failed to reorder images:', error);
         // The mutation's onError will handle showing the error message and reverting optimistic updates

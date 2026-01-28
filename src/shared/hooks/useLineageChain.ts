@@ -1,8 +1,11 @@
 /**
  * useLineageChain Hook
  *
- * Fetches the full lineage chain for a generation by following the `based_on` field.
- * Returns an array ordered from oldest ancestor to newest (the provided generation).
+ * Fetches the full lineage chain for a variant by following the `source_variant_id` field in params.
+ * Returns an array ordered from oldest ancestor to newest (the provided variant).
+ *
+ * Note: Lineage is tracked at the variant level via params.source_variant_id,
+ * not at the generation level via based_on.
  */
 
 import { useQuery } from '@tanstack/react-query';
@@ -13,7 +16,8 @@ export interface LineageItem {
   imageUrl: string;
   thumbnailUrl: string | null;
   createdAt: string;
-  type: 'generation';
+  type: 'variant';
+  variantType: string | null;
 }
 
 interface LineageChainResult {
@@ -24,26 +28,26 @@ interface LineageChainResult {
 }
 
 /**
- * Recursively fetch the lineage chain for a generation.
- * Follows the `based_on` field to find ancestors.
+ * Recursively fetch the lineage chain for a variant.
+ * Follows the `params.source_variant_id` field to find ancestors.
  */
-async function fetchLineageChain(generationId: string): Promise<LineageItem[]> {
+async function fetchLineageChain(variantId: string): Promise<LineageItem[]> {
   const chain: LineageItem[] = [];
   const visited = new Set<string>();
-  let currentId: string | null = generationId;
+  let currentId: string | null = variantId;
 
-  // Follow the based_on chain upward to find all ancestors
+  // Follow the source_variant_id chain upward to find all ancestors
   while (currentId && !visited.has(currentId)) {
     visited.add(currentId);
 
     const { data, error } = await supabase
-      .from('generations')
-      .select('id, location, thumbnail_url, created_at, based_on')
+      .from('generation_variants')
+      .select('id, location, thumbnail_url, created_at, params, variant_type')
       .eq('id', currentId)
       .single();
 
     if (error || !data) {
-      console.error('[useLineageChain] Error fetching generation:', error);
+      console.error('[useLineageChain] Error fetching variant:', error);
       break;
     }
 
@@ -53,33 +57,36 @@ async function fetchLineageChain(generationId: string): Promise<LineageItem[]> {
       imageUrl: data.location,
       thumbnailUrl: data.thumbnail_url,
       createdAt: data.created_at,
-      type: 'generation',
+      type: 'variant',
+      variantType: data.variant_type,
     });
 
-    // Move to the parent generation
-    currentId = data.based_on;
+    // Move to the parent variant via source_variant_id in params
+    const params = data.params as Record<string, any> | null;
+    currentId = params?.source_variant_id || null;
   }
 
   console.log('[useLineageChain] Fetched chain:', {
-    startId: generationId.substring(0, 8),
+    startId: variantId.substring(0, 8),
     chainLength: chain.length,
     ids: chain.map(item => item.id.substring(0, 8)),
+    types: chain.map(item => item.variantType),
   });
 
   return chain;
 }
 
 /**
- * Hook to fetch the full lineage chain for a generation.
+ * Hook to fetch the full lineage chain for a variant.
  *
- * @param generationId - The generation ID to fetch lineage for
+ * @param variantId - The variant ID to fetch lineage for
  * @returns Object with chain (oldest to newest), loading state, and whether there's lineage
  */
-export function useLineageChain(generationId: string | null): LineageChainResult {
+export function useLineageChain(variantId: string | null): LineageChainResult {
   const { data: chain = [], isLoading, error } = useQuery({
-    queryKey: ['lineage-chain', generationId],
-    queryFn: () => fetchLineageChain(generationId!),
-    enabled: !!generationId,
+    queryKey: ['lineage-chain', variantId],
+    queryFn: () => fetchLineageChain(variantId!),
+    enabled: !!variantId,
     staleTime: 5 * 60 * 1000, // 5 minutes - lineage doesn't change
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
@@ -87,28 +94,29 @@ export function useLineageChain(generationId: string | null): LineageChainResult
   return {
     chain,
     isLoading,
-    // Has lineage if chain has more than 1 item (the current generation + at least one ancestor)
+    // Has lineage if chain has more than 1 item (the current variant + at least one ancestor)
     hasLineage: chain.length > 1,
     error: error as Error | null,
   };
 }
 
 /**
- * Synchronous function to check if a generation has lineage.
+ * Check if a variant has lineage (has a source_variant_id in params).
  * This fetches directly without caching - use sparingly for initial checks.
  */
-export async function checkHasLineage(generationId: string): Promise<boolean> {
+export async function checkHasLineage(variantId: string): Promise<boolean> {
   const { data, error } = await supabase
-    .from('generations')
-    .select('based_on')
-    .eq('id', generationId)
+    .from('generation_variants')
+    .select('params')
+    .eq('id', variantId)
     .single();
 
   if (error || !data) {
     return false;
   }
 
-  return !!data.based_on;
+  const params = data.params as Record<string, any> | null;
+  return !!params?.source_variant_id;
 }
 
 export default useLineageChain;

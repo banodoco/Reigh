@@ -25,13 +25,25 @@ export interface CreateGifProgress {
 
 /**
  * Load an image from URL and return an HTMLImageElement.
+ * Handles CORS by setting crossOrigin attribute.
  */
 async function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    // Set crossOrigin to allow canvas operations on the image
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = (e) => reject(new Error(`Failed to load image: ${url}`));
+    img.onload = () => {
+      console.log('[createLineageGif] Image loaded:', {
+        url: url.substring(0, 50) + '...',
+        width: img.width,
+        height: img.height,
+      });
+      resolve(img);
+    };
+    img.onerror = (e) => {
+      console.error('[createLineageGif] Failed to load image:', url);
+      reject(new Error(`Failed to load image: ${url}`));
+    };
     img.src = url;
   });
 }
@@ -151,11 +163,25 @@ export async function createLineageGif(
 
   // Process each image
   for (let i = 0; i < images.length; i++) {
-    // Draw image to canvas
-    drawImageToCanvas(ctx, images[i], width, height);
+    const img = images[i];
 
-    // Get image data
-    const imageData = ctx.getImageData(0, 0, width, height);
+    // Validate image has dimensions
+    if (!img.width || !img.height) {
+      console.warn('[createLineageGif] Image has no dimensions, skipping:', i);
+      continue;
+    }
+
+    // Draw image to canvas
+    drawImageToCanvas(ctx, img, width, height);
+
+    // Get image data (will throw if canvas is tainted by CORS)
+    let imageData: ImageData;
+    try {
+      imageData = ctx.getImageData(0, 0, width, height);
+    } catch (err) {
+      console.error('[createLineageGif] CORS error getting image data for frame', i, err);
+      throw new Error(`CORS error: Cannot process image. The image server may not allow cross-origin access.`);
+    }
     const { data } = imageData;
 
     // Convert RGBA to RGB array for gifenc

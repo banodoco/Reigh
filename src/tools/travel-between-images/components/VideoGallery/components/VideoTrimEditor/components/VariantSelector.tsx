@@ -108,7 +108,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
   const [loadedSettingsVariantId, setLoadedSettingsVariantId] = useState<string | null>(null);
   const [deletingVariantId, setDeletingVariantId] = useState<string | null>(null);
   const [copiedVariantId, setCopiedVariantId] = useState<string | null>(null);
-  const [lineageGifGenerationId, setLineageGifGenerationId] = useState<string | null>(null);
+  const [lineageGifVariantId, setLineageGifVariantId] = useState<string | null>(null);
   const [variantLineageStatus, setVariantLineageStatus] = useState<Record<string, boolean>>({});
   const isMobile = useIsMobile();
   const { data: availableLoras } = usePublicLoras();
@@ -237,15 +237,15 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
     setCurrentPage(0);
   }, [relationshipFilter]);
 
-  // Check for lineage on each variant's generation
+  // Check for lineage on each variant (via params.source_variant_id)
   // This allows showing the "Lineage GIF" button for variants with edit history
   // Use a ref to track which IDs we've started checking to avoid redundant queries
   const checkedLineageIdsRef = React.useRef<Set<string>>(new Set());
 
   React.useEffect(() => {
     const checkLineageForVariants = async () => {
-      const generationIds = [...new Set(variants.map(v => v.generation_id))];
-      const uncheckedIds = generationIds.filter(id => !checkedLineageIdsRef.current.has(id));
+      const variantIds = variants.map(v => v.id);
+      const uncheckedIds = variantIds.filter(id => !checkedLineageIdsRef.current.has(id));
 
       if (uncheckedIds.length === 0) return;
 
@@ -255,12 +255,12 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
       const results: Record<string, boolean> = {};
 
       await Promise.all(
-        uncheckedIds.map(async (genId) => {
+        uncheckedIds.map(async (variantId) => {
           try {
-            const hasLineage = await checkHasLineage(genId);
-            results[genId] = hasLineage;
+            const hasLineage = await checkHasLineage(variantId);
+            results[variantId] = hasLineage;
           } catch {
-            results[genId] = false;
+            results[variantId] = false;
           }
         })
       );
@@ -760,14 +760,14 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                         )}
                       </div>
                     )}
-                    {/* Lineage GIF button - only shown if the generation has lineage (based_on is set) */}
-                    {variantLineageStatus[variant.generation_id] && (
+                    {/* Lineage GIF button - only shown if the variant has lineage (source_variant_id is set) */}
+                    {variantLineageStatus[variant.id] && (
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setLineageGifGenerationId(variant.generation_id);
+                          setLineageGifVariantId(variant.id);
                         }}
                         className="h-6 text-xs gap-1 w-full mt-1.5"
                       >
@@ -793,9 +793,9 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
 
     {/* Lineage GIF Modal - outside TooltipProvider to avoid z-index issues */}
     <LineageGifModal
-      open={!!lineageGifGenerationId}
-      onClose={() => setLineageGifGenerationId(null)}
-      generationId={lineageGifGenerationId}
+      open={!!lineageGifVariantId}
+      onClose={() => setLineageGifVariantId(null)}
+      variantId={lineageGifVariantId}
     />
     </>
   );
