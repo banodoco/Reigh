@@ -114,11 +114,14 @@ export const useMagicEditMode = ({
   const hasManuallyExitedRef = useRef(false);
   // Guard against double-entry during async state updates
   const isEnteringEditModeRef = useRef(false);
+  // Track if we've already restored the prompt for this mode entry (prevents re-restore on clear)
+  const hasRestoredPromptRef = useRef(false);
 
   // Reset flags when media changes
   useEffect(() => {
     hasManuallyExitedRef.current = false;
     isEnteringEditModeRef.current = false;
+    hasRestoredPromptRef.current = false;
   }, [media.id]);
 
   const handleEnterMagicEditMode = useCallback(() => {
@@ -136,6 +139,7 @@ export const useMagicEditMode = ({
     console.log('[MediaLightbox] ✨ Exiting unified edit mode');
     console.log('[MediaLightbox] Exit called from:', new Error().stack);
     hasManuallyExitedRef.current = true;
+    hasRestoredPromptRef.current = false; // Reset so re-entering can restore again
     setIsMagicEditMode(false);
     setIsInpaintMode(false);
   }, [setIsInpaintMode]);
@@ -154,11 +158,16 @@ export const useMagicEditMode = ({
   }, [autoEnterInpaint, isInpaintMode, isMagicEditMode, isVideo, selectedProjectId, handleEnterMagicEditMode]);
 
   // Load saved prompt and settings when entering magic edit mode (without brush strokes)
+  // Only restore once per mode entry to prevent re-restoring when user clears the prompt
   useEffect(() => {
-    if (isMagicEditMode && !isLoadingMetadata && currentShotId && brushStrokes.length === 0) {
+    if (isMagicEditMode && !isLoadingMetadata && currentShotId && brushStrokes.length === 0 && !hasRestoredPromptRef.current) {
+      // Mark as initialized FIRST - we only get one chance to restore per mode entry
+      // This prevents clearing the prompt from triggering restoration
+      hasRestoredPromptRef.current = true;
+
       const lastPrompt = getLastMagicEditPrompt();
       const lastSettings = getLastSettings();
-      
+
       if (lastPrompt && !inpaintPrompt) {
         console.log('[MediaLightbox] Restoring saved magic edit prompt', {
           promptLength: lastPrompt.length,

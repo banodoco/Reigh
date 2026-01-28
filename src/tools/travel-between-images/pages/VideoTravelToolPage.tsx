@@ -648,10 +648,11 @@ const VideoTravelToolPage: React.FC = () => {
     shotSettings.status === 'ready' && 
     shotSettings.shotId === currentShotId;
   
-  const generationMode: 'batch' | 'timeline' | 'by-pair' = 
+  // For new shots (not in cache), default to 'batch' mode
+  const generationMode: 'batch' | 'timeline' | 'by-pair' =
     settingsReadyForCurrentShot
       ? rawGenerationMode
-      : (cachedGenerationMode ?? rawGenerationMode);
+      : (cachedGenerationMode ?? 'batch');
   React.useEffect(() => {
     if (selectedShot?.id) {
       console.log('[GenerationModeDebug] 🎯 MODE COMPARISON:', {

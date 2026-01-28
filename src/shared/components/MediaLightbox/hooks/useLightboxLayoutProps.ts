@@ -364,7 +364,7 @@ export function useLightboxLayoutProps(
     onVariantSelect: input.setActiveVariantId,
     onMakePrimary: input.setPrimaryVariant,
     isLoadingVariants: input.isLoadingVariants,
-    onPromoteToGeneration: input.handlePromoteToGeneration,
+    onPromoteToGeneration: input.isVideo ? undefined : input.handlePromoteToGeneration,
     isPromoting: input.isPromoting,
     onDeleteVariant: input.deleteVariant,
     onLoadVariantSettings: input.setVariantParamsToLoad,

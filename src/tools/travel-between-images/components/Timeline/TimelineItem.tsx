@@ -18,7 +18,7 @@ interface TimelineItemProps {
   isDragging: boolean;
   isSwapTarget: boolean;
   dragOffset: { x: number; y: number } | null;
-  onMouseDown: (e: React.MouseEvent, imageId: string) => void;
+  onMouseDown?: (e: React.MouseEvent, imageId: string) => void;
   onDoubleClick?: () => void;
   onMobileTap?: () => void;
   zoomLevel: number;
@@ -32,9 +32,9 @@ interface TimelineItemProps {
   /** When provided, image src will only be set once this is true */
   shouldLoad?: boolean;
   
-  // Action handlers
-  onDelete: (imageId: string) => void;
-  onDuplicate: (imageId: string, timeline_frame: number) => void;
+  // Action handlers (optional in readOnly mode)
+  onDelete?: (imageId: string) => void;
+  onDuplicate?: (imageId: string, timeline_frame: number) => void;
   onInpaintClick?: () => void;
   duplicatingImageId?: string;
   duplicateSuccessImageId?: string;
@@ -342,11 +342,13 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
           return;
         }
         
-        console.log('[TimelineItem] ✅ CALLING onMouseDown handler:', {
-          itemId: imageKey?.substring(0, 8),
-          hasHandler: typeof onMouseDown === 'function'
-        });
-        onMouseDown(e, imageKey);
+        if (onMouseDown) {
+          console.log('[TimelineItem] ✅ CALLING onMouseDown handler:', {
+            itemId: imageKey?.substring(0, 8),
+            hasHandler: typeof onMouseDown === 'function'
+          });
+          onMouseDown(e, imageKey);
+        }
       }}
       onMouseEnter={() => {
         setIsHovered(true);

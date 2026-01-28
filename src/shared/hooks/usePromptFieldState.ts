@@ -8,6 +8,7 @@
  *
  * Priority logic:
  * 1. If settings.prompt exists AND differs from basePromptForEnhancement → user edited after enhancement, show their edit
+ *    - Fallback: if basePromptForEnhancement is undefined (older data), compare against enhancedPrompt instead
  * 2. If enhancedPrompt exists → show AI-enhanced version with badge
  * 3. If settings.prompt exists (same as base, or no enhanced) → show it
  * 4. Fall back to shot defaults
@@ -131,11 +132,16 @@ export function usePromptFieldState({
   const userHasEditedAfterEnhancement = useMemo(() => {
     if (!hasSettingsPrompt) return false;
     if (!hasEnhancedPrompt) return false; // No enhancement to compare against
-    if (basePromptForEnhancement === undefined) return false; // No base stored, can't compare
 
-    // User has edited if their prompt differs from what was used for enhancement
-    return settingsPrompt.trim() !== basePromptForEnhancement.trim();
-  }, [hasSettingsPrompt, hasEnhancedPrompt, settingsPrompt, basePromptForEnhancement]);
+    // If we have the base that was used for enhancement, compare against it
+    if (basePromptForEnhancement !== undefined) {
+      return settingsPrompt!.trim() !== basePromptForEnhancement.trim();
+    }
+
+    // Fallback: if no base stored (older data), compare against enhanced prompt itself
+    // User has edited if their prompt differs from the displayed enhanced value
+    return settingsPrompt!.trim() !== enhancedPrompt!.trim();
+  }, [hasSettingsPrompt, hasEnhancedPrompt, settingsPrompt, basePromptForEnhancement, enhancedPrompt]);
 
   // Calculate display value and badge type
   const { displayValue, badgeType } = useMemo(() => {

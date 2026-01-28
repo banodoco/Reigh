@@ -809,11 +809,12 @@ export const useTaskStatusCounts = (projectId: string | null) => {
           
         // Query for recent failures (last hour)
         // NOTE: Use `updated_at` for failures since `generation_processed_at` is only set on success
+        // NOTE: Only count 'Failed', not 'Cancelled' - cancelled tasks are user-initiated and not errors
         supabase
           .from('tasks')
           .select('id', { count: 'exact', head: true })
           .eq('project_id', projectId)
-          .in('status', ['Failed', 'Cancelled'])
+          .eq('status', 'Failed')
           .gte('updated_at', oneHourAgo)
           .is('params->orchestrator_task_id_ref', null) // Only parent tasks
           .in('task_type', visibleTaskTypes) // Only visible task types

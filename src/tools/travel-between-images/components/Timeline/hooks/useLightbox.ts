@@ -62,16 +62,16 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
 
   const openLightbox = useCallback((index: number) => {
     console.log('[DoubleTapFlow] 🎭 openLightbox called:', {
-      shotId: shotId.substring(0, 8),
+      shotId: shotId?.substring(0, 8) ?? 'none',
       requestedIndex: index,
       totalImages: images.length,
       isValidIndex: index >= 0 && index < images.length,
       imageId: images[index]?.id?.substring(0, 8) // shot_generations.id
     });
-    
+
     if (index >= 0 && index < images.length) {
       console.log('[DoubleTapFlow] ✅ LIGHTBOX OPENING:', {
-        shotId: shotId.substring(0, 8),
+        shotId: shotId?.substring(0, 8) ?? 'none',
         index,
         imageId: images[index]?.id?.substring(0, 8) // shot_generations.id
       });
@@ -116,7 +116,7 @@ export function useLightbox({ images, shotId, isMobile = false }: LightboxProps)
   // Handle mobile tap - now called by useDoubleTapWithSelection hook
   const handleMobileTap = useCallback((idx: number) => {
     console.log('[DoubleTapFlow] 🎭 useLightbox handleMobileTap called:', {
-      shotId: shotId.substring(0, 8),
+      shotId: shotId?.substring(0, 8) ?? 'none',
       imageIndex: idx,
       isMobile,
       imagesCount: images.length

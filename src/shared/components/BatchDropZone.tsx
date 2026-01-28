@@ -376,7 +376,8 @@ const BatchDropZone: React.FC<BatchDropZoneProps> = ({
   }, [columns, itemCount, disabled, onImageDrop, onGenerationDrop, getFramePositionForIndex]);
 
   if (disabled) {
-    return <>{children}</>;
+    // Handle function children even when disabled
+    return <>{typeof children === 'function' ? children(false, null) : children}</>;
   }
 
   const isOver = dragType !== 'none';

@@ -101,21 +101,26 @@ export function useVariantPromotion({
       // 2. Calculate target timeline frame by querying the TARGET shot's items
       let targetTimelineFrame: number | undefined;
       if (currentTimelineFrame !== undefined) {
-        // Query the target shot to find the next item after current position
-        const { data: shotItems } = await supabase
+        // Query all items in the target shot to find next item and calculate average spacing
+        const { data: allShotItems } = await supabase
           .from('shot_generations')
           .select('timeline_frame')
           .eq('shot_id', shotId)
-          .gt('timeline_frame', currentTimelineFrame)
-          .order('timeline_frame', { ascending: true })
-          .limit(1);
+          .not('timeline_frame', 'is', null)
+          .order('timeline_frame', { ascending: true });
 
-        const nextTimelineFrame = shotItems?.[0]?.timeline_frame ?? undefined;
+        const frames = (allShotItems || [])
+          .map(item => item.timeline_frame as number)
+          .filter(f => f !== null && f !== undefined);
+
+        // Find the next item after current position
+        const nextTimelineFrame = frames.find(f => f > currentTimelineFrame);
 
         console.log('[VariantToShot] Frame calculation:', {
           currentTimelineFrame,
           nextTimelineFrame,
           hasNext: nextTimelineFrame !== undefined,
+          totalFrames: frames.length,
         });
 
         if (nextTimelineFrame !== undefined && nextTimelineFrame > currentTimelineFrame) {
@@ -127,9 +132,21 @@ export function useVariantPromotion({
             targetTimelineFrame = currentTimelineFrame + 1;
           }
         } else {
-          // No next item in shot, place at current + 1
-          targetTimelineFrame = currentTimelineFrame + 1;
-          console.log('[VariantToShot] No next item, using current +1:', targetTimelineFrame);
+          // No next item in shot - calculate average spacing and use that
+          if (frames.length >= 2) {
+            // Calculate average gap between consecutive frames
+            let totalGap = 0;
+            for (let i = 1; i < frames.length; i++) {
+              totalGap += frames[i] - frames[i - 1];
+            }
+            const averageGap = Math.round(totalGap / (frames.length - 1));
+            targetTimelineFrame = currentTimelineFrame + Math.max(1, averageGap);
+            console.log('[VariantToShot] No next item, using average gap:', averageGap, '-> frame:', targetTimelineFrame);
+          } else {
+            // Only one item in shot, use current + 1
+            targetTimelineFrame = currentTimelineFrame + 1;
+            console.log('[VariantToShot] Single item in shot, using current +1:', targetTimelineFrame);
+          }
         }
       }
 

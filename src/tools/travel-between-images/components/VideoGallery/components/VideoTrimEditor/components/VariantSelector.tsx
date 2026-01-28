@@ -657,6 +657,15 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                     )}
 
                     {/* Action buttons row - Make Primary and/or Load Settings - hidden in readOnly mode */}
+                    {console.log('[VariantSelector] Action buttons check:', {
+                      variantId: variant.id.substring(0, 8),
+                      readOnly,
+                      isPrimary,
+                      hasOnMakePrimary: !!onMakePrimary,
+                      hasOnLoadVariantSettings: !!onLoadVariantSettings,
+                      hasParams: !!variant.params,
+                      paramsTaskType: variant.params?.task_type,
+                    })}
                     {!readOnly && ((!isPrimary && onMakePrimary) || (onLoadVariantSettings && variant.params)) && (
                       <div className="flex gap-1.5">
                         {/* Make Primary button - only for non-primary variants */}

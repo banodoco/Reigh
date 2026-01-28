@@ -367,7 +367,7 @@ const Timeline: React.FC<TimelineProps> = ({
   // [TimelineVisibility] Track when Timeline receives data updates from parent
   React.useEffect(() => {
     console.log('[TimelineVisibility] 📥 Timeline DATA RECEIVED from parent:', {
-      shotId: shotId.substring(0, 8),
+      shotId: shotId?.substring(0, 8) ?? 'none',
       propShotGenerationsCount: propShotGenerations?.length ?? 0,
       propImagesCount: propImages?.length ?? 0,
       shotGenerationsCount: shotGenerations.length,
@@ -380,7 +380,7 @@ const Timeline: React.FC<TimelineProps> = ({
   
   // Log data source for debugging
   console.log('[UnifiedDataFlow] Timeline data source:', {
-    shotId: shotId.substring(0, 8),
+    shotId: shotId?.substring(0, 8) ?? 'none',
     hasPropHookData: !!propHookData,
     hasPropImages: !!propImages,
     dataSource: propHookData ? 'shared hookData' : propImages ? 'utility hook (two-phase)' : 'legacy hook',
@@ -388,7 +388,7 @@ const Timeline: React.FC<TimelineProps> = ({
   });
   
   console.log('[DataTrace] 📥 Timeline received data:', {
-    shotId: shotId.substring(0, 8),
+    shotId: shotId?.substring(0, 8) ?? 'none',
     shotGenerationsCount: shotGenerations.length,
     propImagesCount: propImages?.length || 0,
     usingPropImages: !!propImages,
@@ -434,7 +434,7 @@ const Timeline: React.FC<TimelineProps> = ({
 
     // [TimelineVisibility] Log images array changes
     console.log(`[TimelineVisibility] 📸 IMAGES ARRAY COMPUTED:`, {
-      shotId: shotId.substring(0, 8),
+      shotId: shotId?.substring(0, 8) ?? 'none',
       source: propImages ? 'propImages' : 'shotGenerations',
       totalImages: result.length,
       shotGenerationsCount: shotGenerations.length,
@@ -474,7 +474,7 @@ const Timeline: React.FC<TimelineProps> = ({
     });
 
     console.log('[DataTrace] 🎨 Timeline final images for display:', {
-      shotId: shotId.substring(0, 8),
+      shotId: shotId?.substring(0, 8) ?? 'none',
       total: result.length,
       source: propImages ? 'propImages' : 'shotGenerations',
       positioned: result.filter(img => img.timeline_frame != null && img.timeline_frame >= 0).length,
@@ -482,6 +482,11 @@ const Timeline: React.FC<TimelineProps> = ({
     
     return result;
   }, [shotGenerations, propImages, shotId]);
+
+  // Pass all generations for readOnly mode
+  // This allows SegmentOutputStrip to derive parent/child videos and timeline data
+  // without database queries (uses the same filtering logic as the hooks)
+  const allGenerationsForReadOnly = readOnly ? propAllGenerations : undefined;
 
   // Position management hook
   const {
@@ -1094,6 +1099,7 @@ const Timeline: React.FC<TimelineProps> = ({
         selectedOutputId={selectedOutputId}
         onSelectedOutputChange={onSelectedOutputChange}
         onSegmentFrameCountChange={onSegmentFrameCountChange}
+        videoOutputs={allGenerationsForReadOnly}
       />
 
       {/* Lightbox */}

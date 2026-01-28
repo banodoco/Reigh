@@ -27,8 +27,9 @@ declare const Deno: any;
  * Headers: Authorization: Bearer <service-key or PAT>
  * Body: {
  *   worker_id?: string,        // Optional worker ID for service role
- *   run_type?: 'gpu' | 'api', // Optional: filter tasks by execution environment
- *   same_model_only?: boolean // Optional: only claim tasks matching worker's current_model (for model affinity)
+ *   run_type?: 'gpu' | 'api',  // Optional: filter tasks by execution environment
+ *   same_model_only?: boolean, // Optional: only claim tasks matching worker's current_model
+ *   debug?: boolean            // Optional: enable verbose logging/analysis on 204 responses
  * }
  *
  * Returns:
@@ -74,6 +75,7 @@ serve(async (req) => {
   const workerId = requestBody.worker_id || `edge_${crypto.randomUUID()}`;
   const runType = requestBody.run_type || null; // 'gpu', 'api', or null (no filtering)
   const sameModelOnly = requestBody.same_model_only || false; // Only claim tasks matching worker's current model
+  const debug = requestBody.debug === true; // Enable verbose analysis on 204 responses
 
   // Authenticate using shared auth module
   const auth = await authenticateRequest(req, supabaseAdmin, "[CLAIM-NEXT-TASK]");
@@ -132,36 +134,39 @@ serve(async (req) => {
       }
 
       if (!claimResult || claimResult.length === 0) {
-        logger.info("No eligible tasks available", { 
-          worker_id: workerId, 
-          run_type: runType,
-          same_model_only: sameModelOnly
-        });
-        
-        // Add detailed debugging analysis
-        try {
-          const { data: analysis } = await supabaseAdmin
-            .rpc('analyze_task_availability_service_role', {
-              p_include_active: false,
-              p_run_type: runType
-            });
-          
-          if (analysis && analysis.total_tasks > 0 && analysis.eligible_tasks === 0) {
-            const reasons = analysis.rejection_reasons || {};
-            logger.debug("Task availability analysis", {
-              total_tasks: analysis.total_tasks,
-              eligible_tasks: analysis.eligible_tasks,
-              no_credits: reasons.no_credits,
-              cloud_disabled: reasons.cloud_disabled,
-              concurrency_limit: reasons.concurrency_limit,
-              dependency_blocked: reasons.dependency_blocked
-            });
+        // Only log and analyze when debug=true to reduce overhead for frequent polling
+        if (debug) {
+          logger.info("No eligible tasks available", {
+            worker_id: workerId,
+            run_type: runType,
+            same_model_only: sameModelOnly
+          });
+
+          // Detailed debugging analysis (only when debug=true)
+          try {
+            const { data: analysis } = await supabaseAdmin
+              .rpc('analyze_task_availability_service_role', {
+                p_include_active: false,
+                p_run_type: runType
+              });
+
+            if (analysis && analysis.total_tasks > 0 && analysis.eligible_tasks === 0) {
+              const reasons = analysis.rejection_reasons || {};
+              logger.debug("Task availability analysis", {
+                total_tasks: analysis.total_tasks,
+                eligible_tasks: analysis.eligible_tasks,
+                no_credits: reasons.no_credits,
+                cloud_disabled: reasons.cloud_disabled,
+                concurrency_limit: reasons.concurrency_limit,
+                dependency_blocked: reasons.dependency_blocked
+              });
+            }
+          } catch (debugError: any) {
+            logger.debug("Debug analysis failed", { error: debugError?.message });
           }
-        } catch (debugError: any) {
-          logger.debug("Debug analysis failed", { error: debugError?.message });
+
+          await logger.flush();
         }
-        
-        await logger.flush();
         return new Response(null, { status: 204 });
       }
       
@@ -208,32 +213,35 @@ serve(async (req) => {
       }
 
       if (!claimResult || claimResult.length === 0) {
-        logger.info("No eligible tasks for user", { user_id: callerId });
-        
-        // Add detailed debugging analysis for user
-        try {
-          const { data: analysis } = await supabaseAdmin
-            .rpc('analyze_task_availability_user_pat', {
-              p_user_id: callerId,
-              p_include_active: false
-            });
-          
-          if (analysis) {
-            const userInfo = analysis.user_info || {};
-            logger.debug("User task availability analysis", {
-              user_id: callerId,
-              credits: userInfo.credits,
-              allows_local: userInfo.allows_local,
-              projects_count: (analysis.projects || []).length,
-              recent_tasks_count: (analysis.recent_tasks || []).length,
-              eligible_count: analysis.eligible_count
-            });
+        // Only log and analyze when debug=true to reduce overhead
+        if (debug) {
+          logger.info("No eligible tasks for user", { user_id: callerId });
+
+          // Detailed debugging analysis for user (only when debug=true)
+          try {
+            const { data: analysis } = await supabaseAdmin
+              .rpc('analyze_task_availability_user_pat', {
+                p_user_id: callerId,
+                p_include_active: false
+              });
+
+            if (analysis) {
+              const userInfo = analysis.user_info || {};
+              logger.debug("User task availability analysis", {
+                user_id: callerId,
+                credits: userInfo.credits,
+                allows_local: userInfo.allows_local,
+                projects_count: (analysis.projects || []).length,
+                recent_tasks_count: (analysis.recent_tasks || []).length,
+                eligible_count: analysis.eligible_count
+              });
+            }
+          } catch (debugError: any) {
+            logger.debug("User debug analysis failed", { error: debugError?.message });
           }
-        } catch (debugError: any) {
-          logger.debug("User debug analysis failed", { error: debugError?.message });
+
+          await logger.flush();
         }
-        
-        await logger.flush();
         return new Response(null, { status: 204 });
       }
       
