@@ -111,22 +111,21 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
   }
 
   // Overlay variant for positioning on top of video
-  // Position above WorkflowControlsBar (which is at bottom-8 md:bottom-16)
-  // Mobile: very close to edge (bottom-4), Desktop: more spacing (bottom-28)
+  // Same level as other bottom controls (bottom-4)
   return (
     <div
-      className="absolute bottom-4 md:bottom-28 left-1/2 transform -translate-x-1/2 z-[70] select-none"
+      className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-[70] select-none"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {/* Start image button */}
         <button
           onClick={handleStartClick}
           disabled={!startImageId}
           title="View start image"
           className={cn(
-            'relative w-12 h-12 md:w-14 md:h-14 rounded-lg overflow-hidden shadow-lg transition-all',
-            'hover:scale-105 hover:shadow-xl hover:ring-2 hover:ring-white/40',
+            'relative w-9 h-9 md:w-10 md:h-10 rounded-md overflow-hidden shadow-md transition-all',
+            'hover:scale-105 hover:shadow-lg hover:ring-2 hover:ring-white/40',
             'focus:outline-none focus:ring-2 focus:ring-white/50',
             !startImageId && 'opacity-30 cursor-not-allowed pointer-events-none'
           )}
@@ -140,7 +139,7 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
           )}
           {/* Image icon overlay */}
           <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-            <Image className="w-5 h-5 md:w-6 md:h-6 text-white/50" />
+            <Image className="w-4 h-4 text-white/50" />
           </div>
         </button>
 
@@ -150,8 +149,8 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
           disabled={!endImageId}
           title="View end image"
           className={cn(
-            'relative w-12 h-12 md:w-14 md:h-14 rounded-lg overflow-hidden shadow-lg transition-all',
-            'hover:scale-105 hover:shadow-xl hover:ring-2 hover:ring-white/40',
+            'relative w-9 h-9 md:w-10 md:h-10 rounded-md overflow-hidden shadow-md transition-all',
+            'hover:scale-105 hover:shadow-lg hover:ring-2 hover:ring-white/40',
             'focus:outline-none focus:ring-2 focus:ring-white/50',
             !endImageId && 'opacity-30 cursor-not-allowed pointer-events-none'
           )}
@@ -165,7 +164,7 @@ export const ConstituentImageNavigation: React.FC<ConstituentImageNavigationProp
           )}
           {/* Image icon overlay */}
           <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-            <Image className="w-5 h-5 md:w-6 md:h-6 text-white/50" />
+            <Image className="w-4 h-4 text-white/50" />
           </div>
         </button>
       </div>

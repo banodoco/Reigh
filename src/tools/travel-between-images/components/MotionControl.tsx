@@ -375,15 +375,18 @@ export const MotionControl: React.FC<MotionControlProps> = ({
   return (
     <div className="space-y-4">
       <Tabs value={motionMode} onValueChange={handleModeChange}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="basic">Basic</TabsTrigger>
-          <TabsTrigger value="advanced" disabled={turboMode}>
-            Advanced
-          </TabsTrigger>
-        </TabsList>
+        <div className="flex items-center gap-3 mb-3">
+          <Label className="text-sm font-medium">Mode:</Label>
+          <TabsList className="grid w-40 grid-cols-2">
+            <TabsTrigger value="basic">Basic</TabsTrigger>
+            <TabsTrigger value="advanced" disabled={turboMode}>
+              Advanced
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Basic Mode: Preset Chips + LoRAs */}
-        <TabsContent value="basic" className="space-y-4 mt-4">
+        <TabsContent value="basic" className="space-y-4 mt-0">
           {/* Preset Selection Section */}
           <div className="space-y-3">
             {/* Show preset chips OR selected non-known preset card */}

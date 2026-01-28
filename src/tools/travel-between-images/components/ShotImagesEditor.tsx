@@ -2995,7 +2995,7 @@ const ShotImagesEditor: React.FC<ShotImagesEditorProps> = ({
 
           // In batch mode, the structure video covers all segments
           if (effectiveGenerationMode === 'batch') {
-            return propStructureVideos[0].structure_type ?? 'flow';
+            return propStructureVideos[0].structure_type ?? 'uni3c';  // Default to uni3c (only supported option)
           }
 
           // In timeline mode, find a structure video that overlaps with this segment

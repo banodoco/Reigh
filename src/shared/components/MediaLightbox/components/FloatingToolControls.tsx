@@ -30,14 +30,11 @@ export interface FloatingToolControlsProps {
   
   // Reposition props
   repositionTransform?: ImageTransform;
-  onRepositionTranslateXChange?: (value: number) => void;
-  onRepositionTranslateYChange?: (value: number) => void;
   onRepositionScaleChange?: (value: number) => void;
   onRepositionRotationChange?: (value: number) => void;
   onRepositionFlipH?: () => void;
   onRepositionFlipV?: () => void;
   onRepositionReset?: () => void;
-  imageDimensions?: { width: number; height: number } | null;
   
   // Common props
   brushStrokes: BrushStroke[];
@@ -67,14 +64,11 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
   annotationMode,
   onSetAnnotationMode,
   repositionTransform,
-  onRepositionTranslateXChange,
-  onRepositionTranslateYChange,
   onRepositionScaleChange,
   onRepositionRotationChange,
   onRepositionFlipH,
   onRepositionFlipV,
   onRepositionReset,
-  imageDimensions,
   brushStrokes,
   onUndo,
   onClearMask,
@@ -201,18 +195,15 @@ export const FloatingToolControls: React.FC<FloatingToolControlsProps> = ({
         )}
         
         {/* Reposition Mode Controls */}
-        {editMode === 'reposition' && repositionTransform && onRepositionTranslateXChange && onRepositionTranslateYChange && onRepositionScaleChange && onRepositionRotationChange && onRepositionFlipH && onRepositionFlipV && onRepositionReset && (
+        {editMode === 'reposition' && repositionTransform && onRepositionScaleChange && onRepositionRotationChange && onRepositionFlipH && onRepositionFlipV && onRepositionReset && (
           <RepositionControls
             transform={repositionTransform}
-            onTranslateXChange={onRepositionTranslateXChange}
-            onTranslateYChange={onRepositionTranslateYChange}
             onScaleChange={onRepositionScaleChange}
             onRotationChange={onRepositionRotationChange}
             onFlipH={onRepositionFlipH}
             onFlipV={onRepositionFlipV}
             onReset={onRepositionReset}
             variant={variant}
-            imageDimensions={imageDimensions}
           />
         )}
         

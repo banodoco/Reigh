@@ -310,14 +310,11 @@ export const MobileStackedLayout: React.FC<SidePanelLayoutProps> = (props) => {
             annotationMode={floatingToolProps.editMode === 'annotate' ? floatingToolProps.annotationMode : null}
             onSetAnnotationMode={floatingToolProps.setAnnotationMode}
             repositionTransform={floatingToolProps.repositionTransform}
-            onRepositionTranslateXChange={floatingToolProps.setTranslateX}
-            onRepositionTranslateYChange={floatingToolProps.setTranslateY}
             onRepositionScaleChange={floatingToolProps.setScale}
             onRepositionRotationChange={floatingToolProps.setRotation}
             onRepositionFlipH={floatingToolProps.toggleFlipH}
             onRepositionFlipV={floatingToolProps.toggleFlipV}
             onRepositionReset={floatingToolProps.resetTransform}
-            imageDimensions={floatingToolProps.effectiveImageDimensions}
             brushStrokes={floatingToolProps.brushStrokes}
             onUndo={floatingToolProps.handleUndo}
             onClearMask={floatingToolProps.handleClearMask}

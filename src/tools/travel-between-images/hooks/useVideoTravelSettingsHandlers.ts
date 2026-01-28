@@ -214,8 +214,9 @@ export const useVideoTravelSettingsHandlers = ({
     // Only rebuild when in Basic mode, unless force is true
     const isBasicMode = currentSettings?.motionMode === 'basic' || !currentSettings?.motionMode;
     if (!isBasicMode && !options?.force) return;
-    
-    const useVaceMode = (options?.generationTypeMode ?? currentSettings?.generationTypeMode) === 'vace';
+
+    // VACE mode removed - always use I2V
+    const useVaceMode = false;
     const motion = options?.amountOfMotion ?? currentSettings?.amountOfMotion ?? 50;
     const loras = options?.selectedLoras ?? (currentSettings?.loras || []).map(l => ({
       path: l.path,
@@ -262,19 +263,18 @@ export const useVideoTravelSettingsHandlers = ({
     if (mode === 'advanced') {
       const currentPhaseConfig = shotSettingsRef.current.settings?.phaseConfig;
       if (!currentPhaseConfig) {
-        // Build phase config from current basic mode settings (respects I2V/VACE mode)
+        // Build phase config from current basic mode settings (always I2V now)
         const currentSettings = shotSettingsRef.current.settings;
-        const useVaceMode = currentSettings?.generationTypeMode === 'vace';
+        const useVaceMode = false;  // VACE mode removed - always use I2V
         const currentMotion = currentSettings?.amountOfMotion ?? 50;
         const currentLoras = (currentSettings?.loras || []).map(l => ({
           path: l.path,
           strength: l.strength
         }));
-        
+
         const basicConfig = buildBasicModePhaseConfig(useVaceMode, currentMotion, currentLoras);
-        
+
         console.log('[MotionMode] Initializing phaseConfig from basic mode settings:', {
-          useVaceMode,
           amountOfMotion: currentMotion,
           loraCount: currentLoras.length,
           model: basicConfig.model

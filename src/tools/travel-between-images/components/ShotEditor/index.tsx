@@ -2610,14 +2610,16 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                         />
                     </div>
 
-                    {/* Right Column: Structure (if video exists) + Motion Control */}
+                    {/* Right Column: Motion Control (includes Camera Guidance when structure video exists) */}
                     <div className="lg:w-1/2 order-1 lg:order-2">
-                        {/* Structure Section - shown only when structure video is present */}
+                        <div className="mb-4">
+                            <SectionHeader title="Motion" theme="purple" />
+                        </div>
+
+                        {/* Camera Guidance - shown only when structure video is present */}
                         {structureVideoPath && (
                           <div className="mb-6">
-                            <div className="mb-4">
-                              <SectionHeader title="Camera Guidance" theme="green" />
-                            </div>
+                            <h4 className="text-sm font-medium text-muted-foreground mb-3">Camera Guidance:</h4>
                             <div className="space-y-4">
                               {/* Strength and End side by side (uni3c hardcoded) */}
                               <div className="grid grid-cols-2 gap-4">
@@ -2641,7 +2643,7 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                                     <span>2x</span>
                                   </div>
                                 </div>
-                                
+
                                 {/* Uni3C End Percent - shown only when uni3c is selected */}
                                 {structureVideoType === 'uni3c' && (
                                   <div className="space-y-2">
@@ -2668,10 +2670,11 @@ const ShotEditor: React.FC<ShotEditorProps> = ({
                             </div>
                           </div>
                         )}
-                        
-                        <div className="mb-4">
-                            <SectionHeader title="Motion" theme="purple" />
-                        </div>
+
+                        {/* Model Guidance - subheader only shown when Camera Guidance is also present */}
+                        {structureVideoPath && (
+                          <h4 className="text-sm font-medium text-muted-foreground mb-3">Model Guidance:</h4>
+                        )}
                         <MotionControl
                             // motionMode is typed as 'basic' | 'advanced'. Older code used a 'presets' branch.
                             motionMode={motionMode || 'basic'}

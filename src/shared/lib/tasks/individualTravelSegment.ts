@@ -175,7 +175,9 @@ function buildIndividualTravelSegmentParams(
     isUni3c = structureType === 'uni3c';
   }
 
-  const useVaceModel = hasStructureVideos && !isUni3c;
+  // VACE model is no longer supported - always use I2V
+  // Structure video type is hardcoded to uni3c, which uses I2V
+  const useVaceModel = false;
 
   // Determine motion settings
   const motionMode = params.motion_mode ?? orig.motion_mode ?? orchDetails.motion_mode ?? 'basic';

@@ -120,9 +120,12 @@ function migrateToArrayFormat(
 ): StructureVideoConfigWithMetadata[] {
   if (!settings) return [];
   
-  // Already in array format
+  // Already in array format - but still migrate structure_type to 'uni3c'
   if (settings.structure_videos && settings.structure_videos.length > 0) {
-    return settings.structure_videos;
+    return settings.structure_videos.map(video => ({
+      ...video,
+      structure_type: 'uni3c',  // Always uni3c - migrate old flow/canny/depth settings
+    }));
   }
   
   // Check for legacy single-video format (snake_case or camelCase)
@@ -130,19 +133,19 @@ function migrateToArrayFormat(
   if (!videoPath) return [];
   
   // Convert single video to array with one entry
+  // NOTE: structure_type is hardcoded to 'uni3c' - it's the only supported option now
+  // Old shots with 'flow'/'canny'/'depth' are migrated to 'uni3c'
   const singleVideo: StructureVideoConfigWithMetadata = {
     path: videoPath,
     start_frame: 0,
     end_frame: defaultEndFrame,
-    treatment: settings.structure_video_treatment 
-      ?? settings.treatment 
+    treatment: settings.structure_video_treatment
+      ?? settings.treatment
       ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
-    motion_strength: settings.structure_video_motion_strength 
-      ?? settings.motionStrength 
+    motion_strength: settings.structure_video_motion_strength
+      ?? settings.motionStrength
       ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength,
-    structure_type: settings.structure_video_type 
-      ?? settings.structureType 
-      ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type,
+    structure_type: 'uni3c',  // Always uni3c - migrate old flow/canny/depth settings
     uni3c_end_percent: settings.uni3c_end_percent ?? 0.1,
     metadata: settings.metadata ?? null,
     resource_id: settings.resource_id ?? settings.resourceId ?? null,
@@ -170,7 +173,7 @@ function arrayToLegacyConfig(videos: StructureVideoConfigWithMetadata[]): Legacy
     structure_video_path: first.path,
     structure_video_treatment: first.treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
     structure_video_motion_strength: first.motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength,
-    structure_video_type: first.structure_type ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type,
+    structure_video_type: 'uni3c',  // Always uni3c - only supported option now
     uni3c_end_percent: first.uni3c_end_percent ?? 0.1,
     metadata: first.metadata ?? null,
     resource_id: first.resource_id ?? null,
@@ -383,13 +386,14 @@ export function useStructureVideo({
     
     if (config.structure_video_path) {
       // Convert legacy config to array format
+      // NOTE: structure_type is hardcoded to 'uni3c' - only supported option now
       const video: StructureVideoConfigWithMetadata = {
         path: config.structure_video_path,
         start_frame: 0,
         end_frame: timelineEndFrame,
         treatment: config.structure_video_treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
         motion_strength: config.structure_video_motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength,
-        structure_type: config.structure_video_type ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type,
+        structure_type: 'uni3c',  // Always uni3c - migrate old flow/canny/depth settings
         uni3c_end_percent: config.uni3c_end_percent ?? 0.1,
         metadata: config.metadata ?? null,
         resource_id: config.resource_id ?? null,
@@ -405,7 +409,7 @@ export function useStructureVideo({
     metadata: VideoMetadata | null,
     treatment: 'adjust' | 'clip',
     motionStrength: number,
-    structureType: 'uni3c' | 'flow' | 'canny' | 'depth',
+    _structureType: 'uni3c' | 'flow' | 'canny' | 'depth',  // Ignored - always uni3c now
     resourceId?: string
   ) => {
     console.log('[useStructureVideo] [LEGACY] handleStructureVideoChange called');
@@ -413,7 +417,7 @@ export function useStructureVideo({
       structure_video_path: videoPath,
       structure_video_treatment: treatment,
       structure_video_motion_strength: motionStrength,
-      structure_video_type: structureType,
+      structure_video_type: 'uni3c',  // Always uni3c - only supported option now
       metadata: metadata,
       resource_id: resourceId ?? null,
       // Preserve existing uni3c_end_percent from current config to avoid resetting to default
@@ -440,7 +444,7 @@ export function useStructureVideo({
     structureVideoMetadata: legacyConfig.metadata ?? null,
     structureVideoTreatment: legacyConfig.structure_video_treatment ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_treatment,
     structureVideoMotionStrength: legacyConfig.structure_video_motion_strength ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_motion_strength,
-    structureVideoType: legacyConfig.structure_video_type ?? DEFAULT_VIDEO_STRUCTURE_PARAMS.structure_video_type,
+    structureVideoType: 'uni3c' as const,  // Always uni3c - only supported option now
     structureVideoResourceId: legacyConfig.resource_id ?? null,
     handleStructureVideoChange,
   };

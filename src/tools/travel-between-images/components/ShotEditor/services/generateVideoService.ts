@@ -288,23 +288,14 @@ export function buildBasicModePhaseConfig(
   hasStructureVideo: boolean,
   amountOfMotion: number,
   userLoras: Array<{ path: string; strength: number; lowNoisePath?: string; isMultiStage?: boolean }>,
-  structureType?: 'uni3c' | 'flow' | 'canny' | 'depth'
+  _structureType?: 'uni3c' | 'flow' | 'canny' | 'depth'  // Ignored - always uni3c now
 ): { model: string; phaseConfig: PhaseConfig } {
-  // Check if using uni3c mode (I2V with guidance video)
-  const isUni3c = structureType === 'uni3c' && hasStructureVideo;
+  // VACE mode removed - always use I2V model
+  // Structure video type is hardcoded to uni3c, which uses I2V
+  const useVaceModel = false;
 
-  // Determine if using VACE model
-  const useVaceModel = hasStructureVideo && !isUni3c;
-
-  // Model selection:
-  // Uni3C mode: use I2V model
-  // VACE mode: use VACE model
-  // Standard I2V mode: use I2V model
-  const model = isUni3c
-    ? 'wan_2_2_i2v_lightning_baseline_2_2_2'
-    : (hasStructureVideo
-      ? 'wan_2_2_vace_lightning_baseline_2_2_2'
-      : 'wan_2_2_i2v_lightning_baseline_2_2_2');
+  // Always use I2V model (VACE removed)
+  const model = 'wan_2_2_i2v_lightning_baseline_2_2_2';
 
   // Use shared core function (converts 0-100 to 0-1)
   const phaseConfig = buildPhaseConfigCore(
@@ -1021,19 +1012,13 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   let effectivePhaseConfig: PhaseConfig;
   let modelType: 'i2v' | 'vace';
   
-  // Check if using uni3c mode (I2V with guidance video)
+  // Structure video type is always uni3c now (hardcoded), which uses I2V model
   const isUni3cMode = structureVideoConfig.structure_video_type === 'uni3c' && structureVideoConfig.structure_video_path;
-  
-  // Determine if we're using VACE mode based on generationTypeMode setting
-  // Even if structure video exists, if user explicitly chose I2V mode, we use I2V
-  // ALSO: If uni3c mode is selected, use I2V (not VACE)
-  const useVaceMode = generationTypeMode === 'vace' && !isUni3cMode;
-  
-  // Log warning if I2V mode is selected but structure video exists (not applicable for uni3c)
-  if (generationTypeMode === 'i2v' && structureVideoConfig.structure_video_path && !isUni3cMode) {
-    console.warn('[Generation] ⚠️ I2V mode selected but structure video exists. Structure video will NOT be used.');
-  }
-  
+
+  // VACE mode is no longer supported - always use I2V
+  // uni3c structure type uses I2V with guidance video
+  const useVaceMode = false;  // Hardcoded: VACE mode removed, always use I2V
+
   // Log uni3c mode
   if (isUni3cMode) {
     console.log('[Generation] 🔵 Using Uni3C mode - I2V model with guidance video');
@@ -1071,41 +1056,13 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   
   if (useAdvancedMode) {
     // ADVANCED MODE: Use user's phase config
-    let adjustedPhaseConfig = phaseConfig;
-    
-    // Determine model based on generationTypeMode (not just structure video presence)
-    if (useVaceMode) {
-      actualModelName = phaseConfig.num_phases === 2 
-        ? 'wan_2_2_vace_lightning_baseline_3_3' 
-        : 'wan_2_2_vace_lightning_baseline_2_2_2';
-      modelType = 'vace';
-      
-      // Swap I2V LoRAs to VACE LoRAs if needed
-      console.log('[Generation] Advanced mode + VACE - swapping I2V LoRAs to VACE LoRAs');
-      adjustedPhaseConfig = {
-        ...phaseConfig,
-        phases: phaseConfig.phases.map(phase => ({
-          ...phase,
-          loras: phase.loras.map(lora => {
-            // Swap I2V Seko V1 to VACE Seko V2.0
-            if (lora.url.includes('Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/high_noise_model.safetensors')) {
-              return { ...lora, url: 'https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V2.0/high_noise_model.safetensors' };
-            }
-            if (lora.url.includes('Wan2.2-I2V-A14B-4steps-lora-rank64-Seko-V1/low_noise_model.safetensors')) {
-              return { ...lora, url: 'https://huggingface.co/lightx2v/Wan2.2-Lightning/resolve/main/Wan2.2-T2V-A14B-4steps-lora-rank64-Seko-V2.0/low_noise_model.safetensors' };
-            }
-            return lora;
-          })
-        }))
-      };
-    } else {
-      actualModelName = phaseConfig.num_phases === 2 
-        ? 'wan_2_2_i2v_lightning_baseline_3_3' 
-        : 'wan_2_2_i2v_lightning_baseline_2_2_2';
-      modelType = 'i2v';
-    }
-    
-    effectivePhaseConfig = adjustedPhaseConfig;
+    // Always use I2V model - VACE mode removed
+    actualModelName = phaseConfig.num_phases === 2
+      ? 'wan_2_2_i2v_lightning_baseline_3_3'
+      : 'wan_2_2_i2v_lightning_baseline_2_2_2';
+    modelType = 'i2v';
+
+    effectivePhaseConfig = phaseConfig;
     console.log('[Generation] Advanced Mode - using user phase config:', {
       model: actualModelName,
       modelType,
@@ -1127,8 +1084,8 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     
     actualModelName = basicConfig.model;
     effectivePhaseConfig = basicConfig.phaseConfig;
-    // Uni3C mode uses I2V model type, VACE mode uses VACE
-    modelType = isUni3cMode ? 'i2v' : (useVaceMode ? 'vace' : 'i2v');
+    // Always use I2V model type - VACE mode removed
+    modelType = 'i2v';
     
     console.log('[Generation] Basic Mode - built phase config:', {
       model: actualModelName,
@@ -1384,11 +1341,9 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
     // Text before/after prompts
     ...(textBeforePrompts ? { text_before_prompts: textBeforePrompts } : {}),
     ...(textAfterPrompts ? { text_after_prompts: textAfterPrompts } : {}),
-    // Smooth Continuations in VACE mode: disable independent segments, set frame overlap, and enable chain_segments
-    // Otherwise: independent segments enabled (default behavior)
-    independent_segments: !(useVaceMode && useSvi),
-    chain_segments: useVaceMode && useSvi,
-    ...(useVaceMode && useSvi ? { frame_overlap_expanded: 4 } : {}),
+    // Independent segments enabled (VACE mode removed, always I2V now)
+    independent_segments: true,
+    chain_segments: false,
     // Smooth video interpolation (SVI) for smoother transitions - always send explicitly
     use_svi: useSvi ?? false,
   };
@@ -1396,11 +1351,9 @@ export async function generateVideo(params: GenerateVideoParams): Promise<Genera
   // Log Smooth Continuations params
   if (useSvi) {
     console.log('[SmoothContinuationsDebug] Task params:', {
-      useVaceMode,
       useSvi,
       independent_segments: requestBody.independent_segments,
       chain_segments: requestBody.chain_segments,
-      frame_overlap_expanded: requestBody.frame_overlap_expanded,
     });
   }
 

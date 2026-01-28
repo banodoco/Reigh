@@ -274,8 +274,8 @@ export const DesktopSidePanelLayout: React.FC<SidePanelLayoutProps> = (props) =>
         })()}
 
         {/* Top Center - Combined container for segment nav and variant badge */}
-        {/* Mobile: closer to edge (top-4), Desktop: more spacing (top-16) */}
-        <div className="absolute top-4 md:top-16 left-1/2 transform -translate-x-1/2 z-[60] flex flex-col items-center gap-2">
+        {/* Same level as other top controls (top-4) */}
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[60] flex flex-col items-center gap-2">
           {/* Adjacent Segment Navigation (only for images with adjacent segments) */}
           {adjacentSegments && !isVideo && (
             <AdjacentSegmentNavigation adjacentSegments={adjacentSegments} />
@@ -317,14 +317,11 @@ export const DesktopSidePanelLayout: React.FC<SidePanelLayoutProps> = (props) =>
             annotationMode={floatingToolProps.editMode === 'annotate' ? floatingToolProps.annotationMode : null}
             onSetAnnotationMode={floatingToolProps.setAnnotationMode}
             repositionTransform={floatingToolProps.repositionTransform}
-            onRepositionTranslateXChange={floatingToolProps.setTranslateX}
-            onRepositionTranslateYChange={floatingToolProps.setTranslateY}
             onRepositionScaleChange={floatingToolProps.setScale}
             onRepositionRotationChange={floatingToolProps.setRotation}
             onRepositionFlipH={floatingToolProps.toggleFlipH}
             onRepositionFlipV={floatingToolProps.toggleFlipV}
             onRepositionReset={floatingToolProps.resetTransform}
-            imageDimensions={floatingToolProps.effectiveImageDimensions}
             brushStrokes={floatingToolProps.brushStrokes}
             onUndo={floatingToolProps.handleUndo}
             onClearMask={floatingToolProps.handleClearMask}

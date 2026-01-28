@@ -52,8 +52,8 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
           disabled={!prev}
           title="View previous video segment"
           className={cn(
-            'relative w-12 h-12 md:w-14 md:h-14 rounded-lg overflow-hidden shadow-lg transition-all',
-            'hover:scale-105 hover:shadow-xl hover:ring-2 hover:ring-white/40',
+            'relative w-9 h-9 md:w-10 md:h-10 rounded-md overflow-hidden shadow-md transition-all',
+            'hover:scale-105 hover:shadow-lg hover:ring-2 hover:ring-white/40',
             'focus:outline-none focus:ring-2 focus:ring-white/50',
             !prev && 'opacity-30 cursor-not-allowed pointer-events-none'
           )}
@@ -82,7 +82,7 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
           {/* Video icon overlay */}
           {prev && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-              <Video className="w-5 h-5 md:w-6 md:h-6 text-white/50" />
+              <Video className="w-4 h-4 text-white/50" />
             </div>
           )}
         </button>
@@ -93,8 +93,8 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
           disabled={!next}
           title="View next video segment"
           className={cn(
-            'relative w-12 h-12 md:w-14 md:h-14 rounded-lg overflow-hidden shadow-lg transition-all',
-            'hover:scale-105 hover:shadow-xl hover:ring-2 hover:ring-white/40',
+            'relative w-9 h-9 md:w-10 md:h-10 rounded-md overflow-hidden shadow-md transition-all',
+            'hover:scale-105 hover:shadow-lg hover:ring-2 hover:ring-white/40',
             'focus:outline-none focus:ring-2 focus:ring-white/50',
             !next && 'opacity-30 cursor-not-allowed pointer-events-none'
           )}
@@ -123,7 +123,7 @@ export const AdjacentSegmentNavigation: React.FC<AdjacentSegmentNavigationProps>
           {/* Video icon overlay */}
           {next && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-              <Video className="w-5 h-5 md:w-6 md:h-6 text-white/50" />
+              <Video className="w-4 h-4 text-white/50" />
             </div>
           )}
         </button>

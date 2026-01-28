@@ -1,10 +1,8 @@
 import React from 'react';
 import { cn } from '@/shared/lib/utils';
-import { 
-  RotateCcw, 
-  MoveHorizontal, 
-  MoveVertical, 
-  Maximize2, 
+import {
+  RotateCcw,
+  Maximize2,
   RotateCw,
   FlipHorizontal,
   FlipVertical
@@ -13,48 +11,39 @@ import { ImageTransform } from '../../hooks/useRepositionMode';
 
 interface RepositionControlsProps {
   transform: ImageTransform;
-  onTranslateXChange: (value: number) => void;
-  onTranslateYChange: (value: number) => void;
   onScaleChange: (value: number) => void;
   onRotationChange: (value: number) => void;
   onFlipH: () => void;
   onFlipV: () => void;
   onReset: () => void;
   variant: 'tablet' | 'mobile';
-  imageDimensions?: { width: number; height: number } | null; // For dynamic max translate
 }
 
 /**
  * RepositionControls Component
- * 
- * Provides sliders for image repositioning:
- * - Horizontal position (translateX)
- * - Vertical position (translateY)  
+ *
+ * Provides controls for image repositioning:
  * - Zoom (0.25x to 2x)
  * - Rotation (-180° to 180°)
  * - Flip Horizontal / Vertical
  * - Reset button to restore defaults
+ *
+ * Position (X/Y) is controlled via direct drag on the canvas.
  */
 export const RepositionControls: React.FC<RepositionControlsProps> = ({
   transform,
-  onTranslateXChange,
-  onTranslateYChange,
   onScaleChange,
   onRotationChange,
   onFlipH,
   onFlipV,
   onReset,
   variant,
-  imageDimensions,
 }) => {
   const textSize = variant === 'tablet' ? 'text-xs' : 'text-[10px]';
   const buttonPadding = variant === 'tablet' ? 'p-1.5' : 'p-1';
   const iconSize = variant === 'tablet' ? 'h-3 w-3' : 'h-2.5 w-2.5';
   const sliderIconSize = variant === 'tablet' ? 'h-3.5 w-3.5' : 'h-3 w-3';
-  
-  // Max translate as percentage - fixed at ±100% for full repositioning range
-  const maxTranslatePercent = 100;
-  
+
   // Check if any transform has been applied
   const hasChanges = 
     transform.translateX !== 0 || 
@@ -100,76 +89,42 @@ export const RepositionControls: React.FC<RepositionControlsProps> = ({
         </button>
       </div>
       
-      {/* Zoom */}
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-1.5">
-          <Maximize2 className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
-          <div className="flex-1 flex items-center justify-between">
-            <label className={cn("font-medium text-foreground", textSize)}>Zoom:</label>
-            <span className={cn("text-muted-foreground tabular-nums", textSize)}>{(transform.scale * 100).toFixed(0)}%</span>
-          </div>
-        </div>
-        <input
-          type="range"
-          min={25}
-          max={200}
-          value={transform.scale * 100}
-          onChange={(e) => onScaleChange(parseInt(e.target.value) / 100)}
-          className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
-        />
-      </div>
-
-      {/* Rotation */}
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-1.5">
-          <RotateCw className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
-          <div className="flex-1 flex items-center justify-between">
-            <label className={cn("font-medium text-foreground", textSize)}>Rotate:</label>
-            <span className={cn("text-muted-foreground tabular-nums", textSize)}>{transform.rotation}°</span>
-          </div>
-        </div>
-        <input
-          type="range"
-          min={-180}
-          max={180}
-          value={transform.rotation}
-          onChange={(e) => onRotationChange(parseInt(e.target.value))}
-          className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
-        />
-      </div>
-
-      {/* X and Y Position - side by side */}
-      <div className="flex gap-2">
-        {/* Horizontal Position */}
-        <div className="flex-1 space-y-0.5">
-          <div className="flex items-center gap-1">
-            <MoveHorizontal className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
-            <label className={cn("font-medium text-foreground", textSize)}>X:</label>
-            <span className={cn("text-muted-foreground tabular-nums ml-auto", textSize)}>{transform.translateX.toFixed(0)}%</span>
+      {/* Zoom and Rotation - side by side on mobile, stacked on tablet */}
+      <div className={cn(variant === 'mobile' ? "flex gap-2" : "space-y-2")}>
+        {/* Zoom */}
+        <div className={cn("space-y-0.5", variant === 'mobile' && "flex-1")}>
+          <div className="flex items-center gap-1.5">
+            <Maximize2 className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
+            <div className="flex-1 flex items-center justify-between">
+              <label className={cn("font-medium text-foreground", textSize)}>Zoom:</label>
+              <span className={cn("text-muted-foreground tabular-nums", textSize)}>{(transform.scale * 100).toFixed(0)}%</span>
+            </div>
           </div>
           <input
             type="range"
-            min={-maxTranslatePercent}
-            max={maxTranslatePercent}
-            value={transform.translateX}
-            onChange={(e) => onTranslateXChange(parseFloat(e.target.value))}
+            min={25}
+            max={200}
+            value={transform.scale * 100}
+            onChange={(e) => onScaleChange(parseInt(e.target.value) / 100)}
             className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
         </div>
 
-        {/* Vertical Position */}
-        <div className="flex-1 space-y-0.5">
-          <div className="flex items-center gap-1">
-            <MoveVertical className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
-            <label className={cn("font-medium text-foreground", textSize)}>Y:</label>
-            <span className={cn("text-muted-foreground tabular-nums ml-auto", textSize)}>{transform.translateY.toFixed(0)}%</span>
+        {/* Rotation */}
+        <div className={cn("space-y-0.5", variant === 'mobile' && "flex-1")}>
+          <div className="flex items-center gap-1.5">
+            <RotateCw className={cn("text-muted-foreground shrink-0", sliderIconSize)} />
+            <div className="flex-1 flex items-center justify-between">
+              <label className={cn("font-medium text-foreground", textSize)}>Rotate:</label>
+              <span className={cn("text-muted-foreground tabular-nums", textSize)}>{transform.rotation}°</span>
+            </div>
           </div>
           <input
             type="range"
-            min={-maxTranslatePercent}
-            max={maxTranslatePercent}
-            value={transform.translateY}
-            onChange={(e) => onTranslateYChange(parseFloat(e.target.value))}
+            min={-180}
+            max={180}
+            value={transform.rotation}
+            onChange={(e) => onRotationChange(parseInt(e.target.value))}
             className="w-full h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-blue-500"
           />
         </div>

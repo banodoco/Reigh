@@ -184,49 +184,7 @@ export const PhaseConfigVertical: React.FC<PhaseConfigVerticalProps> = ({
         </div>
       </div>
 
-      {/* Model Type Toggle (I2V vs VACE) - Also shown in Advanced mode */}
-      {onGenerationTypeModeChange && (
-        <div className="space-y-2 p-3 bg-muted/30 rounded-lg border">
-          <div className="flex items-center gap-2">
-            <Label className="text-sm font-light">Model Type:</Label>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="text-muted-foreground cursor-help hover:text-foreground transition-colors">
-                  <Info className="h-4 w-4" />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p><strong>I2V (Image-to-Video):</strong> Generate video from images only.<br />
-                <strong>VACE:</strong> Use a structure/guidance video for motion control.</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-          <SegmentedControl
-            value={generationTypeMode}
-            onValueChange={(value) => {
-              if (value) {
-                onGenerationTypeModeChange(value as 'i2v' | 'vace');
-              }
-            }}
-            size="sm"
-          >
-            <SegmentedControlItem value="i2v">
-              I2V
-            </SegmentedControlItem>
-            <SegmentedControlItem value="vace">
-              VACE
-            </SegmentedControlItem>
-          </SegmentedControl>
-          
-          {/* Warning when I2V mode is selected but structure video exists (except for Uni3C which uses I2V with structure video) */}
-          {generationTypeMode === 'i2v' && hasStructureVideo && structureType !== 'uni3c' && (
-            <div className="flex items-start gap-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs">
-              <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-              <span>Structure video is set but won't be used in I2V mode. Switch to VACE to use it, or select Uni3C.</span>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Model Type is now hardcoded to I2V - VACE option removed */}
 
       {/* Global Settings Card */}
       <Card className="bg-muted/20 relative">

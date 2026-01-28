@@ -150,15 +150,13 @@ export const MotionPresetSelector: React.FC<MotionPresetSelectorProps> = ({
   return (
     <div className="space-y-4">
       <Tabs value={normalizedMotionMode} onValueChange={handleModeChange}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Label className="text-sm font-medium">Motion Settings</Label>
-            {labelSuffix}
-          </div>
+        <div className="flex items-center gap-3 mb-3">
+          <Label className="text-sm font-medium">Mode:</Label>
+          {labelSuffix}
           <TabsList className="grid w-40 grid-cols-2">
             <TabsTrigger value="basic">Basic</TabsTrigger>
-            <TabsTrigger 
-              value="advanced" 
+            <TabsTrigger
+              value="advanced"
               disabled={advancedDisabled}
               title={advancedDisabled ? advancedDisabledReason : undefined}
             >
