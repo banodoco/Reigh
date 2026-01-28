@@ -1,18 +1,39 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-// Import gifenc - use default export and destructure
-import gifenc from "https://esm.sh/gifenc@1.0.3"
-const { GIFEncoder, quantize, applyPalette } = gifenc
+import {
+  ImageMagick,
+  initializeImageMagick,
+  MagickFormat,
+  MagickImage,
+  MagickImageCollection,
+} from "npm:@imagemagick/magick-wasm@0.0.30"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Initialize ImageMagick WASM
+let magickInitialized = false
+
+async function ensureMagickInitialized() {
+  if (magickInitialized) return
+
+  const wasmBytes = await Deno.readFile(
+    new URL(
+      "magick.wasm",
+      import.meta.resolve("npm:@imagemagick/magick-wasm@0.0.30"),
+    ),
+  )
+  await initializeImageMagick(wasmBytes)
+  magickInitialized = true
+  console.log('[GENERATE-LINEAGE-GIF] ImageMagick initialized')
+}
+
 /**
  * Edge function: generate-lineage-gif
  *
  * Generates an animated GIF from an array of image URLs.
- * This runs server-side to avoid CORS issues with canvas pixel reading.
+ * Uses ImageMagick WASM for image processing.
  *
  * POST /functions/v1/generate-lineage-gif
  * Body: {
@@ -20,11 +41,6 @@ const corsHeaders = {
  *   frameDelay?: number,  // Milliseconds between frames (default: 800)
  *   width?: number,       // Output width (default: 512)
  * }
- *
- * Returns:
- * - 200 OK with GIF as binary data (Content-Type: image/gif)
- * - 400 Bad Request if missing required fields
- * - 500 Internal Server Error
  */
 
 serve(async (req) => {
@@ -41,6 +57,9 @@ serve(async (req) => {
   }
 
   try {
+    // Initialize ImageMagick
+    await ensureMagickInitialized()
+
     const { imageUrls, frameDelay = 800, width = 512 } = await req.json()
 
     if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
@@ -52,11 +71,11 @@ serve(async (req) => {
 
     console.log(`[GENERATE-LINEAGE-GIF] Processing ${imageUrls.length} images`)
 
-    // Fetch and decode all images
-    const images: ImageBitmap[] = []
+    // Fetch all images
+    const imageDataArray: Uint8Array[] = []
     for (let i = 0; i < imageUrls.length; i++) {
       const url = imageUrls[i]
-      console.log(`[GENERATE-LINEAGE-GIF] Fetching image ${i + 1}/${imageUrls.length}: ${url.substring(0, 60)}...`)
+      console.log(`[GENERATE-LINEAGE-GIF] Fetching image ${i + 1}/${imageUrls.length}`)
 
       try {
         const response = await fetch(url)
@@ -65,120 +84,62 @@ serve(async (req) => {
           continue
         }
 
-        // Get content type from response headers
-        const contentType = response.headers.get('content-type') || 'image/png'
-        console.log(`[GENERATE-LINEAGE-GIF] Image ${i + 1} content-type: ${contentType}`)
-
         const arrayBuffer = await response.arrayBuffer()
-        // Pass the content type to the Blob constructor
-        const blob = new Blob([arrayBuffer], { type: contentType })
-        const bitmap = await createImageBitmap(blob)
-        images.push(bitmap)
-
-        console.log(`[GENERATE-LINEAGE-GIF] Image ${i + 1} loaded: ${bitmap.width}x${bitmap.height}`)
+        imageDataArray.push(new Uint8Array(arrayBuffer))
+        console.log(`[GENERATE-LINEAGE-GIF] Image ${i + 1} loaded: ${arrayBuffer.byteLength} bytes`)
       } catch (err) {
         console.error(`[GENERATE-LINEAGE-GIF] Error loading image ${i}:`, err)
       }
     }
 
-    if (images.length === 0) {
+    if (imageDataArray.length === 0) {
       return new Response(JSON.stringify({ error: 'No images could be loaded' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    // Calculate height based on first image aspect ratio
-    const firstImage = images[0]
-    const aspectRatio = firstImage.width / firstImage.height
-    const height = Math.round(width / aspectRatio)
+    console.log(`[GENERATE-LINEAGE-GIF] Creating animated GIF with ${imageDataArray.length} frames`)
 
-    console.log(`[GENERATE-LINEAGE-GIF] Output size: ${width}x${height}, ${images.length} frames`)
+    // Convert delay from milliseconds to centiseconds (GIF standard)
+    const delayCs = Math.round(frameDelay / 10)
 
-    // Create canvas for rendering frames
-    const canvas = new OffscreenCanvas(width, height)
-    const ctx = canvas.getContext('2d')
+    // Create the animated GIF using ImageMagick
+    const gifData = ImageMagick.readCollection(imageDataArray[0], (images: MagickImageCollection) => {
+      // First image is already in the collection, resize it
+      images[0].resize(width, 0) // 0 = auto height to maintain aspect ratio
+      images[0].animationDelay = delayCs
 
-    if (!ctx) {
-      throw new Error('Failed to get canvas context')
-    }
-
-    // Initialize GIF encoder
-    const gif = GIFEncoder()
-
-    // Process each image
-    for (let i = 0; i < images.length; i++) {
-      const img = images[i]
-
-      // Fill background with black
-      ctx.fillStyle = '#000000'
-      ctx.fillRect(0, 0, width, height)
-
-      // Calculate scaling to fit while maintaining aspect ratio
-      const imgAspect = img.width / img.height
-      const targetAspect = width / height
-
-      let drawWidth: number
-      let drawHeight: number
-      let drawX: number
-      let drawY: number
-
-      if (imgAspect > targetAspect) {
-        // Image is wider - fit to width
-        drawWidth = width
-        drawHeight = width / imgAspect
-        drawX = 0
-        drawY = (height - drawHeight) / 2
-      } else {
-        // Image is taller - fit to height
-        drawHeight = height
-        drawWidth = height * imgAspect
-        drawX = (width - drawWidth) / 2
-        drawY = 0
+      // Add remaining images
+      for (let i = 1; i < imageDataArray.length; i++) {
+        ImageMagick.read(imageDataArray[i], (img: MagickImage) => {
+          img.resize(width, 0)
+          img.animationDelay = delayCs
+          images.push(img)
+        })
       }
 
-      // Draw image to canvas
-      ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight)
-
-      // Get image data
-      const imageData = ctx.getImageData(0, 0, width, height)
-      const { data } = imageData
-
-      // Convert RGBA to RGB array for gifenc
-      const rgbData = new Uint8Array(width * height * 3)
-      for (let j = 0; j < width * height; j++) {
-        rgbData[j * 3] = data[j * 4]
-        rgbData[j * 3 + 1] = data[j * 4 + 1]
-        rgbData[j * 3 + 2] = data[j * 4 + 2]
-      }
-
-      // Quantize colors to 256-color palette
-      const palette = quantize(rgbData, 256)
-      const indexedPixels = applyPalette(rgbData, palette)
-
-      // Add frame with specified delay (gifenc uses centiseconds)
-      gif.writeFrame(indexedPixels, width, height, {
-        palette,
-        delay: frameDelay / 10, // Convert ms to centiseconds
+      // Set loop count (0 = infinite loop)
+      images.forEach((img: MagickImage) => {
+        img.animationIterations = 0
       })
 
-      console.log(`[GENERATE-LINEAGE-GIF] Encoded frame ${i + 1}/${images.length}`)
-    }
+      console.log(`[GENERATE-LINEAGE-GIF] Collection has ${images.length} images`)
 
-    // Finish encoding
-    gif.finish()
+      // Write as animated GIF
+      return images.write(MagickFormat.Gif, (data: Uint8Array) => {
+        return new Uint8Array(data)
+      })
+    })
 
-    // Get the GIF data
-    const gifBytes = gif.bytes()
-
-    console.log(`[GENERATE-LINEAGE-GIF] GIF generated: ${gifBytes.length} bytes`)
+    console.log(`[GENERATE-LINEAGE-GIF] GIF generated: ${gifData.length} bytes`)
 
     // Return GIF as binary response
-    return new Response(gifBytes, {
+    return new Response(gifData, {
       headers: {
         ...corsHeaders,
         'Content-Type': 'image/gif',
-        'Content-Length': gifBytes.length.toString(),
+        'Content-Length': gifData.length.toString(),
       },
       status: 200,
     })
