@@ -65,8 +65,13 @@ serve(async (req) => {
           continue
         }
 
+        // Get content type from response headers
+        const contentType = response.headers.get('content-type') || 'image/png'
+        console.log(`[GENERATE-LINEAGE-GIF] Image ${i + 1} content-type: ${contentType}`)
+
         const arrayBuffer = await response.arrayBuffer()
-        const blob = new Blob([arrayBuffer])
+        // Pass the content type to the Blob constructor
+        const blob = new Blob([arrayBuffer], { type: contentType })
         const bitmap = await createImageBitmap(blob)
         images.push(bitmap)
 
