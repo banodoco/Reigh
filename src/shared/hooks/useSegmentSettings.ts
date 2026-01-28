@@ -144,6 +144,10 @@ export interface UseSegmentSettingsReturn {
   basePromptForEnhancement: string | undefined;
   /** Clear the enhanced prompt from metadata */
   clearEnhancedPrompt: () => Promise<boolean>;
+  /** User's persisted preference for enhance prompt toggle (undefined = use default based on enhanced_prompt existence) */
+  enhancePromptEnabled: boolean | undefined;
+  /** Save the enhance prompt enabled preference to metadata */
+  saveEnhancePromptEnabled: (enabled: boolean) => Promise<boolean>;
 }
 
 // Track hook instances for debugging
@@ -986,6 +990,58 @@ export function useSegmentSettings({
     }
   }, [pairShotGenerationId, instanceId, queryClient]);
 
+  // Save the enhance prompt enabled preference to metadata
+  const saveEnhancePromptEnabled = useCallback(async (enabled: boolean): Promise<boolean> => {
+    if (!pairShotGenerationId) {
+      console.warn('[useSegmentSettings] ⚠️ Cannot save enhance prompt preference - no pairShotGenerationId');
+      return false;
+    }
+
+    console.log(`[useSegmentSettings:${instanceId}] 💾 Saving enhance prompt preference:`, {
+      pairId: pairShotGenerationId.substring(0, 8),
+      enabled,
+    });
+
+    try {
+      // Fetch current metadata
+      const { data: current, error: fetchError } = await supabase
+        .from('shot_generations')
+        .select('metadata')
+        .eq('id', pairShotGenerationId)
+        .single();
+
+      if (fetchError) {
+        console.error('[useSegmentSettings] Error fetching metadata for enhance pref:', fetchError);
+        return false;
+      }
+
+      const currentMetadata = (current?.metadata as Record<string, any>) || {};
+      const updatedMetadata = {
+        ...currentMetadata,
+        enhance_prompt_enabled: enabled,
+      };
+
+      const { error: updateError } = await supabase
+        .from('shot_generations')
+        .update({ metadata: updatedMetadata })
+        .eq('id', pairShotGenerationId);
+
+      if (updateError) {
+        console.error('[useSegmentSettings] Error saving enhance prompt preference:', updateError);
+        return false;
+      }
+
+      // Invalidate cache so next read gets the new value
+      await queryClient.invalidateQueries({ queryKey: ['pair-metadata', pairShotGenerationId] });
+
+      console.log(`[useSegmentSettings:${instanceId}] ✅ Enhance prompt preference saved`);
+      return true;
+    } catch (error) {
+      console.error('[useSegmentSettings] Exception saving enhance prompt preference:', error);
+      return false;
+    }
+  }, [pairShotGenerationId, instanceId, queryClient]);
+
   // Reset to shot defaults by clearing all segment overrides AND enhanced prompt
   // This saves the cleared state to DB, then clears local state so form shows defaults immediately
   const resetSettings = useCallback(async () => {
@@ -1044,6 +1100,8 @@ export function useSegmentSettings({
   // Extract enhanced prompt and base prompt from pair metadata (AI-generated, stored separately)
   const enhancedPrompt = (pairMetadata as Record<string, any> | null)?.enhanced_prompt as string | undefined;
   const basePromptForEnhancement = (pairMetadata as Record<string, any> | null)?.base_prompt_for_enhancement as string | undefined;
+  // User's persisted preference for enhance prompt toggle
+  const enhancePromptEnabled = (pairMetadata as Record<string, any> | null)?.enhance_prompt_enabled as boolean | undefined;
 
   return {
     settings,
@@ -1062,5 +1120,7 @@ export function useSegmentSettings({
     enhancedPrompt: enhancedPrompt?.trim() || undefined,
     basePromptForEnhancement: basePromptForEnhancement?.trim() || undefined,
     clearEnhancedPrompt,
+    enhancePromptEnabled,
+    saveEnhancePromptEnabled,
   };
 }

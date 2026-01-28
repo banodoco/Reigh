@@ -614,8 +614,8 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1">
-                        {/* Copy ID button with tooltip */}
+                      <div className="flex items-center gap-0.5">
+                        {/* Copy ID button */}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
@@ -626,20 +626,20 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                                 setTimeout(() => setCopiedVariantId(null), 2000);
                               }}
                               className={cn(
-                                "px-1.5 py-0.5 rounded text-[10px] transition-colors",
+                                "px-1.5 py-0.5 rounded text-[10px] transition-all duration-150",
                                 copiedVariantId === variant.id
                                   ? "text-green-400 bg-green-400/10"
-                                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-muted/80 active:scale-95"
                               )}
                             >
-                              {copiedVariantId === variant.id ? 'copied' : 'id'}
+                              {copiedVariantId === variant.id ? '✓' : 'id'}
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="text-xs">
-                            Copy variant ID to clipboard
+                            Copy ID
                           </TooltipContent>
                         </Tooltip>
-                        {/* Lineage GIF button - only shown when lineage depth >= 5 */}
+                        {/* Lineage GIF button - appears with subtle animation when depth >= 5 */}
                         {(variantLineageDepth[variant.id] || 0) >= 5 && (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -648,17 +648,17 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                                   e.stopPropagation();
                                   setLineageGifVariantId(variant.id);
                                 }}
-                                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-all duration-150 active:scale-95 animate-in fade-in slide-in-from-left-1 duration-300"
                               >
                                 <GitBranch className="w-3.5 h-3.5" />
                               </button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="text-xs">
-                              Show lineage GIF ({variantLineageDepth[variant.id]} ancestors)
+                              View evolution ({variantLineageDepth[variant.id]} generations)
                             </TooltipContent>
                           </Tooltip>
                         )}
-                        {/* Delete button - only for non-primary variants, hidden in readOnly mode */}
+                        {/* Delete button - non-primary variants only */}
                         {!readOnly && onDeleteVariant && !isPrimary && (
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -669,7 +669,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                                   onDeleteVariant(variant.id).finally(() => setDeletingVariantId(null));
                                 }}
                                 disabled={deletingVariantId === variant.id}
-                                className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                                className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-150 active:scale-95 disabled:opacity-50"
                               >
                                 {deletingVariantId === variant.id ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -679,7 +679,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                               </button>
                             </TooltipTrigger>
                             <TooltipContent side="bottom" className="text-xs">
-                              Delete this variant
+                              Delete
                             </TooltipContent>
                           </Tooltip>
                         )}

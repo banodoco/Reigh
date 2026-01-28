@@ -163,6 +163,8 @@ export function useSegmentSettingsForm(
     enhancedPrompt,
     basePromptForEnhancement,
     clearEnhancedPrompt,
+    enhancePromptEnabled,
+    saveEnhancePromptEnabled,
   } = useSegmentSettings({
     pairShotGenerationId,
     shotId,
@@ -191,6 +193,9 @@ export function useSegmentSettingsForm(
     enhancedPrompt,
     basePromptForEnhancement,
     onClearEnhancedPrompt: clearEnhancedPrompt,
+    // Persisted enhance prompt toggle preference
+    persistedEnhancePromptEnabled: enhancePromptEnabled,
+    onSaveEnhancePromptEnabled: saveEnhancePromptEnabled,
 
     // Display context
     segmentIndex,
@@ -227,6 +232,8 @@ export function useSegmentSettingsForm(
     enhancedPrompt,
     basePromptForEnhancement,
     clearEnhancedPrompt,
+    enhancePromptEnabled,
+    saveEnhancePromptEnabled,
     segmentIndex,
     startImageUrl,
     endImageUrl,

@@ -161,36 +161,39 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
     onRemoveSegmentStructureVideo,
   });
 
-  // Extract enhanced prompt from form props
-  const { enhancedPrompt } = formProps;
+  // Extract enhanced prompt and persisted enhance preference from form props
+  const { enhancedPrompt, persistedEnhancePromptEnabled, onSaveEnhancePromptEnabled } = formProps;
 
-  // Enhance prompt toggle state
-  // We track both the user's explicit choice AND whether they've "seen" the current state
-  // This prevents the default from flipping unexpectedly after user has viewed the form
+  // Enhance prompt toggle state - tracks user's current choice for this session
+  // We initialize from persisted value when available
   const [enhancePromptEnabled, setEnhancePromptEnabled] = useState<boolean | null>(null);
 
   // Track previous pair to detect actual pair changes (not just re-renders)
   const prevPairRef = useRef<string | undefined>(undefined);
-  const hasUserSeenCurrentPair = useRef(false);
+  const hasInitializedFromPersisted = useRef(false);
 
   // Default: false if enhanced prompt exists, true if not
-  // But ONLY use this default before user has "seen" the form for this pair
+  // This default is ONLY used if there's no persisted preference
   const defaultEnhanceEnabled = useMemo(() => !enhancedPrompt?.trim(), [enhancedPrompt]);
 
-  // Once user has seen the form, lock in the current effective state
-  // This prevents the toggle from flipping if enhancedPrompt changes later
+  // Initialize from persisted preference when switching pairs or on first load
   useEffect(() => {
-    if (!hasUserSeenCurrentPair.current && pairShotGenerationId) {
-      hasUserSeenCurrentPair.current = true;
-      // Lock in the initial state based on current default
-      // This ensures what user SEES is what they GET
-      if (enhancePromptEnabled === null) {
-        setEnhancePromptEnabled(defaultEnhanceEnabled);
-      }
+    // Only initialize once per pair
+    if (hasInitializedFromPersisted.current && prevPairRef.current === pairShotGenerationId) {
+      return;
     }
-  }, [pairShotGenerationId, defaultEnhanceEnabled, enhancePromptEnabled]);
 
-  // Compute effective enhance state (user's explicit choice, or locked-in default)
+    if (pairShotGenerationId) {
+      hasInitializedFromPersisted.current = true;
+      // Use persisted preference if available, otherwise use default based on enhanced prompt
+      const initialValue = persistedEnhancePromptEnabled !== undefined
+        ? persistedEnhancePromptEnabled
+        : defaultEnhanceEnabled;
+      setEnhancePromptEnabled(initialValue);
+    }
+  }, [pairShotGenerationId, persistedEnhancePromptEnabled, defaultEnhanceEnabled]);
+
+  // Compute effective enhance state (user's explicit choice, or default)
   const effectiveEnhanceEnabled = enhancePromptEnabled ?? defaultEnhanceEnabled;
 
   // Ref for submit handler - updated synchronously on toggle, not waiting for React re-render
@@ -199,17 +202,22 @@ export const SegmentRegenerateForm: React.FC<SegmentRegenerateFormProps> = ({
   effectiveEnhanceEnabledRef.current = effectiveEnhanceEnabled;
 
   // Wrapper to update ref synchronously when user toggles (before React re-renders)
+  // Also persists the preference to the database
   const handleEnhancePromptChange = useCallback((value: boolean) => {
     effectiveEnhanceEnabledRef.current = value; // Update ref immediately
     setEnhancePromptEnabled(value); // Then schedule React state update
-  }, []);
+    // Persist the preference so it's remembered for this pair
+    if (onSaveEnhancePromptEnabled) {
+      onSaveEnhancePromptEnabled(value);
+    }
+  }, [onSaveEnhancePromptEnabled]);
 
   // Reset enhance state ONLY when pair actually changes to a different value
   useEffect(() => {
     if (prevPairRef.current !== undefined && prevPairRef.current !== pairShotGenerationId) {
-      // Pair actually changed - reset state for new pair
+      // Pair actually changed - reset for new pair
       setEnhancePromptEnabled(null);
-      hasUserSeenCurrentPair.current = false;
+      hasInitializedFromPersisted.current = false;
     }
     prevPairRef.current = pairShotGenerationId;
   }, [pairShotGenerationId]);
