@@ -637,6 +637,7 @@ export const VariantSelector: React.FC<VariantSelectorProps> = ({
                           variant="hover"
                           isMobile={false}
                           availableLoras={availableLoras}
+                          showCopyButtons={true}
                         />
                       </div>
                     )}

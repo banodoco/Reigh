@@ -17,6 +17,8 @@ export interface TaskDetailsProps {
   onShowFullNegativePromptChange?: (show: boolean) => void;
   // Available LoRAs for proper name display
   availableLoras?: LoraModel[];
+  // Show copy buttons next to prompts (only in variant selector tooltip)
+  showCopyButtons?: boolean;
 }
 
 export interface VariantConfig {

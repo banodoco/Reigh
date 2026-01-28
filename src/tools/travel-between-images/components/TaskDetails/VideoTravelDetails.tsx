@@ -20,11 +20,11 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
   showFullNegativePrompt = false,
   onShowFullNegativePromptChange,
   availableLoras,
+  showCopyButtons = false,
 }) => {
   const config = getVariantConfig(variant, isMobile, inputImages.length);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [copiedPrompt, setCopiedPrompt] = useState(false);
-  const [copiedNegativePrompt, setCopiedNegativePrompt] = useState(false);
 
   const handleCopyPrompt = async (text: string, setStateFn: (val: boolean) => void) => {
     await navigator.clipboard.writeText(text);
@@ -217,7 +217,7 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
           <div className="space-y-1">
             <div className="flex items-center justify-between gap-2">
               <p className={`${config.textSize} font-medium text-muted-foreground`}>Prompt{enhancePrompt ? ' (enhanced)' : ''}</p>
-              {prompt && (
+              {prompt && showCopyButtons && (
                 <button
                   onClick={() => handleCopyPrompt(prompt, setCopiedPrompt)}
                   className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
@@ -238,16 +238,7 @@ export const VideoTravelDetails: React.FC<TaskDetailsProps> = ({
           </div>
           {negativePrompt && negativePrompt !== 'N/A' && (
             <div className="space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <p className={`${config.textSize} font-medium text-muted-foreground`}>Negative Prompt</p>
-                <button
-                  onClick={() => handleCopyPrompt(negativePrompt, setCopiedNegativePrompt)}
-                  className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                  title="Copy negative prompt"
-                >
-                  {copiedNegativePrompt ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-                </button>
-              </div>
+              <p className={`${config.textSize} font-medium text-muted-foreground`}>Negative Prompt</p>
               <p className={`${config.textSize} ${config.fontWeight} text-foreground break-words whitespace-pre-wrap preserve-case`}>
                 {showFullNegativePrompt || negativePrompt.length <= config.negativePromptLength ? negativePrompt : negativePrompt.slice(0, config.negativePromptLength) + '...'}
               </p>
