@@ -2,6 +2,8 @@ import {
   ApiError,
   PROTOCOL,
   WorkspaceClient,
+  type CommitRequest,
+  type CommitResult,
   type Handshake,
   type Health,
   type Capability,
@@ -269,6 +271,10 @@ export class ReighRuntimeClient {
       }
       throw error;
     }
+  }
+
+  async commitTimeline(body: CommitRequest): Promise<CommitResult> {
+    return this.withSession(() => this.client.commitTimeline(body));
   }
 
   async listProjects(): Promise<Project[]> {

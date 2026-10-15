@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ReighRuntimeClient, RuntimeAuthenticationError, RUNTIME_CLIENT_SCOPES } from './client.ts';
-import type { RequestBody, Transport } from './generated.ts';
-import { RuntimeDataProvider, toRuntimePublication } from './dataProvider.ts';
+import type { CommitRequest, CommitResult, RequestBody, Transport } from './generated.ts';
+import { RuntimeDataProvider, toRuntimePublication, type TimelineCommitSaveContext } from './dataProvider.ts';
 import { TimelineSchemaIncompatibleError, TimelineVersionConflictError } from '@/tools/video-editor/data/DataProvider.ts';
 import { createTimelineReader } from '@/tools/video-editor/lib/timeline-reader.ts';
 import { buildTimelineData } from '@/tools/video-editor/lib/timeline-data.ts';
@@ -1695,5 +1695,176 @@ describe('current App preservation pending acknowledgements', () => {
     const none = sanitizeTimelineClipSnapshot({ ...partial, transition: undefined });
     await expect(provider.saveTimelineAtHead(TIMELINE_ID, { ...initial.config, clips: [none] }, initial.head!)).rejects.toBeInstanceOf(TimelineVersionConflictError);
     expect(fixture.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/composition-revisions'))).toHaveLength(1);
+  });
+});
+
+// Client fixtures only: these empty command lists do not stand in for GESTURES,
+// D semantic execution, a real Runtime publication, X0, or GATE3.
+describe('RuntimeDataProvider commit save routing', () => {
+  const commitPath = `/astrid/v1/projects/${PROJECT_ID}/timelines/${TIMELINE_ID}/commit`;
+  function request(id = 'save-request-1'): CommitRequest {
+    return {
+      api_version: 1, project_id: PROJECT_ID, timeline_id: TIMELINE_ID,
+      request_id: id, session_id: 'save-session', session_sequence: 1,
+      base_revision_id: 'parent-r1', base_publication_id: null,
+      scope: { target: 'parent', complete: ['clips'], projection_version: 1 },
+      change: { commands: [] }, source: { via: 'app' }, dry_run: false,
+    };
+  }
+  function result(body: CommitRequest, unavailable = false): CommitResult {
+    return {
+      status: unavailable ? 'error' : 'no_change', request_id: body.request_id,
+      request_hash: 'fixture-hash', base_revision_id: body.base_revision_id,
+      accepted_revision_id: unavailable ? null : 'parent-r1', accepted_publication_id: null,
+      previous_revision_id: null, rebased_onto: null, canonical_document: null,
+      projection_version: 1, document_digest: null, id_map: {},
+      change: { changes: [], commands: [], direct_writes: [], consequences: [], affected: [] },
+      conflicts: [], choices: [], provenance: null, evidence: null,
+      schema_report: null, runtime_receipt: null,
+      error: unavailable ? { code: 'runtime_unavailable', message: 'fixture unavailable', hint: 'retry', next_action: 'retry' } : null,
+    };
+  }
+  function commitFixture(reply: (body: CommitRequest, call: number) => Promise<CommitResult>) {
+    const fixture = runtimeFixture();
+    const commits: Array<{ bytes: string; headers: Record<string, string> }> = [];
+    const transport: Transport = async (method, path, headers, body) => {
+      if (method === 'POST' && path === commitPath) {
+        const bytes = new TextDecoder().decode(await requestBodyBytes(body!));
+        commits.push({ bytes, headers: { ...headers } });
+        const response = await reply(JSON.parse(bytes), commits.length);
+        return { status: response.error?.code === 'runtime_unavailable' ? 503 : 200, headers: {}, body: json(response) };
+      }
+      return fixture.transport(method, path, headers, body);
+    };
+    return { ...fixture, transport, commits };
+  }
+
+  it('keeps flag-off publication bytes and headers equal to the unchanged default route', async () => {
+    async function capture(explicitOff: boolean) {
+      const fixture = runtimeFixture();
+      let publication: unknown;
+      const transport: Transport = async (method, path, headers, body) => {
+        if (method === 'POST' && path.endsWith('/composition-revisions')) {
+          publication = { method, path, headers, bytes: new TextDecoder().decode(await requestBodyBytes(body!)) };
+        }
+        return fixture.transport(method, path, headers, body);
+      };
+      const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport,
+        ...(explicitOff ? { commitRouting: { enabled: false, requestForSave: () => { throw new Error('flag off invoked producer'); } } } : {}),
+      });
+      const loaded = await provider.loadTimeline(TIMELINE_ID);
+      await provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!);
+      return publication;
+    }
+    expect(await capture(true)).toEqual(await capture(false));
+  });
+
+  it('routes through the generated commit client with immutable identity and body on unavailable retry', async () => {
+    const body = request();
+    const producer = vi.fn((_save: TimelineCommitSaveContext) => body);
+    const fixture = commitFixture(async (sent, call) => result(sent, call === 1));
+    const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport,
+      commitRouting: { enabled: true, requestForSave: producer } });
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+    await expect(provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!))
+      .rejects.toMatchObject({ code: 'runtime_unavailable' });
+    body.request_id = 'producer-mutated-id';
+    body.session_id = 'producer-mutated-session';
+    body.scope.complete.push('tracks');
+    await provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!);
+    expect(producer).toHaveBeenCalledTimes(1);
+    expect(fixture.commits).toHaveLength(2);
+    expect(fixture.commits[1]).toEqual(fixture.commits[0]);
+    expect(fixture.commits[0].headers).toMatchObject({ 'Idempotency-Key': 'save-request-1', 'X-Astrid-Session': 'save-session' });
+    expect(fixture.requests.some((entry) => entry.method === 'POST' && entry.path.endsWith('/composition-revisions'))).toBe(false);
+    expect(Object.isFrozen(producer.mock.calls[0][0].config)).toBe(true);
+  });
+
+  it('holds a newer edit behind the original flight and its unavailable retry without deadlocking', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let started!: () => void;
+    const firstStarted = new Promise<void>((resolve) => { started = resolve; });
+    const fixture = commitFixture(async (sent, call) => {
+      if (call === 1) { started(); await held; return result(sent, true); }
+      return result(sent);
+    });
+    let sequence = 0;
+    const producer = vi.fn((_save: TimelineCommitSaveContext) => request(`save-request-${++sequence}`));
+    const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport,
+      commitRouting: { enabled: true, requestForSave: producer } });
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+    const first = provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!);
+    const rejected = expect(first).rejects.toMatchObject({ code: 'runtime_unavailable' });
+    await firstStarted;
+    const newer = structuredClone(loaded.config);
+    newer.output.file = 'newer-edit.mp4';
+    const second = provider.saveTimelineAtHead(TIMELINE_ID, newer, loaded.head!);
+    newer.output.file = 'mutation-after-enqueue.mp4';
+    await Promise.resolve();
+    expect(fixture.commits).toHaveLength(1);
+    expect(producer).toHaveBeenCalledTimes(1);
+    release();
+    await rejected;
+    expect(fixture.commits).toHaveLength(1);
+    await provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!);
+    await second;
+    expect(fixture.commits.map((entry) => JSON.parse(entry.bytes).request_id))
+      .toEqual(['save-request-1', 'save-request-1', 'save-request-2']);
+    expect(producer.mock.calls[1][0].config.output.file).toBe('newer-edit.mp4');
+  });
+
+  it('shares simultaneous retries of the same snapshot in one flight', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let started!: () => void;
+    const firstStarted = new Promise<void>((resolve) => { started = resolve; });
+    const fixture = commitFixture(async (sent) => { started(); await held; return result(sent); });
+    const producer = vi.fn((_save: TimelineCommitSaveContext) => request());
+    const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport,
+      commitRouting: { enabled: true, requestForSave: producer } });
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+    const first = provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!);
+    await firstStarted;
+    const second = provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!);
+    expect(fixture.commits).toHaveLength(1);
+    release();
+    expect(await second).toEqual(await first);
+    expect(fixture.commits).toHaveLength(1);
+    expect(producer).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not borrow an older request identity for an equal-valued newer attempt', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let started!: () => void;
+    const firstStarted = new Promise<void>((resolve) => { started = resolve; });
+    const fixture = commitFixture(async (sent, call) => {
+      if (call === 1) { started(); await held; }
+      return result(sent);
+    });
+    let sequence = 0;
+    const producer = vi.fn((_save: TimelineCommitSaveContext) => request(`save-request-${++sequence}`));
+    const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport,
+      commitRouting: { enabled: true, requestForSave: producer } });
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+    const first = provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!);
+    await firstStarted;
+    const second = provider.saveTimelineAtHead(TIMELINE_ID, structuredClone(loaded.config), loaded.head!);
+    expect(producer).toHaveBeenCalledTimes(1);
+    release();
+    await Promise.all([first, second]);
+    expect(fixture.commits.map((entry) => JSON.parse(entry.bytes).request_id))
+      .toEqual(['save-request-1', 'save-request-2']);
+  });
+
+  it('fails closed on a producer with another timeline identity', async () => {
+    const fixture = runtimeFixture();
+    const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport,
+      commitRouting: { enabled: true, requestForSave: () => ({ ...request(), timeline_id: 'another-timeline' }) } });
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+    await expect(provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!))
+      .rejects.toMatchObject({ code: 'schema_incompatible' });
+    expect(fixture.requests.some((entry) => entry.method === 'POST' && entry.path.endsWith('/composition-revisions'))).toBe(false);
   });
 });

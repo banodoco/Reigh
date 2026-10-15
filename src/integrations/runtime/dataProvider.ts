@@ -1,4 +1,4 @@
-import { ApiError, type ByteResponse, type MediaImportOperation as MediaImport, type RequestBody } from './generated.ts';
+import { ApiError, type ByteResponse, type MediaImportOperation as MediaImport, type RequestBody, type CommitRequest, type CommitResult } from './generated.ts';
 import {
   ReighRuntimeClient,
   RuntimeAuthenticationError,
@@ -66,8 +66,50 @@ type CanonicalTimelineState = {
   version: number;
 };
 
+type Immutable<T> = T extends object ? { readonly [K in keyof T]: Immutable<T[K]> } : T;
+export type ImmutableCommitRequest = Immutable<CommitRequest>;
+
+/** A producer supplies explicit commands and captured identity; routing never derives intent. */
+export interface TimelineCommitSaveContext {
+  readonly timelineId: string;
+  readonly expectedHead: Immutable<TimelineHeadRevision>;
+  readonly config: Immutable<TimelineConfig>;
+  readonly registry?: Immutable<AssetRegistry>;
+  readonly bundle?: Immutable<TimelineBundleEnvelope> | null;
+}
+
+export interface TimelineCommitRouting {
+  readonly enabled: boolean;
+  readonly requestForSave: (save: TimelineCommitSaveContext) => ImmutableCommitRequest;
+}
+
+function freezeCommitValue<T>(value: T): T {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const child of Object.values(value)) freezeCommitValue(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+interface TimelineCommitAttemptOwner {
+  readonly config: TimelineConfig;
+  readonly registry?: AssetRegistry;
+  readonly bundle?: TimelineBundleEnvelope | null;
+  readonly headRevisionId: string | null;
+}
+
+interface PendingTimelineCommit {
+  readonly owner: TimelineCommitAttemptOwner;
+  readonly request: CommitRequest;
+  readonly settled: Promise<void>;
+  readonly release: () => void;
+  flight?: Promise<TimelineSaveReceipt>;
+}
+
 export interface RuntimeDataProviderOptions {
   projectId: string;
+  /** Explicit opt-in. With no GESTURES producer, enabling this must fail closed. */
+  commitRouting?: TimelineCommitRouting;
   baseUrl?: string;
   /** Direct clients may pass a disposable test credential; browser callers use the connector. */
   token?: string;
@@ -288,6 +330,8 @@ export class RuntimeDataProvider implements DataProvider {
     },
   };
 
+  private readonly commitRouting?: TimelineCommitRouting;
+  private readonly pendingCommits = new Map<string, PendingTimelineCommit>();
   private readonly projectId: string;
   private readonly client: ReighRuntimeClient;
   private readonly onRuntimeError?: (error: RuntimeConnectorError) => void;
@@ -323,6 +367,9 @@ export class RuntimeDataProvider implements DataProvider {
 
   constructor(options: RuntimeDataProviderOptions) {
     this.projectId = options.projectId;
+    this.commitRouting = options.commitRouting
+      ? Object.freeze({ ...options.commitRouting })
+      : undefined;
     this.client = new ReighRuntimeClient({ baseUrl: options.baseUrl, token: options.token, transport: options.transport });
     this.onRuntimeError = options.onRuntimeError;
     this.apiBaseUrl = this.client.baseUrl;
@@ -539,8 +586,104 @@ export class RuntimeDataProvider implements DataProvider {
       throw new TimelineVersionConflictError('Workspace Runtime save has missing or untrusted timeline head provenance.');
     }
     const base = { ...expectedHead };
+    if (this.commitRouting?.enabled) {
+      // Capture before waiting: subsequent editor/producer mutations cannot alter this save.
+      const save = freezeCommitValue(structuredClone({ timelineId, expectedHead: base, config, registry, bundle }));
+      return this.saveCommitAtHead(save, { config, registry, bundle, headRevisionId: base.headRevisionId });
+    }
     return this.withTimelineOperation(timelineId, () =>
       this.saveTimelineInOrder(timelineId, config, base, registry, bundle));
+  }
+
+  private saveCommitAtHead(
+    save: TimelineCommitSaveContext, owner: TimelineCommitAttemptOwner,
+  ): Promise<TimelineSaveReceipt> {
+    const { timelineId } = save;
+    let pending = this.pendingCommits.get(timelineId);
+    // useTimelinePersistence retains the exact attempt objects for a transport
+    // retry and clones a new config for a newer edit. Equal snapshot values do
+    // not prove equal authorship and must never deduplicate distinct gestures.
+    if (pending && (pending.owner.config !== owner.config || pending.owner.registry !== owner.registry
+      || pending.owner.bundle !== owner.bundle || pending.owner.headRevisionId !== owner.headRevisionId)) {
+      // Wait outside timelineOperations so the original attempt can retry while
+      // newer edits are parked. Waiting inside that queue would deadlock its retry.
+      return pending.settled.then(() => this.saveCommitAtHead(save, owner));
+    }
+    if (!pending) {
+      if (typeof this.commitRouting?.requestForSave !== 'function') {
+        throw new TimelineSchemaIncompatibleError('Commit routing requires an explicit request producer.');
+      }
+      const produced = this.commitRouting.requestForSave(save);
+      // JSON is the generated client's wire boundary. Capture once, including nested
+      // commands; the producer retains no mutable reference into a retry's body.
+      const request = freezeCommitValue(JSON.parse(JSON.stringify(produced)) as CommitRequest);
+      if (request.project_id !== this.projectId || request.timeline_id !== timelineId
+        || request.base_revision_id !== save.expectedHead.headRevisionId || request.dry_run
+        || request.source.via !== 'app' || !request.request_id || !request.session_id) {
+        throw new TimelineSchemaIncompatibleError('Commit producer supplied an untrusted save identity or base.');
+      }
+      let release!: () => void;
+      const settled = new Promise<void>((resolve) => { release = resolve; });
+      pending = { owner, request, settled, release };
+      this.pendingCommits.set(timelineId, pending);
+    }
+    if (pending.flight) return pending.flight;
+    const attempt = pending;
+    const finish = () => {
+      if (this.pendingCommits.get(timelineId) === attempt) this.pendingCommits.delete(timelineId);
+      attempt.release();
+    };
+    attempt.flight = this.withTimelineOperation(timelineId, async () => {
+      try {
+        const result = await this.client.commitTimeline(attempt.request);
+        if (result.request_id !== attempt.request.request_id
+          || result.base_revision_id !== attempt.request.base_revision_id) {
+          throw new TimelineSchemaIncompatibleError('Runtime commit response does not identify this request.');
+        }
+        if (result.status === 'error' && result.error?.code === 'runtime_unavailable') {
+          throw new RuntimeUnavailableError(new ApiError(503, result.error.code, result.error.message), this.apiBaseUrl);
+        }
+        if (result.status === 'conflict') {
+          throw new TimelineVersionConflictError('Runtime commit requires conflict resolution.');
+        }
+        if (result.status !== 'accepted' && result.status !== 'no_change') {
+          throw new TimelineSchemaIncompatibleError(result.error?.message ?? 'Runtime did not accept the timeline commit.');
+        }
+        const receipt = await this.readCommittedTimeline(timelineId, attempt.request, result);
+        finish();
+        return receipt;
+      } catch (error) {
+        // Terminal responses release the next save. Transport/unknown outcomes keep
+        // the exact request reserved until its acknowledgement is recovered.
+        if (error instanceof TimelineVersionConflictError || error instanceof TimelineSchemaIncompatibleError
+          || (error instanceof ApiError && error.status >= 400 && error.status < 500
+            && error.status !== 408 && error.status !== 429)) finish();
+        throw this.toProviderError(error, timelineId);
+      }
+    }).finally(() => { attempt.flight = undefined; });
+    return attempt.flight;
+  }
+
+  private async readCommittedTimeline(
+    timelineId: string, request: CommitRequest, result: CommitResult,
+  ): Promise<TimelineSaveReceipt> {
+    const head = result.accepted_revision_id ?? (result.status === 'no_change' ? result.base_revision_id : null);
+    if (!head) throw new TimelineSchemaIncompatibleError('Runtime commit omitted its accepted revision.');
+    // Resolve the exact immutable Runtime revision, never infer publication shape
+    // from the request snapshot or substitute a later polled head.
+    const record = await this.client.getProjectParentCompositionRevision(this.projectId, timelineId, head);
+    assertRuntimeIdentity(record, this.projectId, timelineId, 'committed parent composition revision');
+    assertRevisionIdentity(record, head, 'committed parent composition revision');
+    const parentComposition = requiredRecord(record.payload, 'committed parent composition revision.payload');
+    const current = this.canonicalTimelineState.get(timelineId);
+    if (current && current.headRevisionId !== request.base_revision_id && current.headRevisionId !== head) {
+      throw new TimelineVersionConflictError('The commit was confirmed, but the timeline has since changed; review the current head.');
+    }
+    const version = current?.headRevisionId === head ? current.version : (current?.version ?? 0) + 1;
+    const registry = normalizeRegistry(parentComposition.registry);
+    this.canonicalTimelineState.set(timelineId, { headRevisionId: head, parentComposition, version });
+    this.activeRegistry = registry;
+    return { configVersion: version, head: this.timelineHead(timelineId, head) };
   }
 
   private async saveTimelineInOrder(
