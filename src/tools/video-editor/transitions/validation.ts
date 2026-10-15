@@ -17,6 +17,10 @@ import {
   isBuiltInTransition,
   normalizeClipTransition,
 } from '@/tools/video-editor/transitions/catalog.ts';
+import {
+  validateTransitionImplementationResource,
+  validateTransitionImplementationRevision,
+} from '@/tools/video-editor/transitions/implementationBinding.ts';
 
 // ---------------------------------------------------------------------------
 // Diagnostic codes
@@ -37,6 +41,18 @@ export const TransitionDiagnosticCodes = {
 
   /** A contributed transition that was previously available has been removed. */
   REMOVED_CONTRIBUTED: 'transitions/validation/removed-contributed',
+
+  /** A shared implementation binding is absent, stale, or inconsistent with its resource. */
+  INVALID_IMPLEMENTATION_BINDING: 'transitions/validation/invalid-implementation-binding',
+
+  /** A shared implementation binding's resource revision is not pinned on the clip. */
+  MISSING_REVISION: 'transitions/validation/missing-revision',
+
+  /** The clip's resource revision differs from the active contribution resource. */
+  MISMATCHED_REVISION: 'transitions/validation/mismatched-revision',
+
+  /** The clip contains malformed or unsupported implementation parameters. */
+  INVALID_IMPLEMENTATION_PARAMS: 'transitions/validation/invalid-implementation-params',
 
   /** The transition record exists but is in an inactive/error state. */
   INACTIVE_RECORD: 'transitions/validation/inactive-record',
@@ -342,13 +358,67 @@ export function validateClipTransition(
   if (record.status !== 'active') {
     diagnostics.push(
       diagnostic(
-        'warning',
+        record.implementationResource ? 'error' : 'warning',
         TransitionDiagnosticCodes.INACTIVE_RECORD,
         `Transition "${transitionType}" is registered but has status "${record.status}". ` +
           `It may not render correctly.`,
         { transitionType, recordStatus: record.status },
       ),
     );
+  }
+
+  const resource = record.implementationResource;
+  if (resource) {
+    const bindingErrors = [
+      ...validateTransitionImplementationResource(resource),
+      ...validateTransitionImplementationRevision(record.implementationRevision),
+    ];
+    for (const message of bindingErrors) {
+      diagnostics.push(diagnostic(
+        'error',
+        TransitionDiagnosticCodes.INVALID_IMPLEMENTATION_BINDING,
+        message,
+        { transitionType, ownerExtensionId: record.ownerExtensionId, contributionId: record.contributionId },
+      ));
+    }
+
+    if (!clipTransition.revision) {
+      diagnostics.push(diagnostic(
+        'error',
+        TransitionDiagnosticCodes.MISSING_REVISION,
+        `Transition "${transitionType}" needs the resource revision of its admitted implementation binding.`,
+        { transitionType, expectedRevision: record.implementationRevision },
+      ));
+    } else if (clipTransition.revision !== record.implementationRevision) {
+      diagnostics.push(diagnostic(
+        'error',
+        TransitionDiagnosticCodes.MISMATCHED_REVISION,
+        `Transition "${transitionType}" pins a different resource revision than the active contribution.`,
+        { transitionType, expectedRevision: record.implementationRevision, actualRevision: clipTransition.revision },
+      ));
+    }
+
+    if (clipTransition.params !== undefined) {
+      const params = clipTransition.params;
+      const isPlainParams = typeof params === 'object'
+        && params !== null
+        && !Array.isArray(params)
+        && (Object.getPrototypeOf(params) === Object.prototype || Object.getPrototypeOf(params) === null);
+      const supported = new Set(Array.isArray(resource.supportedParams) ? resource.supportedParams : []);
+      const unsupportedKeys = isPlainParams
+        ? Object.keys(params).filter((key) => !supported.has(key))
+        : [];
+      if (!isPlainParams || unsupportedKeys.length > 0) {
+        diagnostics.push(diagnostic(
+          'error',
+          TransitionDiagnosticCodes.INVALID_IMPLEMENTATION_PARAMS,
+          !isPlainParams
+            ? `Transition "${transitionType}" parameters must be a plain object.`
+            : `Transition "${transitionType}" has parameters unsupported by its shared implementation: ${unsupportedKeys.join(', ')}.`,
+          { transitionType, unsupportedKeys },
+        ));
+      }
+    }
   }
 
   // Check for missing params

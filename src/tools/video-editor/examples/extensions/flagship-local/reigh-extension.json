@@ -69,6 +69,22 @@
         "order": 10
       },
       {
+        "id": "flagship-transition-cross-fade",
+        "kind": "transition",
+        "label": "Flagship Cross-fade",
+        "transitionId": "com.reigh.flagship.transition.cross-fade",
+        "resourceRevision": "sha256:1048af49b051ab1a1505b7d85707c4dc96aa2225a7bf38ff8f11b64077e7f1e7",
+        "implementation": {
+          "host": "timeline-composition",
+          "id": "cross-fade"
+        },
+        "supportedParams": [],
+        "defaults": {},
+        "allowBrowserExport": false,
+        "allowWorkerExport": false,
+        "order": 11
+      },
+      {
         "id": "flagship-cliptype-future",
         "kind": "clipType",
         "label": "Flagship custom clip type (reserved for M3)",

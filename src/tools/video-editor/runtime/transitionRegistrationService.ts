@@ -32,6 +32,11 @@ import type {
   DeterminismStatus,
 } from '@/tools/video-editor/runtime/renderability.ts';
 import type { ParameterSchema } from '@/tools/video-editor/types/index.ts';
+import {
+  createTransitionImplementationResource,
+  validateTransitionImplementationResource,
+  validateTransitionImplementationRevision,
+} from '@/tools/video-editor/transitions/implementationBinding.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -435,8 +440,57 @@ export function createTransitionRegistrationService(
     const schemaDiags = validateTransitionParameterSchema(sdkSchema);
     const schema = toInternalSchema(sdkSchema);
 
+    const implementationDiags: ExtensionDiagnostic[] = [];
+    let implementationResource: ReturnType<typeof createTransitionImplementationResource>;
+    let implementationRevision: string | undefined;
+    if (contrib.implementation !== undefined) {
+      const resourceInput = {
+        owner: extensionId,
+        id: contrib.id,
+        kind: 'transition' as const,
+        transitionId: contrib.transitionId,
+        implementation: contrib.implementation,
+        supportedParams: contrib.supportedParams ?? [],
+        defaults: contrib.defaults ?? {},
+      };
+      const bindingErrors = validateTransitionImplementationResource(resourceInput);
+      bindingErrors.push(...validateTransitionImplementationRevision(contrib.resourceRevision));
+      const supportedParams = new Set(Array.isArray(resourceInput.supportedParams)
+        ? resourceInput.supportedParams
+        : []);
+      for (const definition of sdkSchema ?? []) {
+        if (!supportedParams.has(definition.name)) {
+          bindingErrors.push(`registration parameter "${definition.name}" is not supported by the selected implementation`);
+        } else if (definition.default !== undefined
+          && resourceInput.defaults[definition.name] !== definition.default) {
+          bindingErrors.push(`registration parameter "${definition.name}" default does not match the immutable implementation resource`);
+        }
+      }
+      for (const message of bindingErrors) {
+        implementationDiags.push({
+          severity: 'error',
+          code: /param/i.test(message)
+            ? 'transitions/unsupported-implementation-parameters'
+            : 'transitions/invalid-implementation-binding',
+          message,
+          detail: {
+            ownerExtensionId: extensionId,
+            contributionId: contrib.id,
+            transitionId,
+          },
+        });
+      }
+      if (bindingErrors.length === 0) {
+        implementationResource = createTransitionImplementationResource(extensionId, contrib);
+        implementationRevision = contrib.resourceRevision;
+      }
+    }
+
     // Emit schema diagnostics into the extension diagnostics service
     for (const diag of schemaDiags) {
+      emit(diag.severity, diag.code, diag.message, diag.detail);
+    }
+    for (const diag of implementationDiags) {
       emit(diag.severity, diag.code, diag.message, diag.detail);
     }
 
@@ -448,11 +502,14 @@ export function createTransitionRegistrationService(
     // The renderer is still registered and render-time parameter coercion
     // continues to work for already-applied legacy data.
     const hasSchemaErrors = schemaDiags.some((d) => d.severity === 'error');
-    const status: TransitionRegistryRecordStatus = hasSchemaErrors ? 'error' : 'active';
+    const hasImplementationErrors = implementationDiags.some((d) => d.severity === 'error');
+    const status: TransitionRegistryRecordStatus = hasSchemaErrors || hasImplementationErrors ? 'error' : 'active';
 
     // Collect record-level diagnostics
     const recordDiagnostics: ExtensionDiagnostic[] | undefined =
-      schemaDiags.length > 0 ? [...schemaDiags] : undefined;
+      schemaDiags.length > 0 || implementationDiags.length > 0
+        ? [...schemaDiags, ...implementationDiags]
+        : undefined;
 
     const record: TransitionRegistryRecord = {
       transitionId,
@@ -460,6 +517,8 @@ export function createTransitionRegistrationService(
       renderer,
       provenance: 'bundled-extension',
       ownerExtensionId: extensionId,
+      ...(implementationResource ? { implementationResource } : {}),
+      ...(implementationRevision ? { implementationRevision } : {}),
       renderability,
       status,
       ...(schema ? { schema } : {}),
@@ -471,11 +530,12 @@ export function createTransitionRegistrationService(
     // with the same transitionId exists, it is safely disposed first.
     const handle = transitionRegistry.register(record);
 
-    const registrationSeverity: ExtensionDiagnostic['severity'] = hasSchemaErrors ? 'warning' : 'info';
+    const hasRegistrationErrors = hasSchemaErrors || hasImplementationErrors;
+    const registrationSeverity: ExtensionDiagnostic['severity'] = hasRegistrationErrors ? 'warning' : 'info';
     emit(
       registrationSeverity,
       'transitions/registered',
-      `Transition "${transitionId}" registered for extension "${extensionId}"${hasSchemaErrors ? ' with schema errors' : ''}.`,
+      `Transition "${transitionId}" registered for extension "${extensionId}"${hasRegistrationErrors ? ' with declaration errors' : ''}.`,
       { transitionId, extensionId, contributionId: contrib.id, status },
     );
 

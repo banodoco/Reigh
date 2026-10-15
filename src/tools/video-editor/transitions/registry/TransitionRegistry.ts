@@ -72,10 +72,24 @@ function freezeRenderability(
   });
 }
 
+function freezeImplementationResource(
+  resource: NonNullable<TransitionRegistryRecord['implementationResource']>,
+): NonNullable<TransitionRegistryRecord['implementationResource']> {
+  return Object.freeze({
+    ...resource,
+    implementation: Object.freeze({ ...resource.implementation }),
+    supportedParams: Object.freeze([...resource.supportedParams]),
+    defaults: Object.freeze({ ...resource.defaults }),
+  });
+}
+
 function freezeRecord(record: TransitionRegistryRecord): TransitionRegistryRecord {
   return Object.freeze({
     ...record,
     renderability: freezeRenderability(record.renderability),
+    ...(record.implementationResource
+      ? { implementationResource: freezeImplementationResource(record.implementationResource) }
+      : {}),
     ...(record.diagnostics ? { diagnostics: freezeDiagnostics(record.diagnostics) } : {}),
   });
 }

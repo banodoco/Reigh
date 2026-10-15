@@ -31,6 +31,7 @@ import type {
   IntegrationCapabilities,
   CapabilitySourceRef,
   ProjectExtensionRequirement,
+  TransitionImplementationResource,
 } from '@reigh/editor-sdk';
 import type { ProcessOperationSpec, ProcessSpec } from '@/sdk/video/families/processes';
 import { buildFamilyContributionSequence } from '@/tools/video-editor/runtime/families/FamilyContributionSequence.ts';
@@ -388,6 +389,10 @@ export interface VideoEditorTransitionDescriptor {
   order?: number;
   /** The transition identifier that must match registerRenderer calls. */
   transitionId: string;
+  /** Immutable contribution identity passed to timeline-composition admission. */
+  implementationResource?: TransitionImplementationResource;
+  /** Pinned SHA-256 revision for this exact contribution resource. */
+  implementationRevision?: string;
   /** Human-readable label, falling back to transitionId. */
   label: string;
   /** When true, the transition contribution allows browser export. */

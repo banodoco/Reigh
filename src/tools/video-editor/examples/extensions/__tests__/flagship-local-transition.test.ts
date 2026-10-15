@@ -10,9 +10,11 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import {
   defineExtension,
 } from '@/sdk/index';
+import { flagshipLocalExtension } from '../flagship-local/index';
 import { createExtensionContext } from '@/tools/video-editor/runtime/extensionContextFactory';
 import type {
   ReighExtension,
@@ -92,6 +94,38 @@ function createTestContext(
 // ---------------------------------------------------------------------------
 
 describe('Flagship local extension — M8 transition contribution', () => {
+  it('declares the namespaced cross-fade resource with its canonical SHA-256 revision', () => {
+    const crossFade = getTransitionContribs(flagshipLocalExtension.manifest)
+      .find((entry) => entry.transitionId === 'com.reigh.flagship.transition.cross-fade');
+    expect(crossFade).toMatchObject({
+      id: 'flagship-transition-cross-fade',
+      kind: 'transition',
+      implementation: {
+        host: 'timeline-composition',
+        id: 'cross-fade',
+      },
+      supportedParams: [],
+      defaults: {},
+      resourceRevision: 'sha256:1048af49b051ab1a1505b7d85707c4dc96aa2225a7bf38ff8f11b64077e7f1e7',
+      allowBrowserExport: false,
+      allowWorkerExport: false,
+    });
+    const canonicalResource = {
+      owner: 'com.reigh.examples.flagship-local',
+      id: 'flagship-transition-cross-fade',
+      kind: 'transition',
+      transitionId: 'com.reigh.flagship.transition.cross-fade',
+      implementation: { host: 'timeline-composition', id: 'cross-fade' },
+      supportedParams: [],
+      defaults: {},
+    };
+    expect(crossFade?.resourceRevision).toBe(
+      `sha256:${createHash('sha256').update(JSON.stringify(canonicalResource), 'utf8').digest('hex')}`,
+    );
+    expect(Object.isFrozen(crossFade)).toBe(true);
+    expect(Object.isFrozen(crossFade?.implementation)).toBe(true);
+  });
+
   // ---- Manifest declaration -------------------------------------------------
 
   describe('manifest declaration', () => {

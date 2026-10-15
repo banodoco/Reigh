@@ -15,3 +15,4 @@ export type {
   TransitionRegistrySnapshot,
   TransitionRegistrySubscriber,
 } from '@/tools/video-editor/transitions/registry/types.ts';
+export type { TransitionImplementationBinding } from '@/tools/video-editor/transitions/implementationBinding.ts';

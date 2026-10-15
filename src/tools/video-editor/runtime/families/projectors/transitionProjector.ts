@@ -11,6 +11,7 @@ import type { TransitionContribution, TransitionMaterialSlotDeclaration } from '
 import type { VideoEditorTransitionDescriptor, VideoEditorTransitionMaterialSlotDescriptor } from '../../extensionSurface';
 import type { CollectedContribution } from '../FamilyContributionSequence';
 import { sortFamilyContributions, freezeDescriptor } from '../familyAdapterUtils';
+import { createTransitionImplementationResource } from '@/tools/video-editor/transitions/implementationBinding.ts';
 
 const EMPTY_MATERIAL_SLOTS: readonly VideoEditorTransitionMaterialSlotDescriptor[] = Object.freeze([]);
 
@@ -40,11 +41,14 @@ export function buildTransitionDescriptors(
   for (const { contribution, extensionId } of sorted) {
     const transitionContrib = contribution as unknown as TransitionContribution;
     if (!transitionContrib.transitionId) continue;
+    const implementationResource = createTransitionImplementationResource(extensionId, transitionContrib);
     descriptors.push(freezeDescriptor({
       id: contribution.id as string,
       extensionId,
       order: contribution.order,
       transitionId: transitionContrib.transitionId,
+      ...(implementationResource ? { implementationResource } : {}),
+      ...(transitionContrib.resourceRevision ? { implementationRevision: transitionContrib.resourceRevision } : {}),
       label: transitionContrib.label ?? transitionContrib.transitionId,
       allowBrowserExport: transitionContrib.allowBrowserExport ?? false,
       allowWorkerExport: transitionContrib.allowWorkerExport ?? false,

@@ -1,6 +1,7 @@
 import type { DisposeHandle, ExtensionDiagnostic, TransitionRenderer } from '@reigh/editor-sdk';
 import type { ContributionRenderability } from '@/tools/video-editor/runtime/renderability.ts';
 import type { ParameterSchema } from '@/tools/video-editor/types/index.ts';
+import type { TransitionImplementationResource } from '@reigh/editor-sdk';
 
 export type TransitionRegistryProvenance =
   | 'built-in'
@@ -22,6 +23,10 @@ export interface TransitionRegistryRecord {
   readonly code?: string;
   readonly provenance: TransitionRegistryProvenance;
   readonly ownerExtensionId?: string;
+  /** Exact immutable shared-composition contribution resource. */
+  readonly implementationResource?: TransitionImplementationResource;
+  /** SHA-256 revision declared for this exact resource. */
+  readonly implementationRevision?: string;
   readonly renderability: ContributionRenderability;
   readonly status: TransitionRegistryRecordStatus;
   readonly diagnostics?: readonly ExtensionDiagnostic[];

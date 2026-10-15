@@ -183,6 +183,12 @@ function flagshipWipeRenderer(...args: unknown[]): Record<string, unknown> {
   return style;
 }
 
+/** Pure browser-preview shim for the shared cross-fade implementation. */
+function flagshipCrossFadeRenderer(...args: unknown[]): Record<string, unknown> {
+  const progress = typeof args[0] === 'number' ? args[0] : 0;
+  return { opacity: Math.max(0, Math.min(1, progress)) };
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -331,6 +337,24 @@ export const flagshipLocalExtension: ReighExtension = defineExtension({
         // the TransitionMaterialSlotDeclaration → VideoEditorTransitionMaterialSlotDescriptor
         // normalization path.
         materialSlots: [{ name: 'transition-mask', label: 'Transition Mask' }],
+      } satisfies TransitionContribution,
+
+      // ---- First shared-composition contributed transition ------------------
+      {
+        id: 'flagship-transition-cross-fade' as any,
+        kind: 'transition',
+        label: 'Flagship Cross-fade',
+        transitionId: 'com.reigh.flagship.transition.cross-fade',
+        resourceRevision: 'sha256:1048af49b051ab1a1505b7d85707c4dc96aa2225a7bf38ff8f11b64077e7f1e7',
+        implementation: {
+          host: 'timeline-composition',
+          id: 'cross-fade',
+        },
+        supportedParams: [],
+        defaults: {},
+        allowBrowserExport: false,
+        allowWorkerExport: false,
+        order: 11,
       } satisfies TransitionContribution,
 
       // ---- Future inactive contribution declarations -----------------------
@@ -486,6 +510,17 @@ export const flagshipLocalExtension: ReighExtension = defineExtension({
       'Flagship Wipe transition renderer registered (preview-only).',
     );
 
+    const crossFadeTransitionHandle = ctx.transitions.registerRenderer(
+      'com.reigh.flagship.transition.cross-fade',
+      flagshipCrossFadeRenderer,
+      { label: 'Flagship Cross-fade' },
+    );
+    info(
+      ctx,
+      'flagship/cross-fade-transition-registered',
+      'Flagship Cross-fade transition registered with its timeline-composition binding.',
+    );
+
     // --- Chrome event subscriptions -------------------------------------
     // Subscribe to toast events to demonstrate the subscribe API
     const toastSub = ctx.chrome.subscribe('toast', (payload) => {
@@ -531,6 +566,7 @@ export const flagshipLocalExtension: ReighExtension = defineExtension({
         commandHandle.dispose();
         effectHandle.dispose();
         transitionHandle.dispose();
+        crossFadeTransitionHandle.dispose();
 
         // Emit disposal diagnostic
         const disposedMsg = ctx.services.i18n.t('activation.disposed');

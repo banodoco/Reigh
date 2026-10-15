@@ -32,6 +32,10 @@ function collectedTransition(
     kind: 'transition',
     transitionId: overrides.transitionId,
     label: overrides.label,
+    implementation: overrides.implementation,
+    supportedParams: overrides.supportedParams,
+    defaults: overrides.defaults,
+    resourceRevision: overrides.resourceRevision,
     allowBrowserExport: overrides.allowBrowserExport,
     allowWorkerExport: overrides.allowWorkerExport,
     order: overrides.order,
@@ -114,6 +118,38 @@ describe('buildTransitionDescriptors', () => {
     const d = singleDescriptor(result);
     expect(d.allowBrowserExport).toBe(true);
     expect(d.allowWorkerExport).toBe(true);
+  });
+
+  it('propagates the immutable owner, contribution resource and SHA-256 revision', () => {
+    const result = buildTransitionDescriptors([
+      collectedTransition({
+        id: 'cross-fade-v1' as any,
+        transitionId: 'com.reigh.test.transition.cross-fade',
+        resourceRevision: `sha256:${'a'.repeat(64)}`,
+        implementation: {
+          host: 'timeline-composition',
+          id: 'cross-fade',
+        },
+        supportedParams: [],
+        defaults: {},
+      }, 'com.reigh.test.transition-owner'),
+    ]);
+
+    const resource = singleDescriptor(result).implementationResource;
+    expect(resource).toMatchObject({
+      owner: 'com.reigh.test.transition-owner',
+      id: 'cross-fade-v1',
+      kind: 'transition',
+      transitionId: 'com.reigh.test.transition.cross-fade',
+      implementation: { host: 'timeline-composition', id: 'cross-fade' },
+      supportedParams: [],
+      defaults: {},
+    });
+    expect(singleDescriptor(result).implementationRevision).toBe(`sha256:${'a'.repeat(64)}`);
+    expect(Object.isFrozen(resource)).toBe(true);
+    expect(Object.isFrozen(resource?.implementation)).toBe(true);
+    expect(Object.isFrozen(resource?.supportedParams)).toBe(true);
+    expect(Object.isFrozen(resource?.defaults)).toBe(true);
   });
 
   it('falls back label to transitionId when no label is provided', () => {
