@@ -1,6 +1,8 @@
 /** Generated from contract/openapi/workspace-v1.yaml; do not edit by hand. */
 // BEGIN GENERATED TIMELINE COMMIT
-export type EditCommand = { "op": string; "select": string | null; "args": Record<string, unknown>; "version"?: string | null; "resolved"?: Array<string> };
+export type EditCommand = { "op": string; "select": string | null; "args": Record<string, unknown>; "expect"?: Record<string, { "state": "absent" } | { "state": "present"; "value": unknown }>; "bindings"?: Record<string, OpCallAnchorIdentity>; "created"?: Array<OpCallScopedId>; "authorship"?: Record<string, "direct" | "consequence">; "version"?: string | null; "resolved"?: Array<OpCallScopedId> };
+export type OpCallScopedId = string;
+export type OpCallAnchorIdentity = OpCallScopedId | string;
 export type CommitJson = unknown;
 export type CommitCommand = EditCommand;
 export type CommitActor = { "kind": "user" | "agent" | "script"; "id": string };
@@ -42,7 +44,7 @@ export interface RuntimeAcceptance {
   revisions(project_id: string, timeline_id: string, options: CommitRevisionQuery): Promise<Array<CommitRevisionSummary>>;
   evidence(digest: string): Promise<CommitEvidence>;
 }
-export const OPCALL_SCHEMA = {"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://astrid.local/schemas/change-contract/opcall.schema.json", "title": "OpCall", "description": "Candidate single EditCommand envelope (SDK executable name: EditCommand). D RUNNER emits canonical OpCalls in Plan.calls and journal calls. Handler ids remain open. This increment is not a schema freeze.", "type": "object", "required": ["op", "select", "args"], "additionalProperties": false, "properties": {"op": {"type": "string", "description": "Qualified operation id, e.g. timeline.opacity or myteam.stagger.", "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$"}, "select": {"type": ["string", "null"], "description": "Authoring selector; executed calls use the canonical stable selector resolved by the runner. null for timeline-level operations."}, "args": {"type": "object", "description": "Opaque finite JSON operation arguments in authoring units. Omitted keys, JSON null, explicit clip.clear keys, and ordinary objects (including {$absent:true} or {op:clear}) remain distinct. Only the selected handler interprets these values.", "additionalProperties": true}, "version": {"type": ["string", "null"], "description": "The tool version when it ran (filled by the runner)."}, "resolved": {"type": "array", "description": "Runner-populated stable string identities. The admitted producer uses local identities; globally scoped ScopedId mapping remains unresolved and is not imposed here.", "items": {"type": "string"}, "default": []}}} as const;
+export const OPCALL_SCHEMA = {"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://astrid.local/schemas/change-contract/opcall.schema.json", "title": "OpCall", "description": "Candidate single EditCommand envelope (SDK executable name: EditCommand). D RUNNER emits canonical OpCalls in Plan.calls and journal calls. Handler ids remain open. This increment is not a schema freeze.", "type": "object", "required": ["op", "select", "args"], "additionalProperties": false, "$defs": {"scopedId": {"type": "string", "description": "Current ScopedId vocabulary: parent, shot, or occurrence clip/track ids, plus cut ids.", "pattern": "^(?:(?:parent|shot:[^/]+|occurrence:[^/]+)/(?:clip|track):[^/]+|cut:[^/:]+)$"}, "anchorIdentity": {"description": "Current resolved anchor identities, including scoped entity ids and the documented word, beat, and cut anchors.", "oneOf": [{"$ref": "#/$defs/scopedId"}, {"type": "string", "pattern": "^(?:word:[^:]+:[0-9]+|beat:[0-9]+|cut:[^/:]+:(?:start|end))$"}]}}, "properties": {"op": {"type": "string", "description": "Qualified operation id, e.g. timeline.opacity or myteam.stagger.", "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$"}, "select": {"type": ["string", "null"], "description": "Authoring selector; executed calls use the canonical stable selector resolved by the runner. null for timeline-level operations."}, "args": {"type": "object", "description": "Opaque finite JSON operation arguments in authoring units. Omitted keys, JSON null, explicit clip.clear keys, and ordinary objects (including {$absent:true} or {op:clear}) remain distinct. Only the selected handler interprets these values.", "additionalProperties": true}, "expect": {"type": "object", "description": "Optional prior values keyed by direct-write path. Absence and present JSON values are tagged separately; command-specific requirements remain producer/consumer rules.", "additionalProperties": {"oneOf": [{"type": "object", "required": ["state"], "properties": {"state": {"const": "absent"}}, "additionalProperties": false}, {"type": "object", "required": ["state", "value"], "properties": {"state": {"const": "present"}, "value": {}}, "additionalProperties": false}]}}, "bindings": {"type": "object", "description": "Runner-resolved anchor identity keyed by the exact authored TimeRef text.", "additionalProperties": {"$ref": "#/$defs/anchorIdentity"}}, "created": {"type": "array", "description": "Scoped IDs allocated by the runner for this call.", "items": {"$ref": "#/$defs/scopedId"}}, "authorship": {"type": "object", "description": "Per-write-path authorship classification; it carries no actor or authentication claim.", "additionalProperties": {"enum": ["direct", "consequence"]}}, "version": {"type": ["string", "null"], "description": "The tool version when it ran (filled by the runner)."}, "resolved": {"type": "array", "description": "Runner-populated IDs of the selected targets in the current ScopedId vocabulary.", "items": {"$ref": "#/$defs/scopedId"}, "default": []}}} as const;
 
 export function validateEditCommand(value: unknown): EditCommand {
   const object = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v) && Object.getPrototypeOf(v) === Object.prototype;
@@ -56,16 +58,62 @@ export function validateEditCommand(value: unknown): EditCommand {
     seen.delete(v);
     return valid;
   };
+
+  const matchesType = (candidate: unknown, kind: string): boolean => {
+    if (kind === "object") return object(candidate);
+    if (kind === "array") return Array.isArray(candidate);
+    if (kind === "string") return typeof candidate === "string";
+    if (kind === "null") return candidate === null;
+    if (kind === "boolean") return typeof candidate === "boolean";
+    if (kind === "integer") return typeof candidate === "number" && Number.isInteger(candidate);
+    if (kind === "number") return typeof candidate === "number" && Number.isFinite(candidate);
+    return false;
+  };
+  const rootSchema = OPCALL_SCHEMA as unknown as Record<string, any>;
+  const schemaValid = (candidate: unknown, schema: Record<string, any>): boolean => {
+    if (typeof schema !== "object" || schema === null || Array.isArray(schema)) return false;
+    if (typeof schema.$ref === "string") {
+      if (!schema.$ref.startsWith("#/")) return false;
+      let target: any = rootSchema;
+      for (const part of schema.$ref.slice(2).split("/")) {
+        const key = part.replace(/~1/g, "/").replace(/~0/g, "~");
+        if (!object(target) || !(key in target)) return false;
+        target = target[key];
+      }
+      return schemaValid(candidate, target);
+    }
+    if (schema.type !== undefined) {
+      const kinds: string[] = Array.isArray(schema.type) ? schema.type : [schema.type];
+      if (!kinds.some(kind => matchesType(candidate, kind))) return false;
+    }
+    if (Object.prototype.hasOwnProperty.call(schema, "const") && candidate !== schema.const) return false;
+    if (Array.isArray(schema.enum) && !schema.enum.some((entry: unknown) => candidate === entry)) return false;
+    if (schema.pattern !== undefined && (typeof candidate !== "string" || !new RegExp(schema.pattern).test(candidate))) return false;
+    if (schema.oneOf !== undefined) {
+      if (!Array.isArray(schema.oneOf) || schema.oneOf.filter((option: Record<string, any>) => schemaValid(candidate, option)).length !== 1) return false;
+    }
+    if (object(candidate)) {
+      if (schema.required !== undefined && (!Array.isArray(schema.required) || schema.required.some((key: string) => !(key in candidate)))) return false;
+      const properties = schema.properties === undefined ? {} : schema.properties;
+      if (!object(properties)) return false;
+      const additional = schema.additionalProperties;
+      for (const [key, child] of Object.entries(candidate)) {
+        if (Object.prototype.hasOwnProperty.call(properties, key)) {
+          if (!schemaValid(child, properties[key])) return false;
+        } else if (additional === false) {
+          return false;
+        } else if (object(additional) && !schemaValid(child, additional)) {
+          return false;
+        }
+      }
+    }
+    if (Array.isArray(candidate) && schema.items !== undefined && !candidate.every(child => schemaValid(child, schema.items))) return false;
+    return true;
+  };
+
   if (!object(value)) throw new TypeError("OpCall must be an object");
-  const fields = OPCALL_SCHEMA.properties as Record<string, { type: string | readonly string[]; pattern?: string; items?: { type: string } }>;
-  if (Object.keys(value).some(key => !(key in fields)) || OPCALL_SCHEMA.required.some(key => !(key in value))) throw new TypeError("OpCall missing or unknown field");
   if (!finiteJson(value)) throw new TypeError("OpCall requires finite JSON values");
-  const types: Record<string, (v: unknown) => boolean> = { string: v => typeof v === "string", null: v => v === null, object, array: Array.isArray };
-  for (const [key, item] of Object.entries(value)) {
-    const field = fields[key];
-    const kinds = typeof field.type === "string" ? [field.type] : field.type;
-    if (!kinds.some(kind => types[kind](item)) || (field.pattern && !new RegExp(field.pattern).test(item as string)) || (field.items && (item as unknown[]).some(v => !types[field.items!.type](v)))) throw new TypeError("OpCall invalid " + key);
-  }
+  if (!schemaValid(value, rootSchema)) throw new TypeError("OpCall schema violation");
   return value as EditCommand;
 }
 

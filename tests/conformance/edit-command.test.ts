@@ -1,7 +1,7 @@
 // App consumer only; fixtures stay in the selected Runtime source worktree.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { parseEditCommand } from '../../src/tools/video-editor/commands/types.ts';
@@ -9,6 +9,13 @@ import { WorkspaceClient } from '../../src/integrations/runtime/generated.ts';
 import { readPlacements } from '../../src/shared/lib/placement/documentPlacement.ts';
 
 const fixture = JSON.parse(readFileSync(join(process.env.CONTRACT_COMMAND_RUNTIME_ROOT!, 'conformance/fixtures/edit-command-candidate.json'), 'utf8'));
+const opcallSchemaFixtureRoot = join(process.env.CONTRACT_COMMAND_RUNTIME_ROOT!, 'conformance/fixtures/opcall-schema');
+const opcallSchemaFixtureCases = [
+  ['valid', 'opcall.spec-stagger.json'],
+  ['valid', 'opcall.state-distinction.json'],
+  ['invalid', 'opcall.unscoped-resolved-id.json'],
+  ['invalid', 'opcall.untagged-absent.json'],
+] as const;
 for (const c of fixture.command_cases) {
   test(`APP-${c.id}`, () => {
     const value = structuredClone(c.value);
@@ -21,6 +28,23 @@ for (const c of fixture.command_cases) {
     assert.deepEqual(value, c.value);
   });
 }
+for (const [validity, filename] of opcallSchemaFixtureCases) {
+  test(`APP-OPCALL-${validity}-${filename}`, () => {
+    const example = JSON.parse(readFileSync(join(opcallSchemaFixtureRoot, validity, filename), 'utf8'));
+    const value = example.instance;
+    if (validity === 'valid') {
+      assert.equal(parseEditCommand(value), value);
+      assert.deepEqual(value, example.instance);
+    } else assert.throws(() => parseEditCommand(value), TypeError);
+  });
+}
+test('APP-OPCALL-FIXTURE-MAP', () => {
+  for (const validity of ['valid', 'invalid']) {
+    const expected = opcallSchemaFixtureCases.filter(([folder]) => folder === validity).map(([, filename]) => filename).sort();
+    const actual = readdirSync(join(opcallSchemaFixtureRoot, validity)).filter(name => name.startsWith('opcall.') && name.endsWith('.json')).sort();
+    assert.deepEqual(actual, expected);
+  }
+});
 test('APP-NON-JSON', () => {
   for (const value of [NaN, Infinity, undefined]) assert.throws(() => parseEditCommand({ op: 'clip.set', select: null, args: { value } }), TypeError);
 });
