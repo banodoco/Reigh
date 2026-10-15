@@ -121,6 +121,7 @@ export interface TimelineClip {
     | {
         [k: string]: number;
       };
+  modifiers?: TimelineClipModifier[];
   params?: {
     [k: string]: unknown;
   };
@@ -137,6 +138,17 @@ export interface TimelineClip {
     [k: string]: unknown;
   };
   derived_output?: {
+    [k: string]: unknown;
+  };
+}
+/**
+ * This interface was referenced by `TimelineConfig`'s JSON-Schema
+ * via the `definition` "TimelineClipModifier".
+ */
+export interface TimelineClipModifier {
+  id: string;
+  element: string;
+  params: {
     [k: string]: unknown;
   };
 }

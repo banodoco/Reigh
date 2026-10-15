@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TimelineConfig } from "../src/generated.js";
+import type { TimelineClip, TimelineClipModifier, TimelineConfig } from "../src/generated.js";
 import { deepMergeTheme, mergeGeneration, resolveTheme } from "../src/resolveTheme.js";
 
 test("deepMergeTheme merges nested visual.canvas key-by-key", () => {
@@ -47,6 +47,21 @@ test("resolveTheme throws when theme missing", () => {
 test("TimelineConfig type accepts persisted no-theme timelines", () => {
   const out: TimelineConfig = { clips: [], tracks: [] };
   assert.deepEqual(out, { clips: [], tracks: [] });
+});
+
+test("TimelineClip type carries declared clip modifiers", () => {
+  const modifier: TimelineClipModifier = {
+    id: "modifier-instance-1",
+    element: "com.example.modifier.vignette",
+    params: { strength: 0.5, futureParameter: { retained: true } },
+  };
+  const clip: TimelineClip = {
+    id: "clip-1",
+    at: 0,
+    track: "V1",
+    modifiers: [modifier],
+  };
+  assert.deepEqual(clip.modifiers, [modifier]);
 });
 
 // Runtime validation of the document shape lives in the Python jsonschema

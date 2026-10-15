@@ -1,7 +1,7 @@
 # Python TypedDict mirrors of the canonical timeline.schema.json definitions.
 #
 # Plan-v5 B2: `timeline.schema.json` is the single source of truth; this file
-# is a small committed mirror of its six definitions so Python consumers get
+# is a small committed mirror of its schema definitions so Python consumers get
 # typing without a runtime codegen dependency. `scripts/gen_python_types.py`
 # checks it stays consistent with the artifact — regenerate by hand from the
 # artifact and run that check (validation itself always uses jsonschema against
@@ -10,6 +10,12 @@
 from __future__ import annotations
 
 from typing import Any, NotRequired, TypedDict
+
+
+class TimelineClipModifier(TypedDict):
+    id: str
+    element: str
+    params: dict[str, Any]
 
 
 class TimelineClip(TypedDict, total=False):
@@ -38,6 +44,7 @@ class TimelineClip(TypedDict, total=False):
     continuous: dict[str, Any]
     transition: Any
     effects: Any
+    modifiers: list[TimelineClipModifier]
     params: dict[str, Any]
     generation: dict[str, Any]
     pool_id: str
