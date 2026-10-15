@@ -88,9 +88,9 @@ export class RuntimeDataProvider implements DataProvider {
   /**
    * Runtime has no public timeline-document event cursor yet. Until that
    * contract exists, the consumer catches up through its canonical versioned
-   * read on a bounded cadence; usePollSync decides whether to adopt it.
+   * read every 30 seconds; usePollSync decides whether to adopt it.
    */
-  readonly refreshIntervalMs = 2_000;
+  readonly refreshIntervalMs = 30_000;
   readonly apiBaseUrl: string;
   readonly projectObjects: ProjectObjectStorage = {
     ingest: async (bytes, mediaType, filename) => {
