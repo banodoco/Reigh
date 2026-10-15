@@ -1,3 +1,4 @@
+import { PlayerAudioSource } from './PlayerAudioSource.tsx';
 import { memo, useState, type FC } from 'react';
 import { Audio as Html5Audio, Sequence, useRemotionEnvironment } from 'remotion';
 import { Audio as MediaAudio } from '@remotion/media';
@@ -88,40 +89,42 @@ const AudioTrackComponent: FC<{
             premountFor={renderClip.app?.canonicalTiming ? 0 : fps}
           >
             {mediaSrc && isPlayableAudio ? (
-              <MediaErrorBoundary
-                clipId={renderClip.id}
-                resetKey={`${renderClip.id}:${mediaSrc}:${trimProps.trimBefore}:${trimProps.trimAfter ?? 'none'}:${playbackRate}:${effectiveVolume}:audio`}
-                fallback={null}
-              >
-                {isRendering ? (
-                  <MediaAudio
-                    src={mediaSrc}
-                    trimBefore={trimProps.trimBefore}
-                    trimAfter={trimProps.trimAfter}
-                    playbackRate={playbackRate}
-                    volume={effectiveVolume}
-                    pauseWhenBuffering={false}
-                  />
-                ) : (
-                  <PreviewAudio
-                    key={JSON.stringify([
-                      renderClip.id,
-                      mediaSrc,
-                      renderClip.at,
-                      trimProps.trimBefore,
-                      trimProps.trimAfter,
-                      playbackRate,
-                      getClipDurationInFrames(renderClip, fps),
-                      fps,
-                    ])}
-                    src={mediaSrc}
-                    trimBefore={trimProps.trimBefore}
-                    trimAfter={trimProps.trimAfter}
-                    playbackRate={playbackRate}
-                    volume={effectiveVolume}
-                  />
-                )}
-              </MediaErrorBoundary>
+              <PlayerAudioSource src={mediaSrc} clip={renderClip} fps={fps}>{(audioSrc) => (
+                <MediaErrorBoundary
+                  clipId={renderClip.id}
+                  resetKey={`${renderClip.id}:${audioSrc}:${trimProps.trimBefore}:${trimProps.trimAfter ?? 'none'}:${playbackRate}:${effectiveVolume}:audio`}
+                  fallback={null}
+                >
+                  {isRendering ? (
+                    <MediaAudio
+                      src={audioSrc}
+                      trimBefore={trimProps.trimBefore}
+                      trimAfter={trimProps.trimAfter}
+                      playbackRate={playbackRate}
+                      volume={effectiveVolume}
+                      pauseWhenBuffering={false}
+                    />
+                  ) : (
+                    <PreviewAudio
+                      key={JSON.stringify([
+                        renderClip.id,
+                        audioSrc,
+                        renderClip.at,
+                        trimProps.trimBefore,
+                        trimProps.trimAfter,
+                        playbackRate,
+                        getClipDurationInFrames(renderClip, fps),
+                        fps,
+                      ])}
+                      src={audioSrc}
+                      trimBefore={trimProps.trimBefore}
+                      trimAfter={trimProps.trimAfter}
+                      playbackRate={playbackRate}
+                      volume={effectiveVolume}
+                    />
+                  )}
+                </MediaErrorBoundary>
+              )}</PlayerAudioSource>
             ) : null}
           </Sequence>
         );

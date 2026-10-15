@@ -1,5 +1,8 @@
-import { useMemo, useState, type CSSProperties, type FC, type ReactNode } from 'react';
-import { AbsoluteFill, Sequence, interpolate, useCurrentFrame, useRemotionEnvironment, useVideoConfig } from 'remotion';
+import { AudioTrack } from './AudioTrack.tsx';
+import { PlayerAudioSource } from './PlayerAudioSource.tsx';
+import { PlayerClipSequence, PlayerClipEvaluationContext } from './PlayerClipSequence.tsx';
+import { useContext, useMemo, useState, type CSSProperties, type ComponentProps, type FC, type ReactNode } from 'react';
+import { AbsoluteFill, Audio, interpolate, useCurrentFrame, useRemotionEnvironment, useVideoConfig } from 'remotion';
 import { ReadinessImage } from '@astrid/packs/rendering/shared/readiness-image';
 import { ReadinessVideo } from './ReadinessVideo.tsx';
 import {
@@ -37,6 +40,26 @@ import {
   useOptionalShaderEffectRegistryContext,
   type ShaderEffectRegistrySnapshot,
 } from '@/tools/video-editor/shaders/registry/index.ts';
+
+// Keep the original video decoder/trim for pictures. Enveloped sound uses the
+// same resolved source, decoded PCM and source clock as audio-only tracks.
+const PlayerVideo: FC<ComponentProps<typeof ReadinessVideo> & {clip: ResolvedTimelineClip; fps: number}> =
+  ({clip, fps, ...props}) => {
+    const evaluation = useContext(PlayerClipEvaluationContext);
+    const sharedAudio = evaluation?.clipId === clip.id
+      && (evaluation.plan.fadeIn || evaluation.plan.fadeOut || evaluation.plan.drawDuration > evaluation.plan.ownDuration);
+    // Freeze stops Remotion playback. Native video sound is therefore mounted
+    // outside the picture transition, in its unchanged own-span AudioTrack.
+    if (sharedAudio) return <ReadinessVideo {...props} muted volume={0} />;
+    return <PlayerAudioSource src={props.src} clip={clip} fps={fps}>{audioSrc => audioSrc === props.src
+      ? <ReadinessVideo {...props} />
+      : <>
+          <ReadinessVideo {...props} muted volume={0} />
+          <Audio src={audioSrc} trimBefore={props.trimBefore} trimAfter={props.trimAfter}
+            playbackRate={props.playbackRate} volume={props.muted ? 0 : props.volume} pauseWhenBuffering={false} />
+        </>}
+    </PlayerAudioSource>;
+  };
 
 // SD-025 (Sprint 3): inline missing-asset placeholder body. Mirrors the
 // styling of UnknownClipPlaceholder so the two loud cases look like a pair.
@@ -381,7 +404,9 @@ const VisualAsset: FC<VisualClipProps & { evaluatedFrame: number }> = ({ clip, t
     }
 
     const content = (
-      <ReadinessVideo
+      <PlayerVideo
+        clip={clip}
+        fps={fps}
         clipId={clip.id}
         resetKey={`${clip.id}:${mediaSrc}:${trimProps.trimBefore}:${trimProps.trimAfter ?? 'none'}:${playbackRate}:${effectiveVolume}:${retryToken}`}
         fallback={mediaFailure?.fallback(sharedStyle) ?? null}
@@ -461,7 +486,9 @@ const VisualAsset: FC<VisualClipProps & { evaluatedFrame: number }> = ({ clip, t
 
   return wrapSpatialContent((
     <div style={viewportStyle}>
-      <ReadinessVideo
+      <PlayerVideo
+        clip={clip}
+        fps={fps}
         clipId={clip.id}
         resetKey={`${clip.id}:${mediaSrc}:${trimProps.trimBefore}:${trimProps.trimAfter ?? 'none'}:${playbackRate}:${effectiveVolume}:viewport:${retryToken}`}
         fallback={mediaFailure?.fallback({position: 'absolute', inset: 0}) ?? null}
@@ -655,6 +682,9 @@ export const VisualClipSequence: FC<VisualClipProps> = ({
   materialStatuses,
   materialDiagnostics,
 }) => {
+  const evaluation = useContext(PlayerClipEvaluationContext);
+  const sharedAudio = evaluation?.clipId === clip.id && clip.assetEntry?.type?.startsWith('video')
+    && (evaluation.plan.fadeIn || evaluation.plan.fadeOut || evaluation.plan.drawDuration > evaluation.plan.ownDuration);
   const durationInFrames = getClipDurationInFrames(clip, fps);
   const transitionFrames = predecessor && clip.transition
     ? secondsToFrames(clip.transition.duration, fps)
@@ -682,7 +712,8 @@ export const VisualClipSequence: FC<VisualClipProps> = ({
       ));
 
   return (
-    <Sequence
+    <PlayerClipSequence clipId={clip.id}
+      audio={sharedAudio ? <AudioTrack track={track} clips={[clip]} fps={fps} /> : undefined}
       key={clip.id}
       from={from}
       durationInFrames={effectiveDuration}
@@ -701,6 +732,6 @@ export const VisualClipSequence: FC<VisualClipProps> = ({
           materialDiagnostics={materialDiagnostics}
         />
       </LazyGuard>
-    </Sequence>
+    </PlayerClipSequence>
   );
 };

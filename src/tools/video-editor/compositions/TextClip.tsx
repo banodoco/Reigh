@@ -1,5 +1,6 @@
+import { PlayerClipSequence } from './PlayerClipSequence.tsx';
 import type { FC } from 'react';
-import { AbsoluteFill, Sequence, useVideoConfig } from 'remotion';
+import { AbsoluteFill, useVideoConfig } from 'remotion';
 import { getClipDurationInFrames, secondsToFrames } from '@/tools/video-editor/lib/config-utils.ts';
 import { getDefaultBoxForClipType } from '@/tools/video-editor/clip-types/index.ts';
 import { wrapWithClipEffects } from '@/tools/video-editor/effects/index.tsx';
@@ -64,12 +65,12 @@ export const TextClip: FC<TextClipProps> = ({ clip, track: _track, fps, effectRe
 
 export const TextClipSequence: FC<TextClipProps> = ({ clip, track, fps, effectRegistrySnapshot }) => {
   return (
-    <Sequence
+    <PlayerClipSequence clipId={clip.id}
       key={clip.id}
       from={secondsToFrames(clip.at, fps)}
       durationInFrames={getClipDurationInFrames(clip, fps)}
     >
       <TextClip clip={clip} track={track} fps={fps} effectRegistrySnapshot={effectRegistrySnapshot} />
-    </Sequence>
+    </PlayerClipSequence>
   );
 };

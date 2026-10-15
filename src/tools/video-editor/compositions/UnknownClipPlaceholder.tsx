@@ -1,5 +1,6 @@
+import { PlayerClipSequence } from './PlayerClipSequence.tsx';
 import type { CSSProperties, FC } from 'react';
-import { AbsoluteFill, Sequence } from 'remotion';
+import { AbsoluteFill } from 'remotion';
 import { getClipDurationInFrames, secondsToFrames } from '@/tools/video-editor/lib/config-utils.ts';
 import type { ResolvedTimelineClip } from '@/tools/video-editor/types/index.ts';
 
@@ -94,8 +95,8 @@ export const UnknownClipPlaceholderSequence: FC<{
   const durationInFrames = getClipDurationInFrames(clip, fps);
   const from = Math.max(0, secondsToFrames(clip.at, fps));
   return (
-    <Sequence key={clip.id} from={from} durationInFrames={durationInFrames}>
+    <PlayerClipSequence clipId={clip.id} key={clip.id} from={from} durationInFrames={durationInFrames}>
       <Body reason={reason} clipType={clip.clipType ?? 'unknown'} clipId={clip.id} />
-    </Sequence>
+    </PlayerClipSequence>
   );
 };

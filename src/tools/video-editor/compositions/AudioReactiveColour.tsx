@@ -1,4 +1,5 @@
-import { AbsoluteFill, Sequence, useCurrentFrame } from 'remotion';
+import { PlayerClipSequence } from './PlayerClipSequence.tsx';
+import { AbsoluteFill, useCurrentFrame } from 'remotion';
 import type { FC } from 'react';
 import { getClipDurationInFrames, secondsToFrames } from '@/tools/video-editor/lib/config-utils.ts';
 import type { ResolvedTimelineClip } from '@/tools/video-editor/types/index.ts';
@@ -122,11 +123,11 @@ export const AudioReactiveColourSequence: FC<{
   clip: ResolvedTimelineClip;
   fps: number;
 }> = ({ clip, fps }) => (
-  <Sequence
+  <PlayerClipSequence clipId={clip.id}
     key={clip.id}
     from={Math.max(0, secondsToFrames(clip.at, fps))}
     durationInFrames={getClipDurationInFrames(clip, fps)}
   >
     <AudioReactiveColour clipId={clip.id} params={clip.params} />
-  </Sequence>
+  </PlayerClipSequence>
 );

@@ -47,6 +47,7 @@ vi.mock('@banodoco/timeline-composition/theme-api', async () => {
   const ThemeContext = React.createContext(visual);
   return {
     DEFAULT_THEME: { id: 'default', visual },
+    MODIFIER_REGISTRY: {},
     ThemeProvider: ({ children, value }: PropsWithChildren<{ value?: unknown }>) => (
       <ThemeContext.Provider
         value={(value && typeof value === 'object' && 'visual' in value && (value as { visual?: typeof visual }).visual) ?? visual}

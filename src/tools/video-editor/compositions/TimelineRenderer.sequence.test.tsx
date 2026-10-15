@@ -156,6 +156,7 @@ vi.mock('@banodoco/timeline-composition/theme-api', async () => {
 
   return {
     DEFAULT_THEME,
+    MODIFIER_REGISTRY: {},
     ThemeProvider: ({
       children,
       value,
@@ -270,6 +271,7 @@ vi.mock('@banodoco/timeline-composition/theme-api', async () => {
   const ThemeContext = React.createContext(DEFAULT_THEME.visual);
   return {
     DEFAULT_THEME,
+    MODIFIER_REGISTRY: {},
     ThemeProvider: ({
       children,
       value,
@@ -1370,7 +1372,7 @@ describe('TimelineRenderer — live binding renderer facade (M11 T6)', () => {
     const TestRenderer: FC<ClipRendererProps> = props => <div data-testid="scene-clock" data-time={props.sourceTime} data-source={JSON.stringify(props.source)} data-params={JSON.stringify(props.params)} />;
     mockClipTypeRegistryGet.mockReturnValue(makeRegistryRecord({clipTypeId:'ext.live-clip',renderer:TestRenderer,schema:[{name:'scale',label:'Scale',description:'',type:'number',default:1}]}));
     mockClipTypeRegistryHas.mockReturnValue(true);
-    const config = liveBuildConfig([{...liveClip('scene',[]),at:2,from:55,hold:20,speed:2,app:{liveScene:{revision:'pinned'}},keyframes:{scale:[{time:0,value:1},{time:10,value:2}]}}]);
+    const config = liveBuildConfig([{...liveClip('scene',[]),at:2,from:55,hold:20,speed:2,app:{liveScene:{revision:'pinned'}},keyframes:{scale:[{time:0,value:1,interpolation:'linear'},{time:10,value:2,interpolation:'linear'}]}}]);
     const view = render(<TimelineRenderer astridElementHost={fixtureAstridElementHost} config={config} />);
     expect(screen.getByTestId('scene-clock')).toHaveAttribute('data-time','63');
     expect(screen.getByTestId('scene-clock')).toHaveAttribute('data-source',JSON.stringify({liveScene:{revision:'pinned'}}));

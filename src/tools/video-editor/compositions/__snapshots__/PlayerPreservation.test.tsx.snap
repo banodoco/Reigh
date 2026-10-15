@@ -1,0 +1,9 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Player legacy text and card preservation > retains exact pre-consumer markup at frame 0 1`] = `"fd2d6281a20cee445a62d2582fc645c200c6bdce7f08064cf875d9c63672ce91"`;
+
+exports[`Player legacy text and card preservation > retains exact pre-consumer markup at frame 12 1`] = `"b3edc6f1db3f7df5833893d46978407f2a4461b8f4e4cb0fa509f6f359ec50b4"`;
+
+exports[`Player legacy text and card preservation > retains exact pre-consumer markup at frame 30 1`] = `"35199b22c70f7b9d9b7860448df045695072d8160cf03111b1a11e7b38d527f2"`;
+
+exports[`Player legacy text and card preservation > retains exact pre-consumer markup at frame 59 1`] = `"fd2d6281a20cee445a62d2582fc645c200c6bdce7f08064cf875d9c63672ce91"`;

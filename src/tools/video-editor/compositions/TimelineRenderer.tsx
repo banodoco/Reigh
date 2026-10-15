@@ -1,4 +1,4 @@
-import { AbsoluteFill, Sequence, useCurrentFrame, useRemotionEnvironment } from 'remotion';
+import { AbsoluteFill, useCurrentFrame, useRemotionEnvironment } from 'remotion';
 import { Component, createContext, memo, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ComponentType, type FC, type ReactNode } from 'react';
 import type { DataProvider } from '@/tools/video-editor/data/DataProvider.ts';
 import { getAudioTracks, getVisualTracks } from '@/tools/video-editor/lib/editor-utils.ts';
@@ -58,6 +58,10 @@ import { boundCanonicalConfigClips } from '@/tools/video-editor/lib/canonicalRen
 import { resolveEndSpanningLayerPreviewParams } from '@/tools/video-editor/sequences/components/EndSpanningLayerSequence.tsx';
 import { projectOutputTimelineConfig } from '@/tools/video-editor/data/timelineOutputProjection.ts';
 import { admitAppModifierTarget, AppModifierHostProvider, useAppModifierHost } from '@/tools/video-editor/runtime/clip-modifiers.ts';
+
+import { querySceneFrame } from '@banodoco/timeline-composition/evaluation';
+import { preparePlayerTrack } from './playerEvaluation.ts';
+import { PlayerClipSequence, PlayerClipEvaluationContext } from './PlayerClipSequence.tsx';
 
 const AstridElementHostContext = createContext<AstridElementHost | null>(null);
 // Preserve the root composition frame through clip Sequences and freezes.
@@ -245,7 +249,7 @@ const ShotClipSequence: FC<{ clip: ResolvedTimelineClip; fps: number }> = ({ cli
   );
 
   return (
-    <Sequence
+    <PlayerClipSequence clipId={clip.id}
       key={clip.id}
       from={Math.max(0, Math.round(clip.at * fps))}
       durationInFrames={durationInFrames}
@@ -274,7 +278,7 @@ const ShotClipSequence: FC<{ clip: ResolvedTimelineClip; fps: number }> = ({ cli
           Loading shot…
         </AbsoluteFill>
       )}
-    </Sequence>
+    </PlayerClipSequence>
   );
 };
 
@@ -348,7 +352,7 @@ const ThemeEffectSequence: FC<ThemeEffectSequenceProps> = ({ clip, fps, theme, d
   }
   const durationInFrames = getClipDurationInFrames(clip, fps);
   return (
-    <Sequence
+    <PlayerClipSequence clipId={clip.id}
       key={clip.id}
       from={Math.round(clip.at * fps)}
       durationInFrames={durationInFrames}
@@ -357,7 +361,7 @@ const ThemeEffectSequence: FC<ThemeEffectSequenceProps> = ({ clip, fps, theme, d
       <ThemeProvider value={theme}>
         <ThemePackageComponent component={Component} clip={clip} fps={fps} />
       </ThemeProvider>
-    </Sequence>
+    </PlayerClipSequence>
   );
 };
 
@@ -435,7 +439,7 @@ const GeneratedModulePreviewSequence: FC<{
   const durationInFrames = getClipDurationInFrames(clip, fps);
   const artifactId = elementId ?? (moduleStatus.kind === 'valid_module' ? moduleStatus.artifactId : null);
   return (
-    <Sequence
+    <PlayerClipSequence clipId={clip.id}
       key={clip.id}
       from={Math.max(0, Math.round(clip.at * fps))}
       durationInFrames={durationInFrames}
@@ -456,7 +460,7 @@ const GeneratedModulePreviewSequence: FC<{
           detail={state.status === 'error' ? state.message : 'Compiling Remotion preview…'}
         />
       )}
-    </Sequence>
+    </PlayerClipSequence>
   );
 };
 
@@ -489,7 +493,7 @@ const AstridEffectPreviewSequence: FC<{
   const params = owner?.packId === 'local' && owner.kind === 'effect' && owner.id === 'end-spanning-layer'
     ? resolveEndSpanningLayerPreviewParams(clip.params, resolvedAssets) : clip.params ?? {};
   return (
-    <Sequence
+    <PlayerClipSequence clipId={clip.id}
       key={clip.id}
       from={Math.max(0, Math.round(clip.at * fps))}
       durationInFrames={durationInFrames}
@@ -509,7 +513,7 @@ const AstridEffectPreviewSequence: FC<{
           assetEntry={resolveAstridComponentAssetEntry(assetEntry)}
         />
       </ThemeProvider>
-    </Sequence>
+    </PlayerClipSequence>
   );
 };
 
@@ -532,7 +536,7 @@ const AstridAnimationPreviewSequence: FC<{
   const effectiveDuration = durationInFrames + transitionFrames + 1;
   if (!Component) return null;
   return (
-    <Sequence
+    <PlayerClipSequence clipId={clip.id}
       key={clip.id}
       from={from}
       durationInFrames={effectiveDuration}
@@ -554,7 +558,7 @@ const AstridAnimationPreviewSequence: FC<{
           )}
         />
       </ThemeProvider>
-    </Sequence>
+    </PlayerClipSequence>
   );
 };
 
@@ -567,7 +571,7 @@ const GeneratedModulePlaceholderSequence: FC<{
 }> = ({ clip, fps, artifactId, reason, detail }) => {
   const durationInFrames = getClipDurationInFrames(clip, fps);
   return (
-    <Sequence
+    <PlayerClipSequence clipId={clip.id}
       key={clip.id}
       from={Math.max(0, Math.round(clip.at * fps))}
       durationInFrames={durationInFrames}
@@ -597,7 +601,7 @@ const GeneratedModulePlaceholderSequence: FC<{
           {detail}
         </div>
       </AbsoluteFill>
-    </Sequence>
+    </PlayerClipSequence>
   );
 };
 
@@ -1064,7 +1068,7 @@ const LiveBindingPlaceholderSequence: FC<{
   const statuses = Array.from(new Set(records.map((record) => record.status))).join(',');
   const bindingIds = records.map((record) => record.binding.bindingId).join(',');
   return (
-    <Sequence key={clip.id} from={from} durationInFrames={durationInFrames}>
+    <PlayerClipSequence clipId={clip.id} key={clip.id} from={from} durationInFrames={durationInFrames}>
       <AbsoluteFill
         data-testid="live-binding-placeholder"
         data-clip-id={clip.id}
@@ -1097,7 +1101,7 @@ const LiveBindingPlaceholderSequence: FC<{
           Live binding unresolved: {statuses || 'unknown'}
         </div>
       </AbsoluteFill>
-    </Sequence>
+    </PlayerClipSequence>
   );
 };
 
@@ -1156,7 +1160,7 @@ const LiveFramePreviewSequence: FC<{
   const result = resolveLiveFrameReadResult(records, clip, fps, liveDataRegistry);
 
   return (
-    <Sequence key={clip.id} from={from} durationInFrames={durationInFrames}>
+    <PlayerClipSequence clipId={clip.id} key={clip.id} from={from} durationInFrames={durationInFrames}>
       {result.kind === 'placeholder' ? (
         <LiveFramePlaceholderBody clip={clip} records={records} result={result} />
       ) : (
@@ -1181,7 +1185,7 @@ const LiveFramePreviewSequence: FC<{
           />
         </AbsoluteFill>
       )}
-    </Sequence>
+    </PlayerClipSequence>
   );
 };
 
@@ -1361,11 +1365,11 @@ const ExtensionClipSequence: FC<ExtensionClipSequenceProps> = ({
   );
 
   return (
-    <Sequence key={clip.id} from={from} durationInFrames={durationInFrames}>
+    <PlayerClipSequence clipId={clip.id} key={clip.id} from={from} durationInFrames={durationInFrames}>
       <ExtensionRendererErrorBoundary fallback={placeholder}>
         <Renderer {...rendererProps} />
       </ExtensionRendererErrorBoundary>
-    </Sequence>
+    </PlayerClipSequence>
   );
 };
 
@@ -1399,7 +1403,12 @@ const VisualTrack: FC<VisualTrackProps> = ({
   const host = useAstridElementHost();
   const { entries: dynamicEntries } = useSequenceComponentRegistrySnapshot();
   const clipTypeRegistry = useClipTypeRegistrySnapshot();
-  const sortedClips = sortClipsByAt(clips);
+  const {width, height} = parseResolution(resolution);
+  const evaluation = useMemo(() => preparePlayerTrack(track, clips, fps, width, height),
+    [track, clips, fps, width, height]);
+  const sortedClips = evaluation.clips;
+  const frame = useCurrentFrame();
+  const evaluated = querySceneFrame(evaluation.scene, Math.max(0, frame));
   if (sortedClips.length === 0) {
     return null;
   }
@@ -1430,7 +1439,12 @@ const VisualTrack: FC<VisualTrackProps> = ({
           : {}),
       }}
     >
-      {sortedClips.map((clip, index) => {
+      {sortedClips.map((originalClip, index) => {
+        const plan = evaluation.scene.tracks[0].prepared.plans[index];
+        const shared = !evaluation.legacyTiming.has(index);
+        // Transition opacity belongs to the shared layer, never the media host too.
+        const clip = shared && originalClip.transition ? {...originalClip, transition: undefined} : originalClip;
+        const renderClip = () => {
         const liveBindingRecords = liveBindingRecordsByClip.get(clip.id) ?? Object.freeze([]);
         if (clip.modifiers?.length) {
           const nativeMedia = (!clip.clipType || ['media', 'hold', 'image'].includes(clip.clipType))
@@ -1701,6 +1715,10 @@ const VisualTrack: FC<VisualTrackProps> = ({
             predecessor={predecessor}
           />
         );
+        };
+        return <PlayerClipEvaluationContext.Provider key={originalClip.id} value={shared ? {
+          clipId: originalClip.id, plan, layer: evaluated.layers.find(layer => layer.clipIndex === index),
+        } : null}>{renderClip()}</PlayerClipEvaluationContext.Provider>;
       })}
     </AbsoluteFill>
   );
