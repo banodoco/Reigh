@@ -1,16 +1,17 @@
 /**
- * Type boundary for generated workspace-primitive registry imports.
+ * App-owned type boundary for generated workspace-primitive registry imports.
+ * Included by tsconfig.app.json through src; the source package stays pristine.
  *
  * The runtime resolves these specifiers to workspace or vendored source via
  * bundler aliases. Registry consumers depend only on the stable public
  * component contracts, not on the source workspace's private relative imports.
  */
 type BanodocoWorkspaceEffectComponent =
-  import('./effects-types').EffectComponent;
+  import('@banodoco/timeline-composition/theme-api').EffectComponent;
 type BanodocoWorkspaceAnimationComponent =
-  import('./effects-types').AnimationComponent;
+  import('@banodoco/timeline-composition/theme-api').AnimationComponent;
 type BanodocoWorkspaceTransitionComponent =
-  import('./effects-types').TransitionComponent;
+  import('@banodoco/timeline-composition/theme-api').TransitionComponent;
 
 declare module '@workspace-effects/*' {
   const component: BanodocoWorkspaceEffectComponent;

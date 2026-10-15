@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const WORKSPACE_ROOT = process.cwd();
 const DECLARATIONS_PATH =
-  'vendor/timeline-composition/typescript/src/workspace-aliases.d.ts';
+  'src/types/timeline-composition-workspace-aliases.d.ts';
 const THEME_API_PATH = 'vendor/timeline-composition/typescript/src/theme-api.ts';
 const RUNTIME_ALIAS_CONFIGS = [
   'config/vite/vite.config.ts',
@@ -34,10 +34,17 @@ function workspaceSource(relativePath: string): string {
 }
 
 describe('vendored timeline-composition workspace aliases', () => {
-  it('loads the declaration contract from the stable non-generated package surface', () => {
-    expect(workspaceSource(THEME_API_PATH)).toContain(
-      '/// <reference path="./workspace-aliases.d.ts" />',
+  it('includes App host declarations using the stable public component contracts', () => {
+    expect(workspaceSource('tsconfig.app.json')).toMatch(/"include"\s*:\s*\[\s*"src"\s*\]/);
+    expect(DECLARATIONS_PATH.startsWith('src/')).toBe(true);
+    const declarations = workspaceSource(DECLARATIONS_PATH);
+    expect(declarations).toContain(
+      "import('@banodoco/timeline-composition/theme-api')",
     );
+    for (const component of ['EffectComponent', 'AnimationComponent', 'TransitionComponent']) {
+      expect(declarations).toContain(`.${component}`);
+      expect(workspaceSource(THEME_API_PATH)).toContain(component);
+    }
   });
 
   it.each(REGISTRY_FAMILIES)(

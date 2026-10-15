@@ -3,13 +3,14 @@
 
 import type {CSSProperties, FC, ReactNode} from 'react';
 import type {RuntimeTheme} from './ThemeContext';
-import type {TimelineClip} from './types';
+import type {AssetRegistryEntry, TimelineClip} from './types';
 
 export type EffectProps<TParams = unknown> = {
   clip: TimelineClip;
   params: TParams;
   theme: RuntimeTheme;
   fps: number;
+  assetEntry?: AssetRegistryEntry;
 };
 
 export type EffectComponent = FC<EffectProps>;

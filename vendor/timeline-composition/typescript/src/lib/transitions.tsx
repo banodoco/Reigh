@@ -1,19 +1,15 @@
-import type {ReactElement, ReactNode} from 'react';
-import {AbsoluteFill, interpolate, useCurrentFrame} from 'remotion';
+import type {TransitionComponent, TransitionReference, TransitionReferenceObject} from '../effects-types';
+import type {RuntimeTheme} from '../ThemeContext';
 import {
   TRANSITION_DEFAULTS,
   TRANSITION_REGISTRY,
 } from '../transitions.generated';
-import type {
-  TransitionComponent,
-  TransitionReference,
-  TransitionReferenceObject,
-} from '../effects-types';
-import type {RuntimeTheme} from '../ThemeContext';
+import type {Align} from './transition-spans';
 
 export type ResolvedTransition = {
   id: string;
   durationFrames: number;
+  align: Align;
   params: Record<string, unknown>;
 };
 
@@ -22,6 +18,11 @@ const transitionDefaults = TRANSITION_DEFAULTS as Record<string, Record<string, 
 
 const isObjectReference = (value: unknown): value is TransitionReferenceObject => {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+};
+
+const readAlign = (ref: TransitionReference | undefined): Align => {
+  const align = isObjectReference(ref) ? (ref as {align?: unknown}).align : undefined;
+  return align === 'start' || align === 'center' || align === 'end' ? align : 'end';
 };
 
 export const resolveTransitionReference = (
@@ -46,40 +47,8 @@ export const resolveTransitionReference = (
     ?? (typeof durationSeconds === 'number' ? Math.round(durationSeconds * fps) : undefined)
     ?? (typeof defaults.durationFrames === 'number' ? defaults.durationFrames : 12);
   const component = transitionRegistry[id] as TransitionComponent<Record<string, unknown>>;
+  // The registry component is called to validate the reference; the visual
+  // result is produced by transition-spans (dissolve or dip), not by this call.
   component({transitionId: id, params, theme, fps, durationFrames});
-  return {id, durationFrames, params};
-};
-
-export const TransitionSeries = ({children}: {children: ReactNode}): ReactElement => {
-  return <AbsoluteFill>{children}</AbsoluteFill>;
-};
-
-export const CrossFadeLayer = ({
-  children,
-  role,
-  durationFrames,
-  transitionDurationFrames,
-}: {
-  children: ReactNode;
-  role: 'from' | 'to';
-  durationFrames: number;
-  transitionDurationFrames: number;
-}): ReactElement => {
-  const frame = useCurrentFrame();
-  const progress = role === 'from'
-    ? interpolate(
-      frame,
-      [Math.max(0, durationFrames - transitionDurationFrames), durationFrames],
-      [0, 1],
-      {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'},
-    )
-    : interpolate(frame, [0, transitionDurationFrames], [0, 1], {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    });
-  return (
-    <AbsoluteFill style={{opacity: role === 'from' ? 1 - progress : progress}}>
-      {children}
-    </AbsoluteFill>
-  );
+  return {id, durationFrames, align: readAlign(ref), params};
 };

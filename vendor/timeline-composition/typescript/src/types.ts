@@ -40,15 +40,12 @@ export type TimelineClip = {
   y?: number;
 };
 
-export type TrackRole = 'output' | 'source';
-
 export type TrackDefinition = {
   blendMode?: 'darken' | 'hard-light' | 'lighten' | 'multiply' | 'normal' | 'overlay' | 'screen' | 'soft-light';
   fit?: 'contain' | 'cover' | 'manual';
   id: string;
   kind: 'audio' | 'visual';
   label: string;
-  role?: TrackRole;
   muted?: boolean;
   opacity?: number;
   scale?: number;

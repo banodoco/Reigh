@@ -8,17 +8,21 @@
 import type {ReactElement} from 'react';
 import {AbsoluteFill, Sequence, useVideoConfig} from 'remotion';
 import {AudioTrack} from './AudioTrack';
+import {ClipLook} from './ClipLook';
 import {CLIP_TYPE_ALIASES, EFFECT_REGISTRY, type EffectId} from './effects.generated';
 import {DEFAULT_THEME, ThemeProvider, useTheme} from './ThemeContext';
 import {VisualClip} from './VisualClip';
 import {resolveParams} from './lib/effect-params';
 import {getClipDurationInFrames} from './lib/duration';
 import {getAudioTracks, getVisualTracks} from './lib/tracks';
+import {resolveTransitionReference} from './lib/transitions';
 import {
-  CrossFadeLayer,
-  TransitionSeries,
-  resolveTransitionReference,
-} from './lib/transitions';
+  prepareTrack,
+  type ClipSpan,
+  type DrawPlan,
+  type TransitionSpec,
+} from './evaluation';
+import {TransitionLayer} from './TransitionLayer';
 import type {
   AssetRegistryEntry,
   HypeCompositionProps,
@@ -72,7 +76,18 @@ const renderVisualClipContent = (
   );
   if (effectId) {
     const EffectComponent = EFFECT_REGISTRY[effectId];
-    return <EffectComponent clip={clip} params={resolveParams(clip)} theme={theme} fps={fps} />;
+    const assetEntry = getAssetEntry(clip, assets);
+    return (
+      <ClipLook clip={clip} fps={fps} kind="element">
+        <EffectComponent
+          clip={clip}
+          params={resolveParams(clip)}
+          theme={theme}
+          fps={fps}
+          assetEntry={assetEntry}
+        />
+      </ClipLook>
+    );
   }
 
   const assetEntry = getAssetEntry(clip, assets);
@@ -81,25 +96,27 @@ const renderVisualClipContent = (
   );
 
   if (hasPositionOverride(clip)) {
-    return baseVisual;
+    return <ClipLook clip={clip} fps={fps} kind="media">{baseVisual}</ClipLook>;
   }
 
   if ((track.scale ?? 1) !== 1) {
     return (
-      <AbsoluteFill
-        style={{
-          transform: `scale(${track.scale})`,
-          transformOrigin: 'center center',
-          overflow: 'hidden',
-          isolation: 'isolate',
-        }}
-      >
-        {baseVisual}
-      </AbsoluteFill>
+      <ClipLook clip={clip} fps={fps} kind="media">
+        <AbsoluteFill
+          style={{
+            transform: `scale(${track.scale})`,
+            transformOrigin: 'center center',
+            overflow: 'hidden',
+            isolation: 'isolate',
+          }}
+        >
+          {baseVisual}
+        </AbsoluteFill>
+      </ClipLook>
     );
   }
 
-  return baseVisual;
+  return <ClipLook clip={clip} fps={fps} kind="media">{baseVisual}</ClipLook>;
 };
 
 const renderVisualSequence = (
@@ -108,75 +125,21 @@ const renderVisualSequence = (
   assets: TimelineCompositionProps['assets'],
   fps: number,
   theme: ReturnType<typeof useTheme>,
+  plan: DrawPlan,
 ): ReactElement | null => {
   const content = renderVisualClipContent(track, clip, assets, fps, theme);
   if (!content) {
     return null;
   }
+  // A clip with no transition on either side renders exactly as before.
+  const needsLayer = plan.drawDuration > plan.ownDuration || plan.fadeIn !== null || plan.fadeOut !== null;
   return (
     <Sequence
       key={clip.id}
-      from={Math.round(clip.at * fps)}
-      durationInFrames={getClipDurationInFrames(clip, fps)}
+      from={plan.drawStart}
+      durationInFrames={plan.drawDuration}
     >
-      {content}
-    </Sequence>
-  );
-};
-
-const renderTransitionGroup = (
-  track: TrackDefinition,
-  fromClip: TimelineClip,
-  toClip: TimelineClip,
-  assets: TimelineCompositionProps['assets'],
-  fps: number,
-  theme: ReturnType<typeof useTheme>,
-): ReactElement | null => {
-  const transition = resolveTransitionReference(fromClip.transition as never, theme, fps);
-  if (!transition) {
-    return null;
-  }
-  const fromDuration = getClipDurationInFrames(fromClip, fps);
-  const toDuration = getClipDurationInFrames(toClip, fps);
-  if (transition.durationFrames <= 0 || transition.durationFrames > fromDuration || transition.durationFrames > toDuration) {
-    return null;
-  }
-
-  const fromContent = renderVisualClipContent(track, fromClip, assets, fps, theme);
-  const toContent = renderVisualClipContent(track, toClip, assets, fps, theme);
-  if (!fromContent || !toContent) {
-    return null;
-  }
-
-  const groupFrom = Math.round(fromClip.at * fps);
-  const toOffset = Math.max(0, fromDuration - transition.durationFrames);
-  const groupDuration = toOffset + toDuration;
-  return (
-    <Sequence
-      key={`${fromClip.id}-${toClip.id}-transition`}
-      from={groupFrom}
-      durationInFrames={groupDuration}
-    >
-      <TransitionSeries>
-        <Sequence from={0} durationInFrames={fromDuration}>
-          <CrossFadeLayer
-            role="from"
-            durationFrames={fromDuration}
-            transitionDurationFrames={transition.durationFrames}
-          >
-            {fromContent}
-          </CrossFadeLayer>
-        </Sequence>
-        <Sequence from={toOffset} durationInFrames={toDuration}>
-          <CrossFadeLayer
-            role="to"
-            durationFrames={toDuration}
-            transitionDurationFrames={transition.durationFrames}
-          >
-            {toContent}
-          </CrossFadeLayer>
-        </Sequence>
-      </TransitionSeries>
+      {needsLayer ? <TransitionLayer plan={plan}>{content}</TransitionLayer> : content}
     </Sequence>
   );
 };
@@ -191,6 +154,26 @@ const clipsCanTransition = (fromClip: TimelineClip, toClip: TimelineClip, fps: n
   return toStart >= fromStart && toStart <= fromEnd;
 };
 
+const resolveTransitionSpec = (
+  fromClip: TimelineClip,
+  toClip: TimelineClip,
+  fps: number,
+  theme: ReturnType<typeof useTheme>,
+): TransitionSpec | null => {
+  if (!clipsCanTransition(fromClip, toClip, fps)) {
+    return null;
+  }
+  const resolved = resolveTransitionReference(fromClip.transition as never, theme, fps);
+  if (!resolved) {
+    return null;
+  }
+  return {
+    T: resolved.durationFrames,
+    kind: resolved.id === 'fade' ? 'dip' : 'dissolve',
+    align: resolved.align,
+  };
+};
+
 const renderVisualTrack = (
   track: TrackDefinition,
   clips: TimelineClip[],
@@ -203,20 +186,18 @@ const renderVisualTrack = (
     return null;
   }
 
-  const rendered: Array<ReactElement | null> = [];
-  for (let index = 0; index < sortedClips.length; index += 1) {
-    const clip = sortedClips[index];
-    const nextClip = sortedClips[index + 1];
-    if (nextClip && clipsCanTransition(clip, nextClip, fps)) {
-      const group = renderTransitionGroup(track, clip, nextClip, assets, fps, theme);
-      if (group) {
-        rendered.push(group);
-        index += 1;
-        continue;
-      }
-    }
-    rendered.push(renderVisualSequence(track, clip, assets, fps, theme));
-  }
+  const spans: ClipSpan[] = sortedClips.map((clip) => ({
+    start: Math.round(clip.at * fps),
+    duration: getClipDurationInFrames(clip, fps),
+  }));
+  const transitions = sortedClips
+    .slice(0, -1)
+    .map((clip, index) => resolveTransitionSpec(clip, sortedClips[index + 1], fps, theme));
+  const {plans} = prepareTrack(spans, transitions);
+
+  const rendered = sortedClips.map((clip, index) =>
+    renderVisualSequence(track, clip, assets, fps, theme, plans[index]),
+  );
 
   return (
     <AbsoluteFill
