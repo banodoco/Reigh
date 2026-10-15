@@ -12,6 +12,7 @@ import {
 } from '@/tools/video-editor/lib/config-utils.ts';
 import { TIMELINE_CLIP_FIELDS } from '@/tools/video-editor/lib/serialize.ts';
 import type { DataProvider } from '@/tools/video-editor/data/DataProvider.ts';
+import type { AudioLanePresentation } from '@/tools/video-editor/data/audioLanePresentation.ts';
 import {
   withDefaultTimelineOutput,
 } from '@/tools/video-editor/lib/defaults.ts';
@@ -86,6 +87,8 @@ export interface TimelineData {
   config: TimelineConfig;
   configVersion: number;
   head?: import('../data/DataProvider.ts').TimelineHeadRevision;
+  /** Read-only Runtime inspect projection. Rebuilds after edits intentionally omit it. */
+  audioLanePresentation?: AudioLanePresentation;
   registry: AssetRegistry;
   resolvedConfig: ResolvedTimelineConfig;
   rows: TimelineRow[];
@@ -604,7 +607,7 @@ export function loadTimelineJsonFromProvider(
       } : assetResolver;
       // E4 seam 4/5: the loaded bundle's SOURCE items ride into assembly
       // data so lanes repaint after reload (views still derive render-side).
-      return buildTimelineDataWithResolver(
+      const timelineData = await buildTimelineDataWithResolver(
         loadedTimeline.config,
         registry,
         loadResolver,
@@ -613,6 +616,9 @@ export function loadTimelineJsonFromProvider(
         loadedTimeline.bundle?.itemsBySchemaRef,
         loadedTimeline.head,
       );
+      return loadedTimeline.audioLanePresentation
+        ? { ...timelineData, audioLanePresentation: loadedTimeline.audioLanePresentation }
+        : timelineData;
     })();
   }
 
@@ -634,7 +640,7 @@ export function loadTimelineJsonFromProvider(
     const urlResolver = loaded.resolveAssetUrl
       ?? explicitUrlResolver
       ?? ((file: string) => provider.resolveAssetUrl(file));
-    return buildTimelineData(
+    const timelineData = await buildTimelineData(
       loadedTimeline.config,
       registry,
       urlResolver,
@@ -642,6 +648,9 @@ export function loadTimelineJsonFromProvider(
       loadedTimeline.bundle?.itemsBySchemaRef,
       loadedTimeline.head,
     );
+    return loadedTimeline.audioLanePresentation
+      ? { ...timelineData, audioLanePresentation: loadedTimeline.audioLanePresentation }
+      : timelineData;
   })();
 }
 

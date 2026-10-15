@@ -37,6 +37,8 @@ import {
 } from '@/tools/video-editor/data/AssetResolver.ts';
 import type { TimelineBundleEnvelope } from '@/tools/video-editor/data/typed/timelineBundle.ts';
 import { parseTimelineBundle } from '@/tools/video-editor/data/typed/timelineBundle.ts';
+import { readAudioLanePresentation } from '@/tools/video-editor/data/audioLanePresentation.ts';
+import type { AudioLanePresentation } from '@/tools/video-editor/data/audioLanePresentation.ts';
 import { withDefaultTimelineOutput } from '@/tools/video-editor/lib/defaults.ts';
 import {
   ShotCompositionUnavailableError,
@@ -59,6 +61,10 @@ import { recordShotTimelinePhase } from '@/tools/video-editor/lib/shot-timeline-
 import { isTimelineDiagnosticsEnabled } from '@/tools/video-editor/lib/timeline-diagnostics.ts';
 
 type RuntimeRecord = Record<string, unknown>;
+type CanonicalTimelineInspection = TimelineInspectionResult & {
+  /** The optional response-only Runtime projection remains opaque to this transport layer. */
+  presentation?: { audio_lane?: unknown };
+};
 
 type CanonicalTimelineState = {
   headRevisionId: string | null;
@@ -338,6 +344,7 @@ export class RuntimeDataProvider implements DataProvider {
   private readonly pendingCommits = new Map<string, PendingTimelineCommit>();
   private readonly projectId: string;
   private readonly client: ReighRuntimeClient;
+  private readonly audioLaneRequestFailures = new WeakMap<object, string>();
   private readonly onRuntimeError?: (error: RuntimeConnectorError) => void;
   private activeRegistry: AssetRegistry | null = null;
   private readonly canonicalTimelineState = new Map<string, CanonicalTimelineState>();
@@ -403,8 +410,9 @@ export class RuntimeDataProvider implements DataProvider {
   private async inspectCanonicalTimelineHead(
     projectId: string,
     timelineId: string,
-  ): Promise<TimelineInspectionResult> {
-    const inspection = await this.client.inspectTimeline(projectId, timelineId);
+    includeAudioLane = false,
+  ): Promise<CanonicalTimelineInspection> {
+    const inspection = await this.requestCanonicalTimelineInspection(projectId, timelineId, includeAudioLane);
     if (inspection.project_id !== projectId) {
       throw new Error(
         `Workspace Runtime canonical timeline inspection belongs to project ${String(inspection.project_id)}, not ${projectId}`,
@@ -438,6 +446,39 @@ export class RuntimeDataProvider implements DataProvider {
       );
     }
     return inspection;
+  }
+
+  /**
+   * Single request seam for the canonical authenticated inspect response used
+   * by the editor loader. Audio presentation is explicitly opt-in and uses C's
+   * exact request envelope; other inspect callers keep their existing request.
+   */
+  private requestCanonicalTimelineInspection(
+    projectId: string,
+    timelineId: string,
+    includeAudioLane: boolean,
+  ): Promise<CanonicalTimelineInspection> {
+    const options = includeAudioLane
+      ? {
+        presentation: { audio_lane: true },
+        supported_capabilities: ['adopted-music-bed'],
+      }
+      : {};
+    return (this.client.inspectTimeline(projectId, timelineId, options) as Promise<CanonicalTimelineInspection>)
+      .catch(async (error: unknown) => {
+        if (!includeAudioLane || !(error instanceof ApiError)
+          || !((error.status === 409 && error.code === 'unavailable')
+            || (error.status === 422 && error.code === 'validation_error'))) {
+          throw error;
+        }
+
+        // Runtime keeps plain inspect usable when the optional presenter or
+        // caller capability is unavailable. Re-read that canonical head without
+        // the opt-in and bind the visible refusal to the fallback response.
+        const inspection = await this.client.inspectTimeline(projectId, timelineId) as unknown as CanonicalTimelineInspection;
+        this.audioLaneRequestFailures.set(inspection as object, error.message);
+        return inspection;
+      });
   }
 
   private logShotTimelineLatency(phase: string, startedAt: number, traceId?: string): void {
@@ -511,7 +552,7 @@ export class RuntimeDataProvider implements DataProvider {
   }
 
   async loadTimeline(timelineId: string): Promise<LoadedTimeline> {
-    const record = await this.readTimeline(timelineId);
+    const record = await this.readTimeline(timelineId, true);
     const configRecord = asRecord(record.config);
     if (!configRecord) {
       throw new TimelineSchemaIncompatibleError('Workspace Runtime timeline has no config object');
@@ -523,6 +564,9 @@ export class RuntimeDataProvider implements DataProvider {
       config: { ...configWithoutBundle, ...withDefaultTimelineOutput(configWithoutBundle as Partial<TimelineConfig>) },
       configVersion: runtimeVersion(record),
       head: this.timelineHead(timelineId, record.head_revision_id as string | null),
+      ...(record.audioLanePresentation
+        ? { audioLanePresentation: record.audioLanePresentation as AudioLanePresentation }
+        : {}),
       ...(bundle === null ? { bundle: null } : bundle === undefined ? {} : { bundle: bundle as TimelineBundleEnvelope }),
     };
   }
@@ -534,7 +578,7 @@ export class RuntimeDataProvider implements DataProvider {
   }
 
   async loadReferencedTimeline(timelineId: string): Promise<LoadedReferencedTimeline> {
-    const record = await this.readTimeline(timelineId);
+    const record = await this.readTimeline(timelineId, true);
     const configRecord = asRecord(record.config);
     if (!configRecord) {
       throw new TimelineSchemaIncompatibleError('Workspace Runtime timeline has no config object');
@@ -547,6 +591,9 @@ export class RuntimeDataProvider implements DataProvider {
         config: { ...configWithoutBundle, ...withDefaultTimelineOutput(configWithoutBundle as Partial<TimelineConfig>) },
         configVersion: runtimeVersion(record),
         head: this.timelineHead(timelineId, record.head_revision_id as string | null),
+        ...(record.audioLanePresentation
+          ? { audioLanePresentation: record.audioLanePresentation as AudioLanePresentation }
+          : {}),
         ...(bundle === null ? { bundle: null } : bundle === undefined ? {} : { bundle: bundle as TimelineBundleEnvelope }),
       },
       registry: normalizeRegistry(record.registry),
@@ -1052,13 +1099,13 @@ export class RuntimeDataProvider implements DataProvider {
     return this.uploadAsset(request.file, request.options);
   }
 
-  private readTimeline(timelineId: string): Promise<RuntimeRecord> {
-    return this.withTimelineOperation(timelineId, () => this.readTimelineInOrder(timelineId));
+  private readTimeline(timelineId: string, includeAudioLane = false): Promise<RuntimeRecord> {
+    return this.withTimelineOperation(timelineId, () => this.readTimelineInOrder(timelineId, includeAudioLane));
   }
 
-  private async readTimelineInOrder(timelineId: string): Promise<RuntimeRecord> {
+  private async readTimelineInOrder(timelineId: string, includeAudioLane = false): Promise<RuntimeRecord> {
     try {
-      const inspection = await this.inspectCanonicalTimelineHead(this.projectId, timelineId);
+      const inspection = await this.inspectCanonicalTimelineHead(this.projectId, timelineId, includeAudioLane);
       const headRevisionId = nullableString(
         inspection.head_revision_id,
         'canonical timeline inspection.head_revision_id',
@@ -1095,6 +1142,13 @@ export class RuntimeDataProvider implements DataProvider {
         head_revision_id: headRevisionId,
         config: { ...config, clips },
         registry: parentComposition.registry ?? { assets: {} },
+        ...(includeAudioLane ? {
+          audioLanePresentation: readAudioLanePresentation(inspection, {
+            projectId: this.projectId,
+            timelineId,
+            revisionId: headRevisionId ?? inspection.revision_id,
+          }, this.audioLaneRequestFailures.get(inspection as object)),
+        } : {}),
       };
     } catch (error) {
       throw this.toProviderError(error, timelineId);

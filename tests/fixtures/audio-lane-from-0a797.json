@@ -1,0 +1,210 @@
+{
+  "arrangements": [
+    {
+      "asset": "Q",
+      "edit_source": {
+        "command": "python3 -m astrid timelines edit t --project p --command '{\"op\":\"clip.set-look\",\"select\":\"occurrence:occ-A/clip:a-music\",\"args\":{\"volume\":1.0}}'",
+        "operation": {
+          "args": {
+            "volume": 1.0
+          },
+          "op": "clip.set-look",
+          "select": "occurrence:occ-A/clip:a-music"
+        }
+      },
+      "gain": {
+        "db": 0.0,
+        "linear": 1.0
+      },
+      "id": "arrangement-716e02c049e940d1cf5e",
+      "owner": "occurrence:occ-A/clip:a-music",
+      "rate": 1.0,
+      "source_offset_s": 0.0,
+      "spans": [
+        {
+          "asset": "Q",
+          "edit_source": {
+            "command": "python3 -m astrid timelines edit t --project p --command '{\"op\":\"clip.set-look\",\"select\":\"occurrence:occ-A/clip:a-music\",\"args\":{\"volume\":1.0}}'",
+            "operation": {
+              "args": {
+                "volume": 1.0
+              },
+              "op": "clip.set-look",
+              "select": "occurrence:occ-A/clip:a-music"
+            }
+          },
+          "fade_in_s": null,
+          "fade_out_s": 0.25,
+          "gain": {
+            "db": 0.0,
+            "linear": 1.0
+          },
+          "generated": true,
+          "id": "a-music",
+          "read_only": true,
+          "source": {
+            "end_s": 2.125,
+            "start_s": 0.0
+          },
+          "timeline": {
+            "end_frame": 64,
+            "end_s": 2.125,
+            "start_frame": 0,
+            "start_s": 0.0
+          }
+        },
+        {
+          "asset": "Q",
+          "edit_source": {
+            "command": "python3 -m astrid timelines edit t --project p --command '{\"op\":\"clip.set-look\",\"select\":\"occurrence:occ-A/clip:a-music\",\"args\":{\"volume\":1.0}}'",
+            "operation": {
+              "args": {
+                "volume": 1.0
+              },
+              "op": "clip.set-look",
+              "select": "occurrence:occ-A/clip:a-music"
+            }
+          },
+          "fade_in_s": 0.25,
+          "fade_out_s": null,
+          "gain": {
+            "db": 0.0,
+            "linear": 1.0
+          },
+          "generated": true,
+          "id": "a-music:b",
+          "read_only": true,
+          "source": {
+            "end_s": 8.0,
+            "start_s": 0.875
+          },
+          "timeline": {
+            "end_frame": 270,
+            "end_s": 9.0,
+            "start_frame": 56,
+            "start_s": 1.875
+          }
+        }
+      ]
+    },
+    {
+      "asset": "Q",
+      "edit_source": {
+        "command": "python3 -m astrid timelines edit t --project p --command '{\"op\":\"clip.set-look\",\"select\":\"occurrence:occ-A/clip:arrangement-two\",\"args\":{\"volume\":1.0}}'",
+        "operation": {
+          "args": {
+            "volume": 1.0
+          },
+          "op": "clip.set-look",
+          "select": "occurrence:occ-A/clip:arrangement-two"
+        }
+      },
+      "gain": {
+        "db": 0.0,
+        "linear": 1.0
+      },
+      "id": "arrangement-2ff413417d9f4d2c46eb",
+      "owner": "occurrence:occ-A/clip:arrangement-two",
+      "rate": 1.0,
+      "source_offset_s": 0.0,
+      "spans": [
+        {
+          "asset": "Q",
+          "edit_source": {
+            "command": "python3 -m astrid timelines edit t --project p --command '{\"op\":\"clip.set-look\",\"select\":\"occurrence:occ-A/clip:arrangement-two\",\"args\":{\"volume\":1.0}}'",
+            "operation": {
+              "args": {
+                "volume": 1.0
+              },
+              "op": "clip.set-look",
+              "select": "occurrence:occ-A/clip:arrangement-two"
+            }
+          },
+          "fade_in_s": null,
+          "fade_out_s": 0.25,
+          "gain": {
+            "db": 0.0,
+            "linear": 1.0
+          },
+          "generated": true,
+          "id": "arrangement-two",
+          "read_only": true,
+          "source": {
+            "end_s": 2.125,
+            "start_s": 0.0
+          },
+          "timeline": {
+            "end_frame": 64,
+            "end_s": 2.125,
+            "start_frame": 0,
+            "start_s": 0.0
+          }
+        },
+        {
+          "asset": "Q",
+          "edit_source": {
+            "command": "python3 -m astrid timelines edit t --project p --command '{\"op\":\"clip.set-look\",\"select\":\"occurrence:occ-A/clip:arrangement-two\",\"args\":{\"volume\":1.0}}'",
+            "operation": {
+              "args": {
+                "volume": 1.0
+              },
+              "op": "clip.set-look",
+              "select": "occurrence:occ-A/clip:arrangement-two"
+            }
+          },
+          "fade_in_s": 0.25,
+          "fade_out_s": null,
+          "gain": {
+            "db": 0.0,
+            "linear": 1.0
+          },
+          "generated": true,
+          "id": "arrangement-two:b",
+          "read_only": true,
+          "source": {
+            "end_s": 8.0,
+            "start_s": 0.875
+          },
+          "timeline": {
+            "end_frame": 270,
+            "end_s": 9.0,
+            "start_frame": 56,
+            "start_s": 1.875
+          }
+        }
+      ]
+    }
+  ],
+  "capability": "adopted-music-bed",
+  "fps": 30.0,
+  "owner": "occurrence:occ-A/clip:a-music",
+  "schema": "astrid.audio-lane.v1",
+  "seams": [
+    {
+      "action": "repeat",
+      "at_s": 2.0,
+      "delta_s": 1.0,
+      "duration_s": 1.0,
+      "frame": 60
+    }
+  ],
+  "switches": [
+    {
+      "curve": "equal-power",
+      "from_arrangement": "arrangement-716e02c049e940d1cf5e",
+      "id": "switch-one",
+      "on": {
+        "center_frame": 192,
+        "center_s": 6.4,
+        "time_ref": "\"SwitchWord\" in s1 #1"
+      },
+      "to_arrangement": "arrangement-2ff413417d9f4d2c46eb",
+      "window": {
+        "end_frame": 222,
+        "end_s": 7.4,
+        "start_frame": 162,
+        "start_s": 5.4
+      }
+    }
+  ]
+}

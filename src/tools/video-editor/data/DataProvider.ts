@@ -18,6 +18,7 @@ import type { AssetRegistry, TimelineConfig } from '@/tools/video-editor/types/i
 import type { Checkpoint } from '@/tools/video-editor/types/history.ts';
 import type { AssetResolver } from '@/tools/video-editor/data/AssetResolver.ts';
 import type { TimelineBundleEnvelope } from '@/tools/video-editor/data/typed/timelineBundle.ts';
+import type { AudioLanePresentation } from '@/tools/video-editor/data/audioLanePresentation.ts';
 import type { GenerationRow } from '@/domains/generation/types/index.ts';
 import type { ShotCompositionPort } from '@/tools/video-editor/data/shotCompositionAdapter.ts';
 export type {
@@ -43,6 +44,11 @@ export interface LoadedTimeline {
   config: TimelineConfig;
   configVersion: number;
   head?: TimelineHeadRevision;
+  /**
+   * Revision-bound, read-only display data from canonical Runtime inspect.
+   * It is kept outside config/bundle so it cannot enter saves or dirty checks.
+   */
+  audioLanePresentation?: AudioLanePresentation;
   /**
    * Persisted data-lane source items ([CONVERGE-WITH-M1] TimelineBundle),
    * parsed fail-closed by the provider on load. `null` = nothing persisted;

@@ -43,6 +43,7 @@ import type { TimelineActionResizeStart, TimelineClipEdgeResizeEnd } from '@/too
 import type { ResolvedTimelineClip, TimelinePostprocessShaderMetadata, TrackDefinition } from '@/tools/video-editor/types/index.ts';
 import type { TimelineAction, TimelineRow } from '@/tools/video-editor/types/timeline-canvas.ts';
 import { useOptionalVideoEditorRuntime } from '@/tools/video-editor/contexts/VideoEditorRuntimeContext.tsx';
+import type { AudioLaneOwnerGainEdit } from '@/tools/video-editor/components/TimelineEditor/AudioLanePresentationList.tsx';
 
 const EMPTY_CLIP_IDS = new Set<string>();
 const EMPTY_SHOT_GROUPS: ShotGroup[] = [];
@@ -291,7 +292,8 @@ function TimelineEditorCoreComponent({
   rowHeight = ROW_HEIGHT,
 }: TimelineEditorCoreBodyProps) {
   useRenderDiagnostic('TimelineEditorCore');
-  const readOnly = useOptionalVideoEditorRuntime()?.timelineEditability?.checkTimeline?.().allowed === false;
+  const videoEditorRuntime = useOptionalVideoEditorRuntime();
+  const readOnly = videoEditorRuntime?.timelineEditability?.checkTimeline?.().allowed === false;
   const [newTrackDropLabel, setNewTrackDropLabel] = useState<string | null>(null);
   const {
     data,
@@ -393,6 +395,28 @@ function TimelineEditorCoreComponent({
     onTimelineDrop: ops.onTimelineDrop,
     onDoubleClickAsset: ops.onDoubleClickAsset,
   }), shallow);
+
+  const audioLaneOwnerEditAvailable = !readOnly
+    && (videoEditorRuntime?.provider as { semanticCommandSaving?: boolean } | undefined)
+      ?.semanticCommandSaving === true;
+  const handleAudioLaneOwnerGainEdit = useCallback((edit: AudioLaneOwnerGainEdit) => {
+    const current = dataRef.current;
+    if (!audioLaneOwnerEditAvailable || !current || !Number.isFinite(edit.value)
+      || edit.operation.op !== 'clip.set-look'
+      || !edit.operation.select
+      || typeof edit.operation.args.volume !== 'number') return;
+
+    // The projection supplies the authored owner and operation. Only the
+    // user's selected value is substituted; the CLI string is never used.
+    applyEdit({ type: 'config', resolvedConfig: current.resolvedConfig }, {
+      editCommands: [{
+        op: edit.operation.op,
+        select: edit.operation.select,
+        args: { ...edit.operation.args, volume: edit.value },
+      }],
+      semantic: true,
+    });
+  }, [applyEdit, audioLaneOwnerEditAvailable, dataRef]);
   const {
     handleAddTrack,
     handleAddTextAt,
@@ -899,6 +923,7 @@ function TimelineEditorCoreComponent({
           rows={renderRows}
           tracks={data.tracks}
           nestedAudioTrackIds={nestedAudioTrackIds}
+          onAudioLaneOwnerGainEdit={audioLaneOwnerEditAvailable ? handleAudioLaneOwnerGainEdit : undefined}
           deviceClass={deviceClass}
           inputModality={inputModality}
           interactionMode={interactionMode}

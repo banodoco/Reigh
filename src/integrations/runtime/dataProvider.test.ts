@@ -1,11 +1,13 @@
 import gesturePreservation from './fixtures/gesture-preservation.json';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { ReighRuntimeClient, RuntimeAuthenticationError, RUNTIME_CLIENT_SCOPES } from './client.ts';
 import type { CommitRequest, CommitResult, RequestBody, Transport } from './generated.ts';
 import { RuntimeDataProvider, toRuntimePublication, type TimelineCommitSaveContext } from './dataProvider.ts';
 import { TimelineSchemaIncompatibleError, TimelineVersionConflictError } from '@/tools/video-editor/data/DataProvider.ts';
 import { createTimelineReader } from '@/tools/video-editor/lib/timeline-reader.ts';
-import { buildTimelineData } from '@/tools/video-editor/lib/timeline-data.ts';
+import { buildTimelineData, loadTimelineJsonFromProvider } from '@/tools/video-editor/lib/timeline-data.ts';
 import {
   RUNTIME_SCHEMA_DIGEST,
   RUNTIME_TARGETED_EXECUTION_CAPABILITY,
@@ -17,6 +19,9 @@ import type { TimelineConfig } from '@/tools/video-editor/types/index.ts';
 
 const PROJECT_ID = 'project-r1';
 const TIMELINE_ID = 'timeline-r1';
+const PRODUCER_AUDIO_LANE_PATH = process.env.R4_AUDIO_LANE_PRODUCER_FIXTURE
+  ?? path.resolve(process.cwd(), 'tests/fixtures/audio-lane-from-0a797.json');
+const PRODUCER_AUDIO_LANE = JSON.parse(readFileSync(PRODUCER_AUDIO_LANE_PATH, 'utf8')) as Record<string, unknown>;
 const MANAGED_OBJECT_DIGEST = 'sha256:837705df2d47b071382f374110cbb5ef50b037c431cac6974cdfba986d836be7';
 const MANAGED_OBJECT_ID = MANAGED_OBJECT_DIGEST;
 const MANAGED_OBJECT_URL = `http://runtime.test/v1/objects/${encodeURIComponent(MANAGED_OBJECT_ID)}`;
@@ -117,6 +122,11 @@ function runtimeFixture(options: {
   initialConfig?: Partial<TimelineConfig> & Record<string, unknown>;
   parentExtensions?: Record<string, unknown>;
   parentComposition?: Record<string, any>;
+  audioLaneProjection?: unknown;
+  audioLaneUnavailable?: boolean;
+  audioLaneInvalid?: boolean;
+  advanceHeadAfterAudioInspect?: boolean;
+  inspectNextCursor?: string | null;
 } = {}) {
   let documentVersion = 1;
   const receipts = new Map<string, { request: string; body: Uint8Array }>();
@@ -284,34 +294,55 @@ function runtimeFixture(options: {
       };
     }
     if (method === 'POST' && path === `/v1/projects/${PROJECT_ID}/timelines/${TIMELINE_ID}/inspect`) {
+      const requestsAudioLane = (parsedBody?.presentation as Record<string, unknown> | undefined)?.audio_lane === true;
+      if (requestsAudioLane && (options.audioLaneUnavailable || options.audioLaneInvalid)) {
+        const unavailable = options.audioLaneUnavailable === true;
+        return {
+          status: unavailable ? 409 : 422,
+          headers: {},
+          body: json(unavailable
+            ? { code: 'unavailable', message: 'No compatible audio-lane provider is installed' }
+            : { code: 'validation_error', message: 'Astrid refused malformed audio-lane source provenance' }),
+        };
+      }
+      const inspectedHead = headRevisionId;
+      const hasAudioLaneProjection = Object.prototype.hasOwnProperty.call(options, 'audioLaneProjection');
+      const responseBody = {
+        schema: 'runtime.timeline.declared_inputs/v1',
+        evidence_kind: 'declared_inputs',
+        render_requested: false,
+        representation: 'canonical_head',
+        authority: 'runtime_parent_composition',
+        project_id: PROJECT_ID,
+        timeline_id: TIMELINE_ID,
+        revision_id: inspectedHead,
+        head_revision_id: inspectedHead,
+        is_current_head: true,
+        parent_content_digest: `sha256:${'1'.repeat(64)}`,
+        head_content_digest: `sha256:${'1'.repeat(64)}`,
+        snapshot_digest: `sha256:${'2'.repeat(64)}`,
+        selectors: {},
+        selection_status: 'selected',
+        target_count: 0,
+        occurrence_count: 0,
+        parent_clip_count: 0,
+        parent_clip_target_count: 0,
+        selected_clip_count: 0,
+        selected: [],
+        selected_parent_clips: [],
+        next_cursor: options.inspectNextCursor ?? null,
+        ...(requestsAudioLane && hasAudioLaneProjection
+          ? { presentation: { audio_lane: options.audioLaneProjection } }
+          : {}),
+      };
+      if (requestsAudioLane && options.advanceHeadAfterAudioInspect) {
+        revisions.set('parent-r2', structuredClone(revisions.get(inspectedHead)));
+        headRevisionId = 'parent-r2';
+      }
       return {
         status: 200,
         headers: {},
-        body: json({
-          schema: 'runtime.timeline.declared_inputs/v1',
-          evidence_kind: 'declared_inputs',
-          render_requested: false,
-          representation: 'canonical_head',
-          authority: 'runtime_parent_composition',
-          project_id: PROJECT_ID,
-          timeline_id: TIMELINE_ID,
-          revision_id: headRevisionId,
-          head_revision_id: headRevisionId,
-          is_current_head: true,
-          parent_content_digest: `sha256:${'1'.repeat(64)}`,
-          head_content_digest: `sha256:${'1'.repeat(64)}`,
-          snapshot_digest: `sha256:${'2'.repeat(64)}`,
-          selectors: {},
-          selection_status: 'selected',
-          target_count: 0,
-          occurrence_count: 0,
-          parent_clip_count: 0,
-          parent_clip_target_count: 0,
-          selected_clip_count: 0,
-          selected: [],
-          selected_parent_clips: [],
-          next_cursor: null,
-        }),
+        body: json(responseBody),
       };
     }
     const revisionPath = `/v1/projects/${PROJECT_ID}/timelines/${TIMELINE_ID}/composition-revisions/`;
@@ -445,10 +476,108 @@ function runtimeFixture(options: {
     throw new Error(`unexpected ${method} ${path}`);
   };
 
-  return { transport, requests, read: () => ({ config, registry, documentVersion, parentComposition: revisions.get(headRevisionId) as Record<string, any> }) };
+  return { transport, requests, read: () => ({ config, registry, documentVersion, headRevisionId, parentComposition: revisions.get(headRevisionId) as Record<string, any> }) };
 }
 
 describe('RuntimeDataProvider', () => {
+  it('requests the exact audio-lane inspect envelope and keeps its projection pinned across head advance', async () => {
+    const fixture = runtimeFixture({
+      audioLaneProjection: PRODUCER_AUDIO_LANE,
+      advanceHeadAfterAudioInspect: true,
+      inspectNextCursor: 'page-2',
+    });
+    const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, baseUrl: 'http://runtime.test', token: 'fixture-token', transport: fixture.transport });
+
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+    expect(fixture.read().headRevisionId).toBe('parent-r2');
+    expect(loaded.head?.headRevisionId).toBe('parent-r1');
+    expect(loaded.audioLanePresentation).toMatchObject({
+      status: 'available',
+      binding: {
+        projectId: PROJECT_ID,
+        timelineId: TIMELINE_ID,
+        revisionId: 'parent-r1',
+        snapshotDigest: `sha256:${'2'.repeat(64)}`,
+      },
+    });
+    const audioInspect = fixture.requests.find((request) => request.method === 'POST'
+      && request.path.endsWith('/inspect'))!;
+    expect(audioInspect.body).toEqual({
+      presentation: { audio_lane: true },
+      supported_capabilities: ['adopted-music-bed'],
+    });
+
+    const timelineData = await loadTimelineJsonFromProvider(provider, TIMELINE_ID, (file) => file);
+    expect(timelineData.audioLanePresentation?.status).toBe('available');
+    if (timelineData.audioLanePresentation?.status !== 'available') throw new Error('expected loaded producer lane');
+    expect(timelineData.audioLanePresentation.binding.revisionId).toBe(timelineData.head?.headRevisionId);
+    const projectedIds = timelineData.audioLanePresentation.lane.arrangements.flatMap(({ spans }) => spans.map(({ id }) => id));
+    expect(projectedIds).toHaveLength(4);
+    expect(timelineData.config.clips.some((clip) => projectedIds.includes(clip.id))).toBe(false);
+    expect((timelineData.config.tracks ?? []).some((track) => projectedIds.includes(track.id))).toBe(false);
+  });
+
+  it('preserves explicit no-bed and missing-projection states through the provider loader', async () => {
+    const noBedFixture = runtimeFixture({ audioLaneProjection: null });
+    const noBedProvider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: noBedFixture.transport });
+    await expect(noBedProvider.loadTimeline(TIMELINE_ID)).resolves.toMatchObject({
+      audioLanePresentation: { status: 'no-bed', lane: null },
+    });
+
+    const missingFixture = runtimeFixture();
+    const missingProvider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: missingFixture.transport });
+    await expect(missingProvider.loadTimeline(TIMELINE_ID)).resolves.toMatchObject({
+      audioLanePresentation: { status: 'unavailable', reason: expect.stringContaining('did not provide') },
+    });
+  });
+
+  it('keeps the timeline readable and displays Runtime unavailable/409 as an audio-lane refusal', async () => {
+    const fixture = runtimeFixture({ audioLaneUnavailable: true });
+    const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport });
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+
+    expect(loaded.head?.headRevisionId).toBe('parent-r1');
+    expect(loaded.audioLanePresentation).toMatchObject({
+      status: 'unavailable',
+      reason: expect.stringContaining('No compatible audio-lane provider is installed'),
+      binding: { revisionId: 'parent-r1' },
+    });
+    expect(fixture.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/inspect'))
+      .map(({ body }) => body)).toEqual([
+      { presentation: { audio_lane: true }, supported_capabilities: ['adopted-music-bed'] },
+      {},
+    ]);
+  });
+
+  it('keeps the timeline readable when the producer refuses the requested lane with 422', async () => {
+    const fixture = runtimeFixture({ audioLaneInvalid: true });
+    const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport });
+    await expect(provider.loadTimeline(TIMELINE_ID)).resolves.toMatchObject({
+      audioLanePresentation: {
+        status: 'unavailable',
+        reason: expect.stringContaining('Astrid refused malformed audio-lane source provenance'),
+        binding: { revisionId: 'parent-r1' },
+      },
+    });
+    expect(fixture.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/inspect')))
+      .toHaveLength(2);
+  });
+
+  it('keeps the presentation out of config and parent-composition save payloads', async () => {
+    const fixture = runtimeFixture({ audioLaneProjection: PRODUCER_AUDIO_LANE });
+    const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport });
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+    expect(loaded.config).not.toHaveProperty('audioLanePresentation');
+    expect(loaded.config).not.toHaveProperty('presentation');
+
+    await provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!);
+    const publication = fixture.requests.find((request) => request.method === 'POST'
+      && request.path.endsWith('/composition-revisions'))?.body as { parent_composition?: Record<string, unknown> };
+    expect(publication.parent_composition).not.toHaveProperty('presentation');
+    expect(publication.parent_composition).not.toHaveProperty('audioLanePresentation');
+    expect(JSON.stringify(publication.parent_composition)).not.toContain('a-music');
+  });
+
   it.each(['empty', 'absent'] as const)('projects top-level compact parent clips with %s config clips through direct and referenced reads', async (shape) => {
     const parent = compactParentComposition();
     const { clips: _clips, ...withoutClips } = parent.config;

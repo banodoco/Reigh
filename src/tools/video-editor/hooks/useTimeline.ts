@@ -77,6 +77,7 @@ export function useTimeline(provider: DataProvider | null, timelineId: string | 
   return {
     ...timelineQuery,
     data: timelineQuery.data?.config,
+    audioLanePresentation: timelineQuery.data?.audioLanePresentation,
     configVersion: timelineQuery.data?.configVersion ?? configVersionRef.current,
     saveTimeline,
   };

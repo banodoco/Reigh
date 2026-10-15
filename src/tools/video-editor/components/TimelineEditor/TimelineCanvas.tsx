@@ -94,6 +94,12 @@ import type { MarqueeRect } from '@/tools/video-editor/hooks/useMarqueeSelect.ts
 import type { TargetContextPayload } from '@reigh/editor-sdk';
 import { TimelineExtensionOverlayHost } from './TimelineExtensionOverlayHost.tsx';
 import {
+  AudioLanePresentationList,
+  getAudioLanePresentationEnd,
+  getAudioLanePresentationHeight,
+  type AudioLaneOwnerGainEdit,
+} from './AudioLanePresentationList.tsx';
+import {
   ACTION_VERTICAL_MARGIN,
   CURSOR_WIDTH,
   EMPTY_RESIZE_PREVIEW_SNAPSHOT,
@@ -108,6 +114,8 @@ export interface TimelineCanvasProps {
   tracks: TrackDefinition[];
   /** Empty parent audio lanes whose actual clips are owned by nested shots. */
   nestedAudioTrackIds?: ReadonlySet<string>;
+  /** Routes only the producer-supplied authored-owner operation through E. */
+  onAudioLaneOwnerGainEdit?: (edit: AudioLaneOwnerGainEdit) => void;
   deviceClass: TimelineDeviceClass;
   inputModality: TimelineInputModality;
   interactionMode: TimelineInteractionMode;
@@ -321,6 +329,7 @@ export const TimelineCanvas = forwardRef<TimelineCanvasHandle, TimelineCanvasPro
   rows,
   tracks,
   nestedAudioTrackIds,
+  onAudioLaneOwnerGainEdit,
   deviceClass,
   inputModality,
   interactionMode,
@@ -400,6 +409,7 @@ export const TimelineCanvas = forwardRef<TimelineCanvasHandle, TimelineCanvasPro
   // co-mounting both surfaces triggers one fetch per asset.
   const mountedEditorData = useTimelineEditorDataSafe();
   const laneData = useDataLanes({ base: mountedEditorData?.data ?? null });
+  const audioLanePresentation = mountedEditorData?.data?.audioLanePresentation;
   const { dataRef, selectedClipIdsRef, ops, previewRef } = useTimelineMutableAdapters();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const latestScrollMetricsRef = useRef({ scrollLeft: 0, scrollTop: 0, viewportWidth: 0 });
@@ -540,6 +550,14 @@ export const TimelineCanvas = forwardRef<TimelineCanvasHandle, TimelineCanvasPro
     () => mountedDataLanes.reduce((sum, lane) => sum + lane.height, 0),
     [mountedDataLanes],
   );
+  const audioLaneHeight = useMemo(
+    () => getAudioLanePresentationHeight(audioLanePresentation),
+    [audioLanePresentation],
+  );
+  const audioLaneEnd = useMemo(
+    () => getAudioLanePresentationEnd(audioLanePresentation),
+    [audioLanePresentation],
+  );
   const maxDataLaneEnd = useMemo(
     () => mountedDataLanes.reduce((laneMaximum, lane) => lane.items.reduce(
       (itemMaximum, item) => Math.max(itemMaximum, item.timelineStart, item.timelineEnd),
@@ -547,7 +565,7 @@ export const TimelineCanvas = forwardRef<TimelineCanvasHandle, TimelineCanvasPro
     ), 0),
     [mountedDataLanes],
   );
-  const scrollContentHeight = (rows.length + 1) * rowHeight + dataLanesHeight;
+  const scrollContentHeight = (rows.length + 1) * rowHeight + dataLanesHeight + audioLaneHeight;
   const maxClipEnd = useMemo(() => rows.reduce((currentMax, row) => row.actions.reduce(
     (rowMax, action) => Math.max(rowMax, resizePreviewSnapshot[action.id]?.end ?? action.end),
     currentMax,
@@ -572,13 +590,16 @@ export const TimelineCanvas = forwardRef<TimelineCanvasHandle, TimelineCanvasPro
     // same proposed boundary line while that transient snapshot is active.
     return Object.keys(resizePreviewSnapshot).length > 0 ? maxClipEnd : undefined;
   }, [dragPreview, maxClipEnd, resizePreviewSnapshot, rows]);
-  const maxEnd = Math.max(maxClipEnd, maxDataLaneEnd, maxShotGroupEnd);
+  const maxEnd = Math.max(maxClipEnd, maxDataLaneEnd, maxShotGroupEnd, audioLaneEnd);
   const dataLaneScaleCount = Math.ceil(
     maxDataLaneEnd / Math.max(scale, Number.EPSILON),
   ) + 1;
+  const audioLaneScaleCount = Math.ceil(
+    audioLaneEnd / Math.max(scale, Number.EPSILON),
+  ) + 1;
   const effectiveMaxScaleCount = maxScaleCount === undefined
     ? undefined
-    : Math.max(maxScaleCount, dataLaneScaleCount);
+    : Math.max(maxScaleCount, dataLaneScaleCount, audioLaneScaleCount);
   // Content-only derivation: the trailing runway is the owner's call and reaches
   // us as minScaleCount/maxScaleCount (TimelineEditorCore pins both to one value).
   const { totalWidth } = computeTimelineExtent({
@@ -1362,6 +1383,11 @@ export const TimelineCanvas = forwardRef<TimelineCanvasHandle, TimelineCanvasPro
             setSelectedTrackId={ops?.setSelectedTrackId}
             setContextTarget={ops?.setContextTarget}
             setInspectorTarget={ops?.setInspectorTarget}
+          />
+          <AudioLanePresentationList
+            presentation={audioLanePresentation}
+            pixelsPerSecond={pixelsPerSecond}
+            onEditOwnerGain={onAudioLaneOwnerGainEdit}
           />
           <div
             ref={setContentOverlayRoot}

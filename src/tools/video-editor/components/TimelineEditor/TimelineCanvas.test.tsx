@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TimelineCanvas } from '@/tools/video-editor/components/TimelineEditor/TimelineCanvas';
 import { VideoEditorRuntimeProvider, type VideoEditorRuntimeContextValue } from '@/tools/video-editor/contexts/VideoEditorRuntimeContext';
+import { createTimelineStore, TimelineStoreProvider } from '@/tools/video-editor/hooks/timelineStore.ts';
 import { createInteractionState, onInteractionEnd } from '@/tools/video-editor/lib/interaction-state';
 import { requestCenterTimelineClip } from '@/tools/video-editor/lib/timeline-viewport-events';
 import { resolveTouchGestureMode } from '@/tools/video-editor/lib/mobile-interaction-model';
@@ -17,6 +18,7 @@ import {
   TRACK_ID_ATTR,
 } from '@/tools/video-editor/lib/timeline-dom';
 import { createCommandRegistry, type CommandRegistry } from '@/tools/video-editor/runtime/commandRegistry';
+import type { TimelineData } from '@/tools/video-editor/lib/timeline-data.ts';
 import type { TimelinePostprocessShaderMetadata, TrackDefinition } from '@/tools/video-editor/types';
 import type { CanonicalShotOccurrence } from '@/tools/video-editor/data/shotCompositionAdapter';
 import type { TimelineAction, TimelineRow } from '@/tools/video-editor/types/timeline-canvas';
@@ -377,6 +379,7 @@ function renderCanvas(params?: {
   canCreateShotFromSelection?: boolean;
   isCreatingShot?: boolean;
   selectedClipCount?: number;
+  editorData?: TimelineData;
 }) {
   const dataRef = params?.dataRef ?? { current: null };
   const trackDefinitions = params?.tracks ?? [params?.track ?? track];
@@ -394,6 +397,13 @@ function renderCanvas(params?: {
   const onClipEdgeResizeEnd = params?.onClipEdgeResizeEnd ?? vi.fn();
   const getActionRender = params?.getActionRender ?? vi.fn(() => <div>clip</div>);
   const runtimeCommandRegistry = params?.commandRegistry ?? createCommandRegistry();
+  const timelineStore = params?.editorData ? createTimelineStore() : undefined;
+  if (timelineStore && params?.editorData) {
+    timelineStore.getState().syncDataSlice({
+      ...timelineStore.getState().data,
+      data: params.editorData,
+    });
+  }
 
   const canvas = (
     <TimelineCanvas
@@ -452,7 +462,7 @@ function renderCanvas(params?: {
     />
   );
 
-  const renderResult = render(
+  const renderTree = (
     params?.commandRegistry || params?.overlays || params?.timelineOverlaysEnabled
       ? (
           <VideoEditorRuntimeProvider value={buildRuntime(
@@ -464,8 +474,11 @@ function renderCanvas(params?: {
             {canvas}
           </VideoEditorRuntimeProvider>
         )
-      : canvas,
+      : canvas
   );
+  const renderResult = render(timelineStore
+    ? <TimelineStoreProvider store={timelineStore}>{renderTree}</TimelineStoreProvider>
+    : renderTree);
 
   const targetRow = timelineRows.find((candidate) => candidate.actions.length > 0) ?? timelineRows[0];
   const targetActionId = params?.actionId ?? targetRow?.actions[0]?.id ?? 'clip-1';
@@ -2309,5 +2322,28 @@ describe('TimelineCanvas — dataKind V1 lane strip', () => {
     await screen.findByTitle('scroll-100');
     expect(screen.queryByTitle('scroll-0')).toBeNull();
     expect(screen.getAllByTestId('data-lane-extent-bar').length).toBeLessThanOrEqual(128);
+  });
+
+  it('renders the no-bed projection in the shared timeline scroller and reserves its row height', () => {
+    const editorData = {
+      audioLanePresentation: {
+        status: 'no-bed',
+        binding: {
+          projectId: 'project-1',
+          timelineId: 'timeline-1',
+          revisionId: 'revision-1',
+          snapshotDigest: 'snapshot-1',
+        },
+        lane: null,
+      },
+    } as unknown as TimelineData;
+    const { container } = renderCanvas({ editorData });
+
+    const lane = screen.getByTestId('audio-lane-no-bed');
+    const trackRow = container.querySelector(`[${ROW_ID_ATTR}='V1']`);
+    expect(trackRow).toBeTruthy();
+    expect(Boolean(trackRow!.compareDocumentPosition(lane) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    expect(lane.closest('.timeline-scroll')).toBeTruthy();
+    expect(screen.getByTestId('timeline-playhead')).toHaveStyle({ height: '124px' });
   });
 });
