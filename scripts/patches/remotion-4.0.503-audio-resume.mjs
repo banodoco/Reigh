@@ -4,28 +4,50 @@ import { createHash, randomBytes } from 'node:crypto';
 import { open, readFile, rename, rm, stat } from 'node:fs/promises';
 import { basename, dirname, join, resolve } from 'node:path';
 
-const EXPECTED_VERSION = '4.0.503';
+// Keep this entrypoint stable for both exact admitted package consumers.
 const PACKAGE_RELATIVE = join('node_modules', 'remotion');
-const TARGETS = [
-  {
-    relativePath: join('dist', 'cjs', 'audio', 'shared-audio-tags.js'),
-    originalSha256: '71bb40afee1be9a9d24fc2ca97dae78428d79270179945f3455d5ef1b68241ea',
-    patchedSha256: '4fbf66aac63105d6ecd8c036b7d6db8cb0f800429be6e4a1633a0584994564c5',
-    originalLine:
-      '(0, wait_until_actually_resumed_js_1.waitUntilActuallyResumed)(ctxAndGain.audioContext, logLevel).then(resolve);',
-    patchedLine:
-      'resumePromise.then(() => (0, wait_until_actually_resumed_js_1.waitUntilActuallyResumed)(ctxAndGain.audioContext, logLevel).then(resolve), () => {});',
-  },
-  {
-    relativePath: join('dist', 'esm', 'index.mjs'),
-    originalSha256: '2fb803a18bd355a3b7dde45fdd0ff857acc6602ba521bf015cca27908285d872',
-    patchedSha256: '447802377a5ecf17b7c224d8a209b4a3c92a29e8efb8ee679a283a48ffc0d9a2',
-    originalLine:
-      'waitUntilActuallyResumed(ctxAndGain.audioContext, logLevel).then(resolve);',
-    patchedLine:
-      'resumePromise.then(() => waitUntilActuallyResumed(ctxAndGain.audioContext, logLevel).then(resolve), () => {});',
-  },
-];
+const TARGETS_BY_VERSION = {
+  '4.0.503': [
+    {
+      relativePath: join('dist', 'cjs', 'audio', 'shared-audio-tags.js'),
+      originalSha256: '71bb40afee1be9a9d24fc2ca97dae78428d79270179945f3455d5ef1b68241ea',
+      patchedSha256: '4fbf66aac63105d6ecd8c036b7d6db8cb0f800429be6e4a1633a0584994564c5',
+      originalLine:
+        '(0, wait_until_actually_resumed_js_1.waitUntilActuallyResumed)(ctxAndGain.audioContext, logLevel).then(resolve);',
+      patchedLine:
+        'resumePromise.then(() => (0, wait_until_actually_resumed_js_1.waitUntilActuallyResumed)(ctxAndGain.audioContext, logLevel).then(resolve), () => {});',
+    },
+    {
+      relativePath: join('dist', 'esm', 'index.mjs'),
+      originalSha256: '2fb803a18bd355a3b7dde45fdd0ff857acc6602ba521bf015cca27908285d872',
+      patchedSha256: '447802377a5ecf17b7c224d8a209b4a3c92a29e8efb8ee679a283a48ffc0d9a2',
+      originalLine:
+        'waitUntilActuallyResumed(ctxAndGain.audioContext, logLevel).then(resolve);',
+      patchedLine:
+        'resumePromise.then(() => waitUntilActuallyResumed(ctxAndGain.audioContext, logLevel).then(resolve), () => {});',
+    },
+  ],
+  '4.0.509': [
+    {
+      relativePath: join('dist', 'cjs', 'audio', 'shared-audio-tags.js'),
+      originalSha256: '471b33916a91f5b9529c477bdf0ec586cb700d5a7179ab910a82dd932e172f6c',
+      patchedSha256: '949ccec3419398183e8e22f63820a4a57cb8379befb184fbac9a3acde040c5b8',
+      originalLine:
+        '(0, wait_until_actually_resumed_js_1.waitUntilActuallyResumed)(ctxAndGain.audioContext, logLevel, abortController.signal).then(resolve);',
+      patchedLine:
+        'resumePromise.then(() => (0, wait_until_actually_resumed_js_1.waitUntilActuallyResumed)(ctxAndGain.audioContext, logLevel, abortController.signal).then(resolve), () => {});',
+    },
+    {
+      relativePath: join('dist', 'esm', 'index.mjs'),
+      originalSha256: '9fdfe58f3f34e6a72564a811ac5d374d1c97a0f535e2a0e3aac198670d9b7ff8',
+      patchedSha256: '5a1584f7660fa8fffa7eb8fe016b82a4d719e67d4b7904d4fa4f299eb1355f28',
+      originalLine:
+        'waitUntilActuallyResumed(ctxAndGain.audioContext, logLevel, abortController.signal).then(resolve);',
+      patchedLine:
+        'resumePromise.then(() => waitUntilActuallyResumed(ctxAndGain.audioContext, logLevel, abortController.signal).then(resolve), () => {});',
+    },
+  ],
+};
 
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
@@ -43,15 +65,18 @@ function replaceExactlyOnce(bytes, from, to, label) {
 async function preflight(projectRoot) {
   const packageRoot = resolve(projectRoot, PACKAGE_RELATIVE);
   const packageJson = JSON.parse(await readFile(join(packageRoot, 'package.json'), 'utf8'));
-  if (packageJson.name !== 'remotion' || packageJson.version !== EXPECTED_VERSION) {
+  const targets = typeof packageJson.version === 'string' && Object.hasOwn(TARGETS_BY_VERSION, packageJson.version)
+    ? TARGETS_BY_VERSION[packageJson.version]
+    : null;
+  if (packageJson.name !== 'remotion' || !targets) {
     throw new Error(
-      `Refusing Remotion ${packageJson.name ?? '(unnamed)'}@${packageJson.version ?? '(unknown)'}; expected remotion@${EXPECTED_VERSION}`,
+      `Refusing Remotion ${packageJson.name ?? '(unnamed)'}@${packageJson.version ?? '(unknown)'}; expected ${Object.keys(TARGETS_BY_VERSION).map((version) => `remotion@${version}`).join(' or ')}`,
     );
   }
 
   // Read and classify every target before any caller can write either file.
   return Promise.all(
-    TARGETS.map(async (target) => {
+    targets.map(async (target) => {
       const absolutePath = join(packageRoot, target.relativePath);
       const [bytes, fileStat] = await Promise.all([readFile(absolutePath), stat(absolutePath)]);
       const digest = sha256(bytes);
@@ -63,7 +88,7 @@ async function preflight(projectRoot) {
           `Refusing unknown content at ${absolutePath} (sha256 ${digest}); no files were written`,
         );
       }
-      return { ...target, absolutePath, bytes, mode: fileStat.mode & 0o777, state };
+      return { ...target, version: packageJson.version, absolutePath, bytes, mode: fileStat.mode & 0o777, state };
     }),
   );
 }
@@ -192,7 +217,7 @@ function parseArgs(argv) {
 function usage() {
   return [
     'Usage: node scripts/patches/remotion-4.0.503-audio-resume.mjs --apply|--check|--revert [--root <project-root>]',
-    '--check is read-only and accepts only the exact known pristine or patched 4.0.503 files.',
+    '--check is read-only and accepts only the exact known pristine or patched 4.0.503/4.0.509 files.',
   ].join('\n');
 }
 
@@ -206,7 +231,7 @@ async function main(argv = process.argv.slice(2)) {
   const entries = await preflight(args.projectRoot);
   const states = entries.map((entry) => `${entry.relativePath}=${entry.state}`).join(', ');
   if (args.action === 'check') {
-    process.stdout.write(`Read-only preflight passed for remotion@${EXPECTED_VERSION}: ${states}\n`);
+    process.stdout.write(`Read-only preflight passed for remotion@${entries[0].version}: ${states}\n`);
     return;
   }
 
@@ -214,7 +239,7 @@ async function main(argv = process.argv.slice(2)) {
   const finalEntries = await preflight(args.projectRoot);
   const finalStates = finalEntries.map((entry) => `${entry.relativePath}=${entry.state}`).join(', ');
   process.stdout.write(
-    `${changed ? (args.action === 'apply' ? 'Applied' : 'Reverted') : 'Already in requested state'} exact Remotion ${EXPECTED_VERSION} audio-resume patch: ${finalStates}\n`,
+    `${changed ? (args.action === 'apply' ? 'Applied' : 'Reverted') : 'Already in requested state'} exact Remotion ${entries[0].version} audio-resume patch: ${finalStates}\n`,
   );
 }
 
