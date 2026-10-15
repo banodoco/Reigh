@@ -24,7 +24,7 @@ function command(id: string, op: string, args: EditCommand['args'], expect: Edit
   const select = scopedGestureClipId(id);
   return { op, select, resolved: [select], args, expect };
 }
-function originalClip(data: TimelineData, id: string) {
+function originalClip(data: Pick<TimelineData, 'config'>, id: string) {
   const clip = data.config.clips.find((candidate) => candidate.id === id);
   if (!clip) throw new Error(`Gesture clip '${id}' is not in its captured base.`);
   return clip;
@@ -37,7 +37,7 @@ const lookFields: Record<string, string> = {
   cropTop: 'crop_top', cropBottom: 'crop_bottom', cropLeft: 'crop_left', cropRight: 'crop_right',
   entrance: 'entrance', exit: 'exit', transition: 'transition',
 };
-export function propertyGestureCommands(data: TimelineData, id: string, patch: Partial<ClipMeta>): EditCommand[] | undefined {
+export function propertyGestureCommands(data: Pick<TimelineData, 'config'>, id: string, patch: Partial<ClipMeta>, options?: { mergeParams: boolean }): EditCommand[] | undefined {
   const entries = Object.entries(patch);
   if (entries.some(([key, value]) => key !== 'params' && (!lookFields[key] || value === null || (key === 'transition' && value !== undefined)))) return undefined;
   const clip = originalClip(data, id);
@@ -50,8 +50,8 @@ export function propertyGestureCommands(data: TimelineData, id: string, patch: P
       // Nested keys require the typed path producer; a literal dotted key must
       // never be mistaken for a nested path. Omitted keys in a replacement map
       // likewise do not express an explicit clear.
-      if (Object.keys(value).some((key) => /[.\[\]]/.test(key))
-        || Object.keys(clip.params ?? {}).some((key) => !hasOwn(value, key))) return undefined;
+      if (Object.keys(value).some((key) => /[.[\]]/.test(key))
+        || (!options?.mergeParams && Object.keys(clip.params ?? {}).some((key) => !hasOwn(value, key)))) return undefined;
       for (const [param, next] of Object.entries(value)) {
         const before = clip.params ?? {};
         result.push(command(id, next === undefined ? 'clip.clear' : 'clip.set-param',

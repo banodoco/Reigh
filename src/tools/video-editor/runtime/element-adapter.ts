@@ -1,4 +1,7 @@
 import type { DataProvider } from '@/tools/video-editor/data/DataProvider.ts';
+import { TimelineVersionConflictError, type TimelineHeadRevision } from '@/tools/video-editor/data/DataProvider.ts';
+import type { EditCommand } from '@/integrations/runtime/generated.ts';
+import { propertyGestureCommands } from '../commands/semanticGestures.ts';
 import type { AssetRegistry, TimelineClip, TimelineConfig } from '@/tools/video-editor/types/index.ts';
 import { getClipTimelineDuration } from '@/tools/video-editor/lib/config-utils.ts';
 import {
@@ -15,6 +18,7 @@ type TimelineDocument = {
   config: unknown;
   registry: unknown;
   config_version: number;
+  head?: TimelineHeadRevision;
 };
 
 export type ReighElementOperationResult = {
@@ -40,13 +44,14 @@ type ElementTimelineDocument = {
   config: unknown;
   registry: unknown;
   config_version: number;
+  head?: TimelineHeadRevision;
 };
 
 export type ElementTimelineRoutes = {
   get(timelineId: string): Promise<ElementTimelineDocument>;
   save(
     timelineId: string,
-    input: { config: unknown; registry: unknown; expectedVersion: number },
+    input: { config: unknown; registry: unknown; expectedVersion: number; head?: TimelineHeadRevision; editCommands?: readonly EditCommand[] },
   ): Promise<ElementTimelineDocument>;
 };
 
@@ -57,7 +62,7 @@ export type ElementTimelineRoutes = {
  * element.
  */
 export function createElementTimelineRoutes(
-  provider: Pick<DataProvider, 'loadTimeline' | 'loadAssetRegistry' | 'saveTimeline'>,
+  provider: Pick<DataProvider, 'loadTimeline' | 'loadAssetRegistry' | 'saveTimeline' | 'saveTimelineAtHead'>,
   assertAuthority: () => void = () => {},
 ): ElementTimelineRoutes {
   return {
@@ -72,7 +77,10 @@ export function createElementTimelineRoutes(
       assertAuthority();
       const confirmedTimeline = await provider.loadTimeline(timelineId);
       assertAuthority();
-      if (confirmedTimeline.configVersion !== timeline.configVersion) {
+      if (confirmedTimeline.configVersion !== timeline.configVersion
+        || confirmedTimeline.head?.headRevisionId !== timeline.head?.headRevisionId
+        || confirmedTimeline.head?.projectId !== timeline.head?.projectId
+        || confirmedTimeline.head?.timelineId !== timeline.head?.timelineId) {
         throw new ReighElementOperationError(
           `Timeline changed while loading element operation data: ${timelineId}`,
         );
@@ -81,12 +89,20 @@ export function createElementTimelineRoutes(
         config: confirmedTimeline.config,
         registry,
         config_version: confirmedTimeline.configVersion,
+        ...(confirmedTimeline.head ? { head: structuredClone(confirmedTimeline.head) } : {}),
       };
     },
     async save(timelineId, input) {
       assertAuthority();
       const config = input.config as TimelineConfig;
       const registry = input.registry as AssetRegistry;
+      if (provider.saveTimelineAtHead) {
+        if (!input.head) throw new TimelineVersionConflictError('Element operation requires its captured timeline head.');
+        const receipt = await provider.saveTimelineAtHead(
+          timelineId, config, input.head, registry, undefined, input.editCommands,
+        );
+        return { config, registry, config_version: receipt.configVersion, head: receipt.head };
+      }
       const configVersion = await provider.saveTimeline(
         timelineId,
         config,
@@ -531,10 +547,19 @@ export class AstridElementOperationAdapter {
       operation,
     );
     const nextConfig = this.attachDraftSource(nextConfigBeforeSources, operation);
+    // Only parameter-only updates have an admitted command with identical
+    // semantics. Ref/source/transition/overlay mutations remain explicit fallback.
+    const editCommands = operation.name === 'timeline.update_element' && !operation.element && operation.params
+      ? propertyGestureCommands({ config: asTimelineConfig(document.config) }, operation.clip_id, {
+          params: operation.params,
+        }, { mergeParams: true })
+      : undefined;
     const saved = await this.routes.save(operation.timeline, {
       config: nextConfig,
       registry: asAssetRegistry(document.registry),
       expectedVersion: operation.expected_version,
+      ...(document.head ? { head: document.head } : {}),
+      ...(editCommands?.length ? { editCommands } : {}),
     }) as TimelineDocument;
     return {
       operation: operation.name,

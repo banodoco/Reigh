@@ -21,14 +21,25 @@ import { useClipResize } from './useClipResize.ts';
 import { useClipEditing } from './useClipEditing.ts';
 import { useTimelineTrackManagement } from './useTimelineTrackManagement.ts';
 import { buildKeyboardTimeNudgeEdit } from '../lib/keyboard-nudge.ts';
+import { expandTinyClip } from '../lib/expand-tiny-clip.ts';
 import { gestureCommandsFor } from '../commands/semanticGestures.ts';
+import { useTimelineOps } from './useTimelineOps.ts';
+import { createProposalRuntime } from '../lib/proposal-runtime.ts';
+import { createTimelineReader } from '../lib/timeline-reader.ts';
+import { AstridElementOperationAdapter, createElementTimelineRoutes } from '../runtime/element-adapter.ts';
+import { buildReighAgentElementContext } from '../runtime/element-contract.ts';
 
 // This transport is a wire recorder, not an Astrid operation executor. Successful
 // fixture acknowledgements establish App adaptation only, never Runtime acceptance.
 const json = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
 function wireFixture(initial: TimelineData, reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable'>) {
   const requests: Array<{ request: CommitRequest; bytes: string; headers: Record<string, string> }> = [];
+  const compatibilityRequests: string[] = [];
   const transport: Transport = async (method, path, headers, body) => {
+    if (method === 'POST' && (/\/(?:publish-document|publish|composition-revisions)(?:$|\?)/.test(path))) {
+      compatibilityRequests.push(path);
+      throw new Error(`Unmarked census writer used compatibility publication: ${path}`);
+    }
     if (path === '/v1/health') return { status: 200, headers: {}, body: json({ status: 'ok', protocol: 'workspace.v1', schema_digest: RUNTIME_SCHEMA_DIGEST, runtime_epoch: 1 }) };
     if (path === '/v1/handshake') return { status: 200, headers: {}, body: json({ protocol: 'workspace.v1', schema_digest: RUNTIME_SCHEMA_DIGEST, session_id: 'fixture', actor_id: 'reigh-product-connector', realm_id: 'fixture', scopes: RUNTIME_CLIENT_SCOPES, capabilities: [RUNTIME_TARGETED_EXECUTION_CAPABILITY] }) };
     if (path === '/v1/realm') return { status: 200, headers: {}, body: json({ realm_id: 'fixture' }) };
@@ -51,7 +62,7 @@ function wireFixture(initial: TimelineData, reply?: (request: CommitRequest, cal
     if (method === 'GET' && revision) return { status: 200, headers: {}, body: json({ project_id: 'gesture-project', timeline_id: 'gesture-timeline', revision_id: revision[1], payload: { config: initial.config, clips: initial.config.clips, registry: initial.registry, occurrences: [] } }) };
     throw new Error(`Unexpected fixture call ${method} ${path}`);
   };
-  return { requests, provider: new RuntimeDataProvider({ projectId: 'gesture-project', baseUrl: 'http://runtime.fixture', token: 'fixture-only', transport, commitRouting: { enabled: true } }) };
+  return { requests, compatibilityRequests, transport, provider: new RuntimeDataProvider({ projectId: 'gesture-project', baseUrl: 'http://runtime.fixture', token: 'fixture-only', transport, commitRouting: { enabled: true } }) };
 }
 async function initialData(media = false, crops: { cropTop?: number; cropBottom?: number; cropLeft?: number; cropRight?: number } = {}) {
   const data = await buildTimelineData({
@@ -81,7 +92,8 @@ async function setup(reply?: (request: CommitRequest, call: number) => Promise<v
     const editing = useClipEditing({ ...commit, selectedClipId: 'clip-1', selectedTrack: initial.tracks[0], currentTime: 1, selectClip: vi.fn(), resolvedConfig: commit.data?.resolvedConfig ?? null });
     const tracks = useTimelineTrackManagement({ ...commit, resolvedConfig: commit.data?.resolvedConfig ?? null, eventBus });
     const resize = useClipResize(commit);
-    return { ...commit, editing, tracks, resize, persistence };
+    const ops = useTimelineOps({ ...commit, createManualCheckpoint: vi.fn(), jumpToCheckpoint: vi.fn(), checkpoints: [] });
+    return { ...commit, editing, tracks, resize, persistence, ops };
   }, { wrapper });
   return { ...hook, ...fixture, initial, savedSeqRef, interactionStateRef, eventBus };
 }
@@ -550,6 +562,196 @@ describe('supported detach and explicit unconverted structural seams', () => {
       if (operation === 'remove') h.result.current.tracks.handleRemoveTrack('V2');
       if (operation === 'property') h.result.current.tracks.handleTrackPopoverChange('V1', { label: 'Changed' });
     });
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+});
+
+describe('WRITERS census converted handlers and route intercept', () => {
+  it.each(['patch', 'proposal'] as const)('%s property batch reaches one generated commit with captured expectations', async (writer) => {
+    const h = await setup();
+    const patch = { version: 1, operations: [
+      { op: 'clip.update' as const, target: 'clip-1', payload: { opacity: 0.3, params: { data: 'caption' } } },
+      { op: 'clip.update' as const, target: 'clip-2', payload: { entrance: { type: 'fade', duration: 0.2 } } },
+    ] };
+    act(() => {
+      if (writer === 'patch') h.result.current.ops.apply(patch);
+      else {
+        const proposals = createProposalRuntime({ timelineOps: h.result.current.ops,
+          reader: createTimelineReader({ data: () => h.result.current.data! }) });
+        const proposal = proposals.create({ source: 'writer-census', baseVersion: 1, patch });
+        proposals.accept(proposal.id);
+      }
+    });
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.compatibilityRequests).toEqual([]);
+    expect(h.requests[0].request.base_revision_id).toBe('parent-r1');
+    expect(h.requests[0].request.change).toEqual({ commands: [
+      { op: 'clip.set-look', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args: { opacity: 0.3 }, expect: { opacity: { state: 'present', value: 0.9 } } },
+      { op: 'clip.set-param', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args: { path: 'data', value: 'caption' }, expect: { 'params.data': { state: 'present', value: null } } },
+      { op: 'clip.set-look', select: 'parent/clip:clip-2', resolved: ['parent/clip:clip-2'], args: { entrance: { type: 'fade', duration: 0.2 } }, expect: { entrance: { state: 'absent' } } },
+    ] });
+    expect(h.result.current.data!.config.app).toEqual(h.initial.config.app);
+    expect(h.result.current.data!.config.clips[0].app).toEqual(h.initial.config.clips[0].app);
+    h.unmount();
+  });
+  it.each(['patch', 'proposal'] as const)('%s deletion uses the captured clip and leaves one transaction', async (writer) => {
+    const h = await setup();
+    const patch = { version: 1, operations: [
+      { op: 'clip.remove' as const, target: 'clip-1' }, { op: 'clip.remove' as const, target: 'clip-2' },
+    ] };
+    act(() => {
+      if (writer === 'patch') h.result.current.ops.apply(patch);
+      else {
+        const proposals = createProposalRuntime({ timelineOps: h.result.current.ops, reader: createTimelineReader({ data: h.initial }) });
+        const proposal = proposals.create({ source: 'writer-delete', baseVersion: 1, patch });
+        proposals.accept(proposal.id);
+      }
+    });
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.compatibilityRequests).toEqual([]);
+    expect(h.requests[0].request.change).toEqual({ commands: h.initial.config.clips.map((clip) => ({
+      op: 'clip.remove', select: `parent/clip:${clip.id}`, resolved: [`parent/clip:${clip.id}`], args: {}, expect: { '': { state: 'present', value: clip } },
+    })) });
+    h.unmount();
+  });
+  it('catalog parameter merge uses the captured head and only the requested keys', async () => {
+    const initial = await initialData();
+    initial.config.clips[0].params = { ...initial.config.clips[0].params, retained: { opaque: true } };
+    const fixture = wireFixture(initial);
+    const adapter = new AstridElementOperationAdapter(buildReighAgentElementContext({}), createElementTimelineRoutes({
+      loadTimeline: async () => ({ config: initial.config, configVersion: 1, head: initial.head }),
+      loadAssetRegistry: async () => initial.registry,
+      saveTimeline: fixture.provider.saveTimeline.bind(fixture.provider),
+      saveTimelineAtHead: fixture.provider.saveTimelineAtHead.bind(fixture.provider),
+    }), 'gesture-project');
+    const result = await adapter.execute({ name: 'timeline.update_element', project: 'gesture-project', timeline: 'gesture-timeline',
+      expected_version: 1, clip_id: 'clip-1', params: { data: 'Updated', added: null } });
+    expect(fixture.requests).toHaveLength(1);
+    expect(fixture.compatibilityRequests).toEqual([]);
+    expect(fixture.requests[0].request.base_revision_id).toBe('parent-r1');
+    expect(fixture.requests[0].request.change).toEqual({ commands: [
+      { op: 'clip.set-param', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args: { path: 'data', value: 'Updated' }, expect: { 'params.data': { state: 'present', value: null } } },
+      { op: 'clip.set-param', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args: { path: 'added', value: null }, expect: { 'params.added': { state: 'absent' } } },
+    ] });
+    expect(result.config!.clips[0].params).toEqual({ data: 'Updated', added: null, retained: { opaque: true } });
+    expect(result.config!.clips[0].app).toEqual(initial.config.clips[0].app);
+  });
+  it.each([
+    ['mixed track batch', [{ op: 'clip.update', target: 'clip-1', payload: { opacity: 0.2 } }, { op: 'track.update', target: 'V1', payload: { label: 'Changed' } }]],
+    ['replacement properties', [{ op: 'clip.update', target: 'clip-1', payload: { mode: 'replace', opacity: 0.2 } }]],
+    ['omitted params', [{ op: 'clip.update', target: 'clip-1', payload: { params: { added: 1 } } }]],
+    ['top-level keyframes', [{ op: 'clip.update', target: 'clip-1', payload: { keyframes: {} } }]],
+  ])('%s is an explicit whole-batch fallback without a partial commit', async (_row, operations) => {
+    const h = await setup();
+    act(() => h.result.current.ops.apply({ version: 1, operations: operations as import('@/sdk/video/timeline/patch.ts').TimelinePatchOperation[] }));
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it('stale proposal accept sends neither a generated commit nor compatibility publication', async () => {
+    const h = await setup();
+    const proposals = createProposalRuntime({ timelineOps: h.result.current.ops, reader: createTimelineReader({ data: h.initial }) });
+    const proposal = proposals.create({ source: 'census-stale', baseVersion: 2, patch: { version: 2, operations: [{ op: 'clip.update', target: 'clip-1', payload: { opacity: 0.1 } }] } });
+    expect(() => proposals.accept(proposal.id)).toThrow('baseVersion');
+    expect(h.requests).toHaveLength(0);
+    expect(h.compatibilityRequests).toEqual([]);
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    h.unmount();
+  });
+});
+
+describe('WRITERS explicit unsupported property and track census', () => {
+  it.each([
+    ['top-level keyframes', { keyframes: { opacity: [{ time: 0, value: 0.3 }] }, keyframeOrigin: 0 }],
+    ['continuous effect', { continuous: { type: 'glow', intensity: 0.3 } }],
+    ['shader', { app: { shader: { shaderId: 'fixture' } } }],
+    ['transition assignment', { transition: { type: 'cross-fade', duration: 0.2 } }],
+    ['text content', { text: { content: 'Caption' } }],
+  ])('%s stays on its marked fallback instead of attaching partial commands', async (_row, patch) => {
+    const h = await setup();
+    act(() => h.result.current.editing.handleSelectedClipChange(patch));
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it('mute-all keeps one track patch transaction on its explicit fallback', async () => {
+    const initial = await videoData(true);
+    const h = await setup(undefined, false, initial);
+    act(() => h.result.current.ops.setAllTracksMuted(true));
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(h.result.current.data!.config.tracks!.find((track) => track.id === 'A1')!.muted).toBe(true);
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it.each(['/publish-document', '/v1/projects/p/timelines/t/composition-revisions'])(
+    'the unmarked-writer intercept rejects the actual compatibility endpoint %s', async (path) => {
+      const fixture = wireFixture(await initialData());
+      await expect(fixture.transport('POST', path, {}, json({}))).rejects.toThrow('Unmarked census writer');
+      expect(fixture.compatibilityRequests).toEqual([path]);
+      expect(fixture.requests).toHaveLength(0);
+    },
+  );
+});
+
+
+describe('WRITERS sequential patch intent', () => {
+  it('keeps repeated-target expectations sequential within one generated commit', async () => {
+    const h = await setup();
+    act(() => h.result.current.ops.apply({ version: 1, operations: [
+      { op: 'clip.update', target: 'clip-1', payload: { opacity: 0.2 } },
+      { op: 'clip.update', target: 'clip-1', payload: { opacity: 0.4 } },
+    ] }));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.compatibilityRequests).toEqual([]);
+    expect(h.requests[0].request.base_revision_id).toBe('parent-r1');
+    expect(h.requests[0].request.change).toEqual({ commands: [
+      { op: 'clip.set-look', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args: { opacity: 0.2 }, expect: { opacity: { state: 'present', value: 0.9 } } },
+      { op: 'clip.set-look', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args: { opacity: 0.4 }, expect: { opacity: { state: 'present', value: 0.2 } } },
+    ] });
+    expect(h.result.current.data!.config.clips[0].opacity).toBe(0.4);
+    h.unmount();
+  });
+});
+
+
+describe('WRITERS tiny-clip context-menu writer', () => {
+  it('extends an ordinary hold through one duration command with captured base and expect', async () => {
+    const base = await initialData();
+    const initial = await buildTimelineData({ ...base.config, clips: base.config.clips.map((clip) => clip.id === 'clip-1' ? { ...clip, hold: 0.2 } : clip) }, base.registry, undefined, 1, undefined, base.head);
+    const h = await setup(undefined, false, initial);
+    act(() => expandTinyClip(h.result.current.dataRef, h.result.current.applyEdit, 'clip-1'));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.compatibilityRequests).toEqual([]);
+    expect(h.requests[0].request.base_revision_id).toBe('parent-r1');
+    expect(h.requests[0].request.change).toEqual({ commands: [{
+      op: 'clip.set-duration', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args: { seconds: 0.5 },
+      expect: { hold: { state: 'present', value: 0.2 }, 'app.astrid.until': { state: 'absent' }, 'app.astrid.for': { state: 'absent' } },
+    }] });
+    expect(h.result.current.data!.config.clips[0]).toEqual({ ...initial.config.clips[0], hold: 0.5 });
+    h.unmount();
+  });
+  it('does not send a command when expansion is unnecessary', async () => {
+    const h = await setup();
+    act(() => expandTinyClip(h.result.current.dataRef, h.result.current.applyEdit, 'clip-1'));
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it('keeps a tiny hold with an authored end relation on its explicit fallback', async () => {
+    const base = await relationData({ on: 'beat 2', until: 'beat 4' });
+    const initial = await buildTimelineData({ ...base.config, clips: base.config.clips.map((clip) => clip.id === 'clip-1' ? { ...clip, hold: 0.2 } : clip) }, base.registry, undefined, 1, undefined, base.head);
+    const h = await setup(undefined, false, initial);
+    act(() => expandTinyClip(h.result.current.dataRef, h.result.current.applyEdit, 'clip-1'));
     expect(h.result.current.editSeqRef.current).toBe(1);
     expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
     expect(h.requests).toHaveLength(0);

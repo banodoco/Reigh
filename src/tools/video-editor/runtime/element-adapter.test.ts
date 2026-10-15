@@ -365,3 +365,27 @@ it('refuses a retired editor authority across separate registry reads and before
   await expect(routes.save('owned-timeline', {config: {clips: []}, registry: {}, expectedVersion: 3})).rejects.toThrow('captured editor retired');
   expect(provider.saveTimeline).not.toHaveBeenCalled();
 });
+
+describe('catalog captured head provenance', () => {
+  it('rejects a changed head during registry loading even when the numeric version is equal', async () => {
+    let reads = 0;
+    const saveTimelineAtHead = vi.fn();
+    const payload = documentPayload();
+    const routes = createElementTimelineRoutes({
+      loadTimeline: async () => ({ config: payload.config as TimelineConfig, configVersion: 7,
+        head: { projectId: 'project', timelineId: 'main', headRevisionId: ++reads === 1 ? 'r1' : 'r2' } }),
+      loadAssetRegistry: async () => ({ assets: {} }), saveTimeline: vi.fn(), saveTimelineAtHead,
+    });
+    await expect(routes.get('main')).rejects.toThrow('changed while loading');
+    expect(saveTimelineAtHead).not.toHaveBeenCalled();
+  });
+  it('refuses a head-based save without its captured head rather than reading a newer base', async () => {
+    const saveTimelineAtHead = vi.fn();
+    const saveTimeline = vi.fn();
+    const routes = createElementTimelineRoutes({ loadTimeline: vi.fn(), loadAssetRegistry: vi.fn(), saveTimeline, saveTimelineAtHead });
+    await expect(routes.save('main', { config: documentPayload().config, registry: {}, expectedVersion: 7 }))
+      .rejects.toThrow('captured timeline head');
+    expect(saveTimelineAtHead).not.toHaveBeenCalled();
+    expect(saveTimeline).not.toHaveBeenCalled();
+  });
+});

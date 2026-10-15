@@ -12,6 +12,8 @@
  */
 
 import { useCallback, useMemo, useRef } from 'react';
+import { propertyGestureCommands, deleteGestureCommands } from '../commands/semanticGestures.ts';
+import type { EditCommand } from '@/integrations/runtime/generated.ts';
 import type {
   TimelineOps,
 } from '@/sdk/index';
@@ -271,11 +273,36 @@ export function useTimelineOps({
         );
       }
 
+      // Adapt explicit patch intent, never a diff of its materialized document.
+      // A mixed/unsupported batch stays entirely on the compatibility route.
+      // Use the existing compiler for intermediate bases so repeated targets
+      // carry sequential expectations without duplicating patch semantics.
+      let captured = current;
+      const commands: EditCommand[] = [];
+      const supported = patch.operations.length > 0 && patch.operations.every((operation) => {
+        if (!captured.config.clips.some((clip) => clip.id === operation.target)) return false;
+        if (operation.op === 'clip.remove') {
+          commands.push(...deleteGestureCommands(captured, [operation.target]));
+        } else {
+          if (operation.op !== 'clip.update') return false;
+          const { mode, ...properties } = operation.payload ?? {};
+          if (mode !== undefined && mode !== 'merge') return false;
+          const produced = propertyGestureCommands(captured, operation.target, properties);
+          if (!produced?.length) return false;
+          commands.push(...produced);
+        }
+        const step = compileTimelinePatch({ ...patch, operations: [operation] }, captured);
+        if (!step.valid || !step.nextData) return false;
+        captured = step.nextData;
+        return true;
+      });
+
       // 3. Commit once through commitData with semantic transaction metadata.
       //    History recording is enabled by default (skipHistory defaults to false).
       commitData(compiled.nextData, {
         save: true,
         semantic: true,
+        editCommands: supported ? commands : undefined,
       });
 
       // 4. Return the semantic diff

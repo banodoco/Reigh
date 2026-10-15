@@ -1,4 +1,5 @@
 // Layer map & invariants: docs/structure_detail/tool_video_editor.md
+import { expandTinyClip } from '../../lib/expand-tiny-clip.ts';
 import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { shallow } from 'zustand/shallow';
 import {
@@ -617,31 +618,7 @@ function TimelineEditorCoreComponent({
   }, [clientXToTime, handleSplitClipAtTime]);
 
   const handleExpandTinyClip = useCallback((clipId: string) => {
-    const current = dataRef.current;
-    if (!current) return;
-    const row = current.rows.find((r) => r.actions.some((a) => a.id === clipId));
-    const action = row?.actions.find((a) => a.id === clipId);
-    if (!row || !action) return;
-    const duration = action.end - action.start;
-    if (duration >= 0.5) return;
-    const newEnd = action.start + 0.5;
-    const clipMeta = current.meta[clipId];
-    const metaUpdates: Record<string, Partial<ClipMeta>> = {};
-    if (clipMeta && typeof clipMeta.hold === 'number') {
-      metaUpdates[clipId] = { hold: 0.5 };
-    }
-    applyEdit({
-      type: 'rows',
-      rows: current.rows.map((r) =>
-        r.id !== row.id ? r : {
-          ...r,
-          actions: r.actions.map((a) =>
-            a.id !== clipId ? a : { ...a, end: newEnd },
-          ),
-        },
-      ),
-      ...(Object.keys(metaUpdates).length > 0 ? { metaUpdates } : {}),
-    });
+    expandTinyClip(dataRef, applyEdit, clipId);
   }, [applyEdit, dataRef]);
 
   const handleTrimClipToMediaEnd = useCallback((clipId: string) => {

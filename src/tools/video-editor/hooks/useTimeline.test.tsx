@@ -48,3 +48,25 @@ describe('useTimeline', () => {
     expect(provider.saveTimeline).not.toHaveBeenCalled();
   });
 });
+
+describe('standalone snapshot writer explicit fallback', () => {
+  it('passes its captured head without inventing command intent from a replacement config', async () => {
+    const config = createDefaultTimelineConfig();
+    const head = { projectId: 'project', timelineId: 'timeline-1', headRevisionId: 'r1' };
+    const saveTimelineAtHead = vi.fn(async () => ({ configVersion: 8, head: { ...head, headRevisionId: 'r2' } }));
+    const saveTimeline = vi.fn();
+    const provider: DataProvider = {
+      loadTimeline: vi.fn(async () => ({ config, configVersion: 7, head })),
+      loadAssetRegistry: vi.fn(async () => ({ assets: {} })), resolveAssetUrl: vi.fn(async (file) => file),
+      saveTimeline, saveTimelineAtHead,
+    };
+    const h = renderHook(() => useTimeline(provider, 'timeline-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(h.result.current.data).toEqual(config));
+    const next = { ...config, app: { customMetadata: 'fallback' } };
+    await act(async () => { await h.result.current.saveTimeline.mutateAsync(next); });
+    expect(saveTimelineAtHead).toHaveBeenCalledOnce();
+    expect(saveTimelineAtHead).toHaveBeenCalledWith('timeline-1', next, head);
+    expect(saveTimeline).not.toHaveBeenCalled();
+    h.unmount();
+  });
+});

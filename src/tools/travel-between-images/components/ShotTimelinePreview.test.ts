@@ -963,3 +963,29 @@ describe('shot timeline popup persistence', () => {
     expect(boundCanonicalClipToOccurrence(reenabled.clips.find((clip) => clip.id.endsWith('disabled-long-clip'))!)).not.toBeNull();
   });
 });
+
+describe('WRITERS popup metadata explicit fallback', () => {
+  it('publishes metadata from its captured occurrence base without a fresh-head adoption', async () => {
+    const base = createShotCompositionAdapter({ load: vi.fn(), publish: vi.fn() }).prepare(fixture);
+    const occurrence = base.occurrences[0]!;
+    const config = projectCanonicalComposition({ ...base, occurrences: [occurrence] }).config;
+    const publish = vi.fn(async (request) => ({ ...base, contract: request.graph, headRevisionId: 'metadata-ack' }));
+    const load = vi.fn();
+    const provider = createShotTimelineDataProvider(config, base, occurrence.occurrenceId, { prepare: vi.fn(), load, publish });
+    const loaded = await provider.loadTimeline('popup');
+    const next = { ...loaded.config,
+      app: { ...loaded.config.app, customMetadata: { label: 'My popup', opaque: null } },
+      clips: loaded.config.clips.map((clip, index) => index === 0 ? { ...clip, label: 'My clip' } : clip),
+    };
+    await provider.saveTimeline('popup', next, loaded.configVersion);
+    expect(load).not.toHaveBeenCalled();
+    expect(publish).toHaveBeenCalledOnce();
+    const request = publish.mock.calls[0][0];
+    expect(request.expectedHeadRevisionId).toBe(base.headRevisionId);
+    expect(request.parentDocumentId).toBe(base.parentDocumentId);
+    const target = request.graph.occurrences.find((candidate) => candidate.occurrence_id === occurrence.occurrenceId);
+    const revision = request.graph.shot_revisions.find((candidate) => candidate.shot_id === target.shot_id && candidate.revision_id === target.revision_id);
+    expect(revision.internal_timeline_revision.timeline.app.customMetadata).toEqual({ label: 'My popup', opaque: null });
+    expect(revision.internal_timeline_revision.timeline.clips[0].label).toBe('My clip');
+  });
+});
