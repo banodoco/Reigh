@@ -25,6 +25,7 @@ import type {
 import {
   resolveAnimatedParams,
   validateKeyframes,
+  timelineKeyframeTime,
   type InterpolatedParam,
   type KeyframeValidationDiagnostic,
 } from '@/tools/video-editor/keyframes/index.ts';
@@ -34,6 +35,7 @@ import {
 // ---------------------------------------------------------------------------
 
 export interface KeyframeInspectorProps {
+  clip?: {at: number; keyframeOrigin?: number};
   /** Parameter schema defining the keyframe-able parameters. */
   schema: ParameterSchema;
   /** Current keyframe data keyed by parameter name. */
@@ -396,14 +398,16 @@ function ParameterKeyframeSection({
 export function KeyframeInspector({
   schema,
   keyframes,
-  currentTime,
+  currentTime: timelineTime,
+  clip,
   onChange,
   disabled = false,
   className,
 }: KeyframeInspectorProps) {
+  const currentTime = clip ? timelineKeyframeTime(clip, timelineTime) : timelineTime;
   const interpolatedParams = useMemo(
-    () => resolveAnimatedParams(keyframes, schema, currentTime),
-    [keyframes, schema, currentTime],
+    () => resolveAnimatedParams(keyframes, schema, timelineTime, clip),
+    [keyframes, schema, timelineTime, clip],
   );
 
   const interpolatedByParam = useMemo(() => {

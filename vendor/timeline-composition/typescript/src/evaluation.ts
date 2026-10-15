@@ -67,3 +67,6 @@ export const queryTrackFrame = (track: PreparedTrack, frame: number): TrackFrame
     return [{clipIndex, ...queryDrawFrame(plan, frame - plan.drawStart)}];
   }),
 });
+
+export {keyframeOrigin, timelineKeyframeTime, spriteKeyframeFrame, declareKeyframeOrigin} from './lib/keyframe-origin';
+export type {KeyframeClock} from './lib/keyframe-origin';

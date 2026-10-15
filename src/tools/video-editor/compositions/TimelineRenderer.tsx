@@ -1297,7 +1297,7 @@ const ExtensionClipSequence: FC<ExtensionClipSequenceProps> = ({
       // No schema → pass raw params (no interpolation needed)
       baseParams = { ...rawParams };
     } else {
-      const resolved = resolveAnimatedParams(keyframes, schema, timeSeconds);
+      const resolved = resolveAnimatedParams(keyframes, schema, timeSeconds, clip);
       // Parameter resolution owns only declared animated values. Preserve
       // opaque source/package identity carried beside them.
       baseParams = { ...rawParams, ...interpolatedParamsToRecord(resolved) };
@@ -1318,7 +1318,7 @@ const ExtensionClipSequence: FC<ExtensionClipSequenceProps> = ({
       );
     }
     return baseParams;
-  }, [timeSeconds, clip.keyframes, clip.params, clip.clipType, registryRecord.schema, allClips]);
+  }, [timeSeconds, clip.at, clip.keyframeOrigin, clip.keyframes, clip.params, clip.clipType, registryRecord.schema, allClips]);
 
   const rendererProps: ClipRendererProps = {
     clipId: clip.id,

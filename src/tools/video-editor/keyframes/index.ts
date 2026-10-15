@@ -12,6 +12,9 @@
  * All functions are deterministic — same inputs always produce same outputs.
  */
 
+import {timelineKeyframeTime} from '@banodoco/timeline-composition/evaluation';
+export {declareKeyframeOrigin, timelineKeyframeTime} from '@banodoco/timeline-composition/evaluation';
+
 import type {
   ClipKeyframe,
   KeyframeInterpolation,
@@ -412,11 +415,15 @@ export function resolveAnimatedParams(
   keyframes: Record<string, ClipKeyframe[]>,
   schema: ParameterSchema,
   time: number,
+  clip?: {at: number; keyframeOrigin?: number},
 ): InterpolatedParam[] {
   const results: InterpolatedParam[] = [];
 
-  // Clamp time to non-negative for safety
-  const t = Math.max(0, time);
+  // Preserve the legacy non-negative timeline clamp. Declared origins may
+  // put key-time zero after clip start, so their local clock can be negative.
+  const t = clip?.keyframeOrigin === undefined
+    ? Math.max(0, time)
+    : timelineKeyframeTime(clip, time);
 
   for (const definition of schema) {
     const entry = keyframes[definition.name];

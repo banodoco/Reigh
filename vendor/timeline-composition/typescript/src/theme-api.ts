@@ -59,3 +59,6 @@ export {
   DEFAULT_THEME,
 } from "./ThemeContext";
 export type { Theme, RuntimeTheme } from "./ThemeContext";
+
+export {keyframeOrigin, timelineKeyframeTime, spriteKeyframeFrame, declareKeyframeOrigin} from './lib/keyframe-origin';
+export type {KeyframeClock} from './lib/keyframe-origin';

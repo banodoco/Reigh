@@ -5,6 +5,7 @@ import { ChunkLoadErrorBoundary } from '@/shared/runtime/ChunkLoadErrorBoundary'
 import { SequenceParamEditor } from '@/tools/video-editor/components/PropertiesPanel/SequenceParamEditor.tsx';
 import { isEditorParamsSchema } from '@/tools/video-editor/clip-types/defineClipType.ts';
 import type { ClipTypeDescriptor } from '@/tools/video-editor/clip-types/defineClipType.ts';
+import { declareKeyframeOrigin } from '@/tools/video-editor/keyframes/index.ts';
 import { KeyframeInspector } from '@/tools/video-editor/components/KeyframeInspector/KeyframeInspector';
 import type { EffectResource } from '@/tools/video-editor/hooks/useEffectResources.ts';
 import type { VideoEditorEffectCatalog } from '@/tools/video-editor/lib/effect-catalog.ts';
@@ -192,10 +193,11 @@ export function ClipEffectsTab({
       {/* M9: Keyframe Inspector — shown when clip type has editor params schema */}
       {clipDescriptor && isEditorParamsSchema(clipDescriptor.paramsSchema) && (
         <KeyframeInspector
+          clip={clip}
           schema={clipDescriptor.paramsSchema.params}
           keyframes={clip.keyframes ?? {}}
           currentTime={currentTime}
-          onChange={(updatedKeyframes) => onChange({ keyframes: updatedKeyframes })}
+          onChange={(updatedKeyframes) => onChange({ keyframes: updatedKeyframes, keyframeOrigin: declareKeyframeOrigin(clip, 'app-seconds').keyframeOrigin })}
         />
       )}
     </>

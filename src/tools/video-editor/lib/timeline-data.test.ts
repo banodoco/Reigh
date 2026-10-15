@@ -390,6 +390,7 @@ describe('timeline data sequence clip persistence', () => {
       clips: [
         {
           id: 'clip-kf',
+          keyframeOrigin: -3.125,
           at: 0,
           track: 'V1',
           clipType: 'contributed:animated',
@@ -408,6 +409,7 @@ describe('timeline data sequence clip persistence', () => {
 
     const { rows, meta, clipOrder, tracks } = configToRows(config);
 
+    expect(meta['clip-kf'].keyframeOrigin).toBe(-3.125);
     expect(meta['clip-kf'].keyframes).toEqual({
       opacity: [
         { time: 0, value: 0, interpolation: 'linear' },
@@ -418,6 +420,7 @@ describe('timeline data sequence clip persistence', () => {
 
     const roundTripped = rowsToConfig(rows, meta, config.output, clipOrder, tracks, undefined, config);
 
+    expect(roundTripped.clips[0].keyframeOrigin).toBe(-3.125);
     expect(roundTripped.clips[0].keyframes).toEqual({
       opacity: [
         { time: 0, value: 0, interpolation: 'linear' },

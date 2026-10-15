@@ -352,3 +352,16 @@ describe('KeyframeInspector', () => {
     expect(updatedKeyframes.opacity).toBeUndefined();
   });
 });
+
+
+describe('clip-local origin in the existing inspector', () => {
+  it('adds a key at the declared local playhead using the same interpolated value as playback', () => {
+    const onChange = vi.fn();
+    render(<KeyframeInspector schema={numberParamSchema} keyframes={sampleKeyframes}
+      currentTime={10.5} clip={{at:10,keyframeOrigin:0}} onChange={onChange} />);
+    fireEvent.click(screen.getByRole('button', {name:/Add keyframe at 0.50s/}));
+    expect(onChange).toHaveBeenCalledWith({opacity:expect.arrayContaining([
+      {time:0.5,value:0.5,interpolation:'linear'},
+    ])});
+  });
+});

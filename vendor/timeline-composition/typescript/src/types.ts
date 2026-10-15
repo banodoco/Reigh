@@ -10,6 +10,8 @@
 export type TimelineClip = {
   id: string;
   at: number;
+  /** Key-time zero in seconds relative to clip start; independent of media trim. */
+  keyframeOrigin?: number;
   track: string;
   asset?: string;
   clipType?: string;
