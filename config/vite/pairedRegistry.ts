@@ -86,7 +86,8 @@ export class PairingRegistry {
     connector.activeConnection = input.connection;
     this.connectors.set(connector.connectorId, connector);
     const currentPair = connector.pairId ? this.pairs.get(connector.pairId) : undefined;
-    if (currentPair) currentPair.generation = connector.generation;
+    // A reconnect requires a fresh invitation redemption. Old bindings stay frozen.
+    if (currentPair) connector.pairId = undefined;
     const invitation = this.createInvitation(connector.connectorId);
     return { connector, invitation };
   }

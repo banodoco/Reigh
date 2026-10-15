@@ -124,7 +124,12 @@ describe('paired transport boundary', () => {
     const pair = redemption.pair;
     const second = registry.connectConnector({ connectorId: 'connector-1', realmId: 'realm-1', connectorSecret: 'secret-1' });
     expect(second.connector.generation).toBeGreaterThan(firstGeneration);
-    expect(registry.authorizeSession(redemption.sessionToken).generation).toBe(second.connector.generation);
+    expect(pair.generation).toBe(firstGeneration);
+    expect(() => registry.authorizeSession(redemption.sessionToken)).toThrowError(
+      expect.objectContaining({ code: 'invalid_connector' }),
+    );
+    const fresh = registry.redeemInvitation(second.invitation!.code);
+    expect(registry.authorizeSession(fresh.sessionToken).generation).toBe(second.connector.generation);
     expect(() => registry.authorizeConnector(pair.pairId, 'wrong-secret', second.connector.generation)).toThrow();
   });
 

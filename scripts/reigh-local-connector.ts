@@ -9,11 +9,12 @@ import { homedir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { WebSocket } from 'ws';
-import { classifyPairedRoute, forwardHeaders, hasUnapprovedHeaders, pairedBodyLimit, PAIRED_MAX_FRAME_BYTES } from '../config/vite/pairedRoutePolicy';
+import { classifyPairedRoute, forwardHeaders, hasUnapprovedHeaders, pairedBodyLimit, PAIRED_MAX_FRAME_BYTES } from '../config/vite/pairedRoutePolicy.ts';
+import { PAIRED_SESSION_HEADER, validatedPairedSession } from '../config/vite/pairedSessionContext.ts';
 import {
   ASTRID_BRIDGE_PROTOCOL_HEADER,
   ASTRID_BRIDGE_PROTOCOL_VERSION,
-} from '../src/tools/video-editor/data/astridBridgeWire';
+} from '../src/tools/video-editor/data/astridBridgeWire.ts';
 
 const args = new Map<string, string>();
 for (let index = 2; index < process.argv.length; index += 1) {
@@ -71,15 +72,16 @@ function readProductToken(): string {
   if (metadata && !requiredScopes.every((scope) => scopes.includes(scope))) return fail(`paired connector product actor is missing required scopes: ${requiredScopes.filter((scope) => !scopes.includes(scope)).join(', ')}`);
   return raw || fail('runtime credential has no token');
 }
-function validateHandshake(value: unknown): { realmId: string } {
+function validateHandshake(value: unknown): { realmId: string; connectorId: string } {
   if (!value || typeof value !== 'object') return fail('Runtime handshake response is malformed');
-  const handshake = value as { realm_id?: unknown; protocol?: unknown; actor_id?: unknown; scopes?: unknown };
+  const handshake = value as { realm_id?: unknown; protocol?: unknown; actor_id?: unknown; scopes?: unknown; connector_assertion?: { connector_id?: unknown; realm_id?: unknown } };
   const scopes = Array.isArray(handshake.scopes) ? handshake.scopes.filter((scope): scope is string => typeof scope === 'string') : [];
   const expectedScopes = [...PRODUCT_SCOPES].sort();
   if (handshake.protocol !== 'workspace.v1' || typeof handshake.realm_id !== 'string' || (expectedRealm && handshake.realm_id !== expectedRealm) || handshake.actor_id !== expectedActor || JSON.stringify([...scopes].sort()) !== JSON.stringify(expectedScopes)) {
     return fail('Runtime handshake actor, realm, protocol, or product scopes did not match the explicitly expected contract');
   }
-  return { realmId: handshake.realm_id };
+  if (typeof handshake.connector_assertion?.connector_id !== 'string' || handshake.connector_assertion.realm_id !== handshake.realm_id) return fail('Runtime credential lacks host-provisioned connector assertion authority');
+  return { realmId: handshake.realm_id, connectorId: handshake.connector_assertion.connector_id };
 }
 let token = readProductToken();
 const health = await fetch(new URL('/v1/health', endpoint), { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(3000) });
@@ -91,12 +93,14 @@ const handshakeResponse = await fetch(new URL('/v1/handshake', endpoint), {
   signal: AbortSignal.timeout(3000),
 });
 if (!handshakeResponse.ok) fail(`Runtime handshake returned HTTP ${handshakeResponse.status}`);
-const realm = { realm_id: validateHandshake(await handshakeResponse.json()).realmId };
+const authenticatedConnector = validateHandshake(await handshakeResponse.json());
+const realm = { realm_id: authenticatedConnector.realmId };
 
 let state: { connectorId: string; connectorSecret: string };
 if (existsSync(statePath) && !resetPairing) state = readJson(statePath, 'connector state') as typeof state;
-else { state = { connectorId: `reigh-${randomBytes(16).toString('hex')}`, connectorSecret: randomBytes(32).toString('base64url') }; mkdirSync(dirname(statePath), { recursive: true, mode: 0o700 }); writeFileSync(statePath, `${JSON.stringify(state)}\n`, { mode: 0o600 }); chmodSync(statePath, 0o600); }
+else { state = { connectorId: authenticatedConnector.connectorId, connectorSecret: randomBytes(32).toString('base64url') }; mkdirSync(dirname(statePath), { recursive: true, mode: 0o700 }); writeFileSync(statePath, `${JSON.stringify(state)}\n`, { mode: 0o600 }); chmodSync(statePath, 0o600); }
 if (!state.connectorId || !state.connectorSecret) fail('connector state is malformed');
+if (state.connectorId !== authenticatedConnector.connectorId) fail('connector state does not match host-provisioned credential');
 
 function connectorWebSocketUrl(origin: string): URL {
   const url = new URL(origin);
@@ -113,19 +117,22 @@ function connectorWebSocketUrl(origin: string): URL {
 const wsOrigin = connectorWebSocketUrl(relayOrigin);
 let socket: WebSocket;
 let stopping = false;
+let generation = 0;
+const pairs = new Map<string, number>();
 const requests = new Map<string, { controller?: ReadableStreamDefaultController<Uint8Array>; abort: AbortController; cancelled: boolean; bytes: number; maxBytes: number; declaredLength?: number }>();
 const pausedResponses = new Map<string, Promise<void>>();
 const resumeResponses = new Map<string, () => void>();
 
 function send(value: Record<string, unknown>): void { if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(value)); }
 function connect(): void {
+  generation = 0; pairs.clear();
   socket = new WebSocket(wsOrigin, { maxPayload: PAIRED_MAX_FRAME_BYTES });
   socket.on('open', async () => {
     try {
       token = readProductToken();
       const check = await fetch(new URL('/v1/handshake', endpoint), { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ protocol: 'workspace.v1', client_name: 'reigh-paired-connector', client_version: '1', requested_scopes: PRODUCT_SCOPES }), signal: AbortSignal.timeout(3000) });
       const current = check.ok ? validateHandshake(await check.json()) : undefined;
-      if (!current || current.realmId !== realm.realm_id) { socket.close(1008, 'local Runtime identity changed'); return; }
+      if (!current || current.realmId !== realm.realm_id || current.connectorId !== state.connectorId) { socket.close(1008, 'local Runtime identity changed'); return; }
     } catch { socket.close(1008, 'local Runtime unavailable'); return; }
     send({ type: 'connector_hello', connector_id: state.connectorId, connector_secret: state.connectorSecret, realm_id: realm.realm_id });
   });
@@ -133,11 +140,18 @@ function connect(): void {
   if (isBinary || raw.byteLength > PAIRED_MAX_FRAME_BYTES) { socket.close(1009, 'frame too large'); return; }
   let message: Record<string, unknown>; try { message = JSON.parse(raw.toString()) as Record<string, unknown>; } catch { socket.close(1002, 'invalid control frame'); return; }
   if (message.type === 'connector_hello_ack') {
+    if (message.connector_id !== state.connectorId || message.realm_id !== realm.realm_id || !Number.isSafeInteger(message.generation) || Number(message.generation) <= 0) { socket.close(1008, 'invalid connector binding'); return; }
+    generation = Number(message.generation);
     if (typeof message.invitation === 'string') console.log(`Pair this browser at ${new URL(`/pairing#${encodeURIComponent(message.invitation)}`, relayOrigin).toString()}`);
     return;
   }
+  if (message.type === 'paired') {
+    if (!generation || message.generation !== generation || message.realm_id !== realm.realm_id || typeof message.pair_id !== 'string' || !Number.isSafeInteger(message.expires_at) || Number(message.expires_at) <= Date.now()) { socket.close(1008, 'invalid pair binding'); return; }
+    pairs.set(message.pair_id, Number(message.expires_at));
+    return;
+  }
   if (message.type === 'request_start' && typeof message.id === 'string' && typeof message.service === 'string' && typeof message.path === 'string') {
-    await beginRequest(message.id, message.service, message.path, typeof message.method === 'string' ? message.method : 'GET', message.headers && typeof message.headers === 'object' ? message.headers as Record<string, string> : {});
+    await beginRequest(message.id, message.service, message.path, typeof message.method === 'string' ? message.method : 'GET', message.headers && typeof message.headers === 'object' ? message.headers as Record<string, string> : {}, message.paired_session);
     return;
   }
   if (message.type === 'request_chunk' && typeof message.id === 'string' && typeof message.data === 'string') {
@@ -169,7 +183,10 @@ function connect(): void {
 }
 connect();
 
-async function beginRequest(id: string, service: string, path: string, method: string, headers: Record<string, string>): Promise<void> {
+async function beginRequest(id: string, service: string, path: string, method: string, headers: Record<string, string>, context: unknown): Promise<void> {
+  let pairedSession;
+  try { pairedSession = validatedPairedSession(context, { connectorId: state.connectorId, realmId: realm.realm_id, generation, pairs }); }
+  catch { send({ type: 'response_error', id, detail: 'paired_session_binding_mismatch' }); return; }
   const publicPath = routePath(service, path);
   const route = classifyPairedRoute(publicPath, method, headers);
   if (!route || route.service !== service || route.upstreamPath !== path || hasUnapprovedHeaders(headers)) { send({ type: 'response_error', id, detail: 'connector route is outside the closed product table' }); return; }
@@ -199,6 +216,9 @@ async function beginRequest(id: string, service: string, path: string, method: s
     return;
   }
   outgoing.Authorization = `Bearer ${authorizationToken}`;
+  // Only the authenticated Runtime boundary consumes session assertions. Other
+  // local bridges do not become session authorities by receiving browser JSON.
+  if (service === 'runtime') outgoing[PAIRED_SESSION_HEADER] = JSON.stringify(pairedSession);
   // The local composer is an in-process loopback handler with the same
   // origin guard as the normal Vite proxy. The connector owns this
   // destination, so it supplies that exact local origin after authenticating
