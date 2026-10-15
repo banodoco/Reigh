@@ -1,3 +1,4 @@
+import { confinementReadPath, confinedLaunch, requireHostConfinement, type HostConfinementPolicy } from './hostConfinement.ts';
 import {
   AcpProcessHost,
   AcpProcessHostError,
@@ -37,6 +38,8 @@ type HostChildProcess = {
     args: readonly string[],
     options: {
       readonly encoding: 'utf8';
+      readonly cwd: string;
+      readonly shell: false;
       readonly env: Record<string, string | undefined>;
       readonly stdio: readonly ['ignore', 'pipe', 'pipe'];
       readonly timeout: number;
@@ -52,8 +55,10 @@ type HostChildProcess = {
 /** Ask the installed Astrid command for its immutable packaged profile resource. */
 export function resolveAstridAcpSystemPromptFile(
   command = ASTRID_ACP_COMMAND,
-  env: Record<string, string | undefined> = {},
+  _env: Record<string, string | undefined> = {},
+  confinement?: HostConfinementPolicy,
 ): string {
+  const plan = confinedLaunch(confinement, command, [ASTRID_ACP_PROFILE_FILE_ARG]);
   const runtime = (globalThis as { readonly process?: HostRuntime }).process;
   const childProcess = runtime?.getBuiltinModule?.('node:child_process') as HostChildProcess | undefined;
   if (typeof childProcess?.spawnSync !== 'function') {
@@ -62,9 +67,11 @@ export function resolveAstridAcpSystemPromptFile(
       { code: 'acp_unavailable' },
     );
   }
-  const result = childProcess.spawnSync(command, [ASTRID_ACP_PROFILE_FILE_ARG], {
+  const result = childProcess.spawnSync(plan.command, plan.args, {
     encoding: 'utf8',
-    env: { ...(runtime?.env ?? {}), ...env },
+    env: plan.options.env,
+    cwd: plan.options.cwd,
+    shell: false,
     stdio: ['ignore', 'pipe', 'pipe'],
     timeout: 5_000,
   });
@@ -80,7 +87,7 @@ export function resolveAstridAcpSystemPromptFile(
       { code: 'acp_unavailable', cause: result.error },
     );
   }
-  return requireAbsolute(path, 'system prompt file');
+  return confinementReadPath(confinement, requireAbsolute(path, 'system prompt file'));
 }
 
 type HostFileSystem = {
@@ -109,6 +116,7 @@ function requireAbsolute(value: string, name: string): string {
 }
 
 export type AstridAcpLauncherOptions = {
+  readonly confinement?: HostConfinementPolicy;
   /** Caller-owned project cwd; never inferred from the browser. */
   readonly cwd: string;
   /** Optional isolated Astrid/OMP profile; omitted uses the machine's normal profile. */
@@ -142,6 +150,8 @@ export type AstridAcpLauncherOptions = {
  * optional sessionDir/profile are forwarded as explicit OMP launch flags.
  */
 export function createAstridAcpProcessHost(options: AstridAcpLauncherOptions): AcpProcessHost {
+  // Fake spawners are a host test seam, never reachable from HTTP/config.
+  if (!options.spawnProcess) requireHostConfinement(options.confinement);
   const cwd = requireAbsolute(options.cwd, 'cwd');
   const command = options.command ?? ASTRID_ACP_COMMAND;
   const profile = options.profile?.trim() || undefined;
@@ -150,9 +160,12 @@ export function createAstridAcpProcessHost(options: AstridAcpLauncherOptions): A
     : requireAbsolute(options.sessionDir, 'session directory');
   const systemPromptFile = requireAbsolute(
     options.systemPromptFile
-      ?? (options.profileFileForCommand ?? resolveAstridAcpSystemPromptFile)(command, options.env),
+      ?? (options.profileFileForCommand
+        ? options.profileFileForCommand(command, options.env)
+        : resolveAstridAcpSystemPromptFile(command, options.env, options.confinement)),
     'system prompt file',
   );
+  if (!options.spawnProcess) confinementReadPath(options.confinement, systemPromptFile);
   const promptCheck = options.fileIsRegularFile ?? isRegularFile;
   if (!promptCheck(systemPromptFile)) {
     throw new AcpProcessHostError(
@@ -179,5 +192,6 @@ export function createAstridAcpProcessHost(options: AstridAcpLauncherOptions): A
     requestTimeoutMs: options.requestTimeoutMs,
     callbacks: options.callbacks,
     spawnProcess: options.spawnProcess,
+    confinement: options.confinement,
   });
 }

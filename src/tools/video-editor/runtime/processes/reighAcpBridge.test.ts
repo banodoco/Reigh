@@ -425,7 +425,7 @@ describe('Reigh ACP HTTP bridge', () => {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   });
 
-  it('answers local permission and terminal callbacks instead of forcing ACP fallback retries', async () => {
+  it('cancels permission claims and refuses terminal callbacks without host confinement', async () => {
     const fakeProcess = new FakeProcess();
     const config: ReighAcpBridgeConfig = {
       token: 'test-token',
@@ -462,7 +462,7 @@ describe('Reigh ACP HTTP bridge', () => {
     await waitForRequest(fakeProcess, afterInitialize);
     expect(lastRequest(fakeProcess)).toMatchObject({
       id: 'permission-1',
-      result: { outcome: { outcome: 'selected', optionId: 'allow_always' } },
+      result: { outcome: { outcome: 'cancelled' } },
     });
 
     const afterPermission = fakeProcess.stdin.writes.length;
@@ -470,25 +470,13 @@ describe('Reigh ACP HTTP bridge', () => {
       jsonrpc: '2.0',
       id: 'terminal-1',
       method: 'terminal/create',
-      params: { command: '/bin/echo', args: ['bridge-ok'], cwd: globalThis.process.cwd() },
+      params: { command: '/bin/echo', args: ['must-not-run'], cwd: globalThis.process.cwd() },
     })}\n`);
     await waitForRequest(fakeProcess, afterPermission);
-    const terminalCreate = lastRequest(fakeProcess) as { result?: { terminalId?: string } };
-    expect(terminalCreate.result?.terminalId).toEqual(expect.any(String));
-    const terminalId = terminalCreate.result!.terminalId!;
-
-    await new Promise<void>((resolve) => setTimeout(resolve, 20));
-    const afterCreate = fakeProcess.stdin.writes.length;
-    fakeProcess.stdout.emit('data', `${JSON.stringify({
+    expect(lastRequest(fakeProcess)).toEqual({
       jsonrpc: '2.0',
-      id: 'terminal-output-1',
-      method: 'terminal/output',
-      params: { terminalId },
-    })}\n`);
-    await waitForRequest(fakeProcess, afterCreate);
-    expect(lastRequest(fakeProcess)).toMatchObject({
-      id: 'terminal-output-1',
-      result: { output: 'bridge-ok\n', truncated: false, exitStatus: { exitCode: 0, signal: null } },
+      id: 'terminal-1',
+      error: { code: -32000, message: 'ACP callback "terminal/create" failed.' },
     });
 
     await bridge.close();

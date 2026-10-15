@@ -1,3 +1,4 @@
+import { confinedLaunch, type HostConfinementPolicy } from './hostConfinement.ts';
 import type {
   JsonRpcProcessLike,
   JsonRpcReadableStreamLike,
@@ -27,6 +28,7 @@ export type AcpProcessHostCallbacks = {
 };
 
 export type AcpProcessSpawnOptions = {
+  readonly confinement?: HostConfinementPolicy;
   readonly command: string;
   readonly args: readonly string[];
   readonly cwd?: string;
@@ -36,6 +38,8 @@ export type AcpProcessSpawnOptions = {
 export type AcpProcessSpawner = (options: AcpProcessSpawnOptions) => JsonRpcProcessLike;
 
 export type AcpProcessHostOptions = {
+  /** Trusted host input, never request or environment configuration. */
+  readonly confinement?: HostConfinementPolicy;
   /** Injected only by host fixtures; production uses the explicit Node spawner. */
   readonly process?: JsonRpcProcessLike;
   readonly spawnProcess?: AcpProcessSpawner;
@@ -138,12 +142,9 @@ function defaultSpawnProcess(options: AcpProcessSpawnOptions): JsonRpcProcessLik
     );
   }
 
-  const runtime = (globalThis as { readonly process?: NodeProcessRuntime }).process;
-  const child = childProcess.spawn(options.command, [...options.args], {
-    cwd: options.cwd,
-    env: { ...(runtime?.env ?? {}), ...(options.env ?? {}) },
-    shell: false,
-    stdio: 'pipe',
+  const plan = confinedLaunch(options.confinement, options.command, options.args, options.cwd);
+  const child = childProcess.spawn(plan.command, [...plan.args], {
+    ...plan.options, stdio: [...plan.options.stdio],
   });
   return child;
 }
@@ -245,6 +246,7 @@ export class AcpProcessHost {
         args,
         cwd: this.options.cwd,
         env: this.options.env,
+        ...(this.options.confinement ? { confinement: this.options.confinement } : {}),
       }) as ChildProcessLike;
     } catch (cause) {
       if (cause instanceof AcpProcessHostError) throw cause;
@@ -508,6 +510,8 @@ export class AcpProcessHost {
     if (this.disconnected) return;
     this.disconnected = true;
     this.rejectPending(error);
+    // EOF/malformed transport must also stop an owned still-running agent.
+    if (this.ownsProcess && !this.disposed) this.process?.kill?.('SIGTERM');
     if (!this.disposed) this.callbacks.onDisconnect?.(error);
   }
 }

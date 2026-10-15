@@ -1,10 +1,10 @@
+import { confinedLaunch, type HostConfinementPolicy } from '../src/tools/video-editor/runtime/processes/hostConfinement.ts';
 import { randomUUID } from 'node:crypto';
 import { ApiError } from '../src/integrations/runtime/generated.ts';
 import { ChatError, ProjectChatRegistry, chatClaimIdentity, chatStoreIdentity, projectChatClaimDirectory, runtimeChatClient, type QueuedChatMessage } from './reigh-project-chat.ts';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { delimiter } from 'node:path';
 
 import {
   AcpProcessHost,
@@ -81,6 +81,8 @@ type TerminalRecord = {
 };
 
 type BridgeOptions = {
+  /** Host capability only; intentionally absent from public config/env decoding. */
+  readonly confinement?: HostConfinementPolicy;
   readonly chatRegistry?: ProjectChatRegistry;
   readonly config: ReighAcpBridgeConfig;
   readonly hostFactory?: (options: AstridAcpLauncherOptions) => AcpProcessHost;
@@ -159,16 +161,6 @@ function terminalCwd(value: unknown, root: string): string {
   return isPathWithin(root, value) ? value : root;
 }
 
-function terminalEnvironment(value: unknown): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { ...process.env };
-  if (!Array.isArray(value)) return env;
-  for (const item of value) {
-    if (!isRecord(item) || typeof item.name !== 'string' || typeof item.value !== 'string') continue;
-    env[item.name] = item.value;
-  }
-  return env;
-}
-
 function terminalOutputLimit(value: unknown): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) return 1_048_576;
   return Math.max(1, Math.min(Math.floor(value), 8 * 1_048_576));
@@ -196,16 +188,15 @@ function createTerminal(
   params: unknown,
   root: string,
   terminals: Map<string, TerminalRecord>,
+  confinement?: HostConfinementPolicy,
 ): { terminalId: string } {
   if (!isRecord(params) || typeof params.command !== 'string' || !params.command) {
     throw new Error('terminal/create requires a command');
   }
   const args = Array.isArray(params.args) ? params.args.filter((value): value is string => typeof value === 'string') : [];
-  const child = spawn(params.command, args, {
-    cwd: terminalCwd(params.cwd, root),
-    env: terminalEnvironment(params.env),
-    shell: false,
-    stdio: 'pipe',
+  const plan = confinedLaunch(confinement, params.command, args, terminalCwd(params.cwd, root));
+  const child = spawn(plan.command, [...plan.args], {
+    ...plan.options, stdio: [...plan.options.stdio],
   });
   const terminal: TerminalRecord = {
     process: child,
@@ -317,6 +308,7 @@ function hostError(error: unknown): { status: number; body: JsonRecord } {
 
 export class ReighAcpBridge {
   private readonly config: ReighAcpBridgeConfig;
+  private readonly confinement?: HostConfinementPolicy;
   private readonly hostFactory: (options: AstridAcpLauncherOptions) => AcpProcessHost;
   private readonly idFactory: () => string;
   private readonly connections = new Map<string, Connection>();
@@ -324,6 +316,7 @@ export class ReighAcpBridge {
 
   constructor(options: BridgeOptions) {
     this.config = options.config;
+    this.confinement = options.confinement;
     this.hostFactory = options.hostFactory ?? createAstridAcpProcessHost;
     this.idFactory = options.idFactory ?? randomUUID;
     const runtime = options.chatRegistry ? undefined : runtimeChatClient();
@@ -439,17 +432,10 @@ export class ReighAcpBridge {
     const terminals = new Map<string, TerminalRecord>();
     let connection: Connection | null = null;
     const callbacks: AcpProcessHostCallbacks = {
-      requestPermission: (params) => {
-        // Reigh's local editor is the user-facing ACP client. It has no separate
-        // permission modal, so approve normal agent work once for the session;
-        // keep destructive delete/move requests fail-closed until the UI grows a
-        // real approval surface.
-        const toolCall = isRecord(params) && isRecord(params.toolCall) ? params.toolCall : null;
-        const title = typeof toolCall?.title === 'string' ? toolCall.title.toLowerCase() : '';
-        const destructive = title.startsWith('delete ') || title.startsWith('move ');
-        return { outcome: { outcome: 'selected', optionId: destructive ? 'reject_once' : 'allow_always' } };
-      },
-      createTerminal: (params) => createTerminal(params, this.config.cwd, terminals),
+      // No real human approval consumer exists here. Titles/options are claims,
+      // never security approval or a source of confinement authority.
+      requestPermission: () => ({ outcome: { outcome: 'cancelled' } }),
+      createTerminal: (params) => createTerminal(params, this.config.cwd, terminals, this.confinement),
       terminalOutput: (params) => {
         const terminal = getTerminal(params, terminals);
         return {
@@ -500,6 +486,7 @@ export class ReighAcpBridge {
       },
     };
     const host = this.hostFactory({
+      confinement: this.confinement,
       cwd: this.config.cwd,
       profile: this.config.profile,
       sessionDir: this.config.sessionDir,
@@ -507,7 +494,7 @@ export class ReighAcpBridge {
       command: this.config.command,
       callbacks,
       ...(localMediaOnly ? { env: {
-        PI_CONFIG_FILES: [process.env.PI_CONFIG_FILES, fileURLToPath(new URL('./reigh-acp-local-only.yml', import.meta.url))].filter(Boolean).join(delimiter),
+        PI_CONFIG_FILES: fileURLToPath(new URL('./reigh-acp-local-only.yml', import.meta.url)),
         PI_BASH_NO_LOGIN: '1',
         ASTRID_SYSTEM_PROMPT: `${ASTRID_ACP_CONTEXT_SYSTEM_PROMPT}\nHosted same-machine mode: keep all media bytes on this computer. Use Runtime IDs, text and scoped metadata for CPU edits. Do not send media to model/provider tools or cloud media executors, including through shell commands. Native image submission and inspection are disabled for this session.`,
       } } : {}),
