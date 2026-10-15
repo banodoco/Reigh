@@ -444,6 +444,10 @@ export const deriveTimelineShotGroupViews = (
 };
 
 export const cloneAssetRegistry = (registry: AssetRegistry): AssetRegistry => ({
+  // Runtime registry metadata is opaque authored state, not resolved media data.
+  ...(Reflect.get(registry, 'metadata') !== undefined
+    ? { metadata: cloneAppValue(Reflect.get(registry, 'metadata')) }
+    : {}),
   assets: Object.fromEntries(
     Object.entries(registry.assets ?? {}).map(([assetId, entry]) => [assetId, sanitizeAssetRegistryEntry(entry)]),
   ),
@@ -2498,11 +2502,27 @@ export const sanitizeTrackDefinitionSnapshot = (track: TrackDefinition): TrackDe
     }
   }
 
+  // Runtime's persisted name is distinct from the editor's display label.
+  // Carry it without interpreting it or filling an absent value from a base.
+  const name = Reflect.get(track, 'name');
+  if (name !== undefined) {
+    Object.assign(serializedTrack, { name: cloneAppValue(name) });
+  }
+
   return serializedTrack as TrackDefinition;
 };
 
 export const sanitizeAssetRegistryEntry = (entry: AssetRegistryEntry): AssetRegistryEntry => {
   const sanitizedEntries: [string, unknown][] = [];
+  // Identity carried by Runtime's admitted asset entries is opaque to the
+  // editor. Preserve these persisted siblings while still stripping src and
+  // other resolved-only fields below. Never merge a prior entry into this one.
+  for (const field of ['asset_id', 'digest', 'media_type', 'object_id', 'role', 'scope']) {
+    const value = Reflect.get(entry, field);
+    if (value !== undefined) {
+      sanitizedEntries.push([field, cloneAppValue(value)]);
+    }
+  }
   for (const field of ASSET_REGISTRY_ENTRY_FIELDS) {
     const value = entry[field];
     if (value === undefined) {
@@ -2571,7 +2591,7 @@ const validateSerializedConfig = (
     }
   }
 
-  const allowedTrackKeys = new Set<string>(TRACK_DEFINITION_FIELDS);
+  const allowedTrackKeys = new Set<string>([...TRACK_DEFINITION_FIELDS, 'name']);
   for (const track of config.tracks ?? []) {
     for (const key of Object.keys(track)) {
       if (!allowedTrackKeys.has(key)) {

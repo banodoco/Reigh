@@ -1676,6 +1676,35 @@ describe('current App preservation', () => {
 });
 
 
+// Contract-level clear check for the already covered transition field. The
+// contract names explicit removal as args.transition = { op: 'clear' }. This
+// test starts at the existing editor None representation (own undefined), not
+// a raw command handler. No command adapter or unobserved UI case is claimed.
+describe('covered transition clear preservation', () => {
+  it('keeps the named transition absent after reload and a later partial save', async () => {
+    const initialClip = { id: 'clip-transition', at: 0, track: 'V1', hold: 2,
+      transition: { type: 'crossfade', duration: 0.5 },
+      app: { other: { keep: true } }, opaque_clip: { keep: true } };
+    const fixture = runtimeFixture({ initialClips: [initialClip] });
+    const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport });
+    const initial = await provider.loadTimeline(TIMELINE_ID);
+    const cleared = sanitizeTimelineClipSnapshot({ id: initialClip.id, at: 0, track: 'V1', hold: 2,
+      transition: undefined });
+    await provider.saveTimelineAtHead(TIMELINE_ID, { ...initial.config, clips: [cleared] }, initial.head!);
+    const reloaded = await provider.loadTimeline(TIMELINE_ID);
+    expect(reloaded.config.clips[0]).not.toHaveProperty('transition');
+    expect(reloaded.config.clips[0].app).toEqual(initialClip.app);
+    expect(reloaded.config.clips[0]).toHaveProperty('opaque_clip', initialClip.opaque_clip);
+    const partial = sanitizeTimelineClipSnapshot({ id: initialClip.id, at: 1, track: 'V1', hold: 2 });
+    await provider.saveTimelineAtHead(TIMELINE_ID, { ...reloaded.config, clips: [partial] }, reloaded.head!);
+    const again = await provider.loadTimeline(TIMELINE_ID);
+    expect(again.config.clips[0]).not.toHaveProperty('transition');
+    expect(again.config.clips[0].app).toEqual(initialClip.app);
+    expect(again.config.clips[0]).toHaveProperty('opaque_clip', initialClip.opaque_clip);
+  });
+});
+
+
 describe('current App preservation pending acknowledgements', () => {
   it('does not replay an accepted partial edit for a new explicit None action', async () => {
     const fixture = runtimeFixture({ initialClips: [{ id: 'clip-transition', at: 0, track: 'V1', hold: 2, transition: { type: 'crossfade', duration: 0.5 } }] });

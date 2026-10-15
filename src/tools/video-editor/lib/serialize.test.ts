@@ -3,6 +3,8 @@ import { repairConfig } from '@/tools/video-editor/lib/migrate';
 import { serializeClipForDisk, serializeForDisk, validateSerializedConfig } from '@/tools/video-editor/lib/serialize';
 import {
   TIMELINE_POSTPROCESS_SHADER_APP_KEY,
+  cloneAssetRegistry,
+  sanitizeAssetRegistryEntry,
   TimelineDomainError,
   serializeTimelineConfigSnapshot,
   serializeTimelinePair,
@@ -931,5 +933,49 @@ describe('video-editor serialization', () => {
     ]);
     expect(pair.registry.assets['asset-dur']).toEqual({ file: 'video.mp4', duration: 6 });
     expect(pair.issues.every((i) => i.severity !== 'error')).toBe(true);
+  });
+});
+
+// Persisted siblings observed in admitted synthetic X0 case 2. These opaque
+// Runtime fields must survive the editor filters without acquiring defaults.
+describe('Runtime persisted preservation siblings', () => {
+  it('keeps track names distinct from labels through disk serialization', () => {
+    const resolved = {
+      output: { resolution: '1280x720', fps: 30, file: 'out.mp4' },
+      tracks: [{ id: 'video', kind: 'visual', label: 'video', name: 'Video', role: 'output' }],
+      clips: [], registry: {},
+    } as unknown as ResolvedTimelineConfig;
+    const serialized = serializeForDisk(resolved);
+    expect(serialized.tracks?.[0]).toMatchObject({ label: 'video', name: 'Video' });
+    validateSerializedConfig(serialized);
+    Reflect.deleteProperty(resolved.tracks[0], 'name');
+    expect(serializeForDisk(resolved).tracks?.[0]).not.toHaveProperty('name');
+  });
+
+  it('clones registry metadata and asset identity without persisting resolved state', () => {
+    const registry = {
+      metadata: { x0RegistryMetadata: { sentinel: 'preserve-registry-metadata' } },
+      assets: { 'asset-x0-sentinel-audio.wav': {
+        asset_id: 'asset-x0-sentinel-audio.wav',
+        digest: 'sha256:226f1a1b7d7ba27fe193c6ccbaa03aebd24ec1f6a4330d308c2f40ad7bbea2d4',
+        object_id: 'sha256:226f1a1b7d7ba27fe193c6ccbaa03aebd24ec1f6a4330d308c2f40ad7bbea2d4',
+        media_type: 'audio/wav', role: 'source',
+        scope: { project_id: 'ce1a990672c745039855220750d8dc0c', shot_id: 'shot-main' },
+        type: 'audio',
+      } },
+    };
+    const cloned = cloneAssetRegistry(registry);
+    expect(cloned).toEqual(registry);
+    expect(Reflect.get(cloned, 'metadata')).not.toBe(registry.metadata);
+    expect(Reflect.get(cloned.assets['asset-x0-sentinel-audio.wav'], 'scope'))
+      .not.toBe(registry.assets['asset-x0-sentinel-audio.wav'].scope);
+    const resolvedEntry = { ...registry.assets['asset-x0-sentinel-audio.wav'], src: 'blob:resolved-only' };
+    expect(sanitizeAssetRegistryEntry(resolvedEntry)).toEqual(registry.assets['asset-x0-sentinel-audio.wav']);
+  });
+
+  it('does not restore removed registry metadata or asset identity siblings', () => {
+    const registry = { assets: { 'asset-x0-sentinel-audio.wav': { type: 'audio' } } };
+    expect(cloneAssetRegistry(registry)).toEqual(registry);
+    expect(cloneAssetRegistry(cloneAssetRegistry(registry))).toEqual(registry);
   });
 });
