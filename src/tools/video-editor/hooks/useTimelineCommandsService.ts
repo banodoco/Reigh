@@ -1,4 +1,5 @@
 import type { TimelineEditability } from '@/tools/video-editor/lib/timeline-editability.ts';
+import { deleteGestureCommands, moveGestureCommands, propertyGestureCommands, rightResizeGestureCommands } from '../commands/semanticGestures.ts';
 import { getAssetImmediateSource } from '../lib/asset-registry.ts';
 import { canonicalJsonStringify } from '../data/typed/timelineBundle.ts';
 import { useMemo } from 'react';
@@ -277,6 +278,16 @@ const getCurrentData = (state: CommandStoreState): TimelineData | null => {
 
 const getResolvedClip = (current: TimelineData, clipId: string) => {
   return current.resolvedConfig.clips.find((clip) => clip.id === clipId) ?? null;
+};
+
+// Tool inputs may request subframe times, unlike snapped pointer gestures.
+// Keep those on the existing route instead of silently rounding their intent.
+const toolMoveCommands = (current: TimelineData, clipId: string, start: number, track?: string) => {
+  const action = current.rows.flatMap((row) => row.actions).find((candidate) => candidate.id === clipId);
+  if (!action) return undefined;
+  const frames = Math.round((start - action.start) * current.output.fps);
+  if (roundTimelineValue(action.start + frames / current.output.fps) !== roundTimelineValue(start)) return undefined;
+  return moveGestureCommands(current, clipId, start, track);
 };
 
 const isPinnedGroupClip = (current: TimelineData, clipId: string): boolean => {
@@ -639,6 +650,20 @@ export function createTimelineCommands(
         ...input.patch,
         ...(typeof input.patch.at === 'number' ? { at: Math.max(0, roundTimelineValue(input.patch.at)) } : {}),
       }));
+      const { at, track, hold, ...properties } = input.patch;
+      const propertyCommands = propertyGestureCommands(current, input.clipId, properties);
+      const durationCommands = Object.prototype.hasOwnProperty.call(input.patch, 'hold')
+        ? typeof hold === 'number' && typeof current.config.clips.find((candidate) => candidate.id === input.clipId)?.hold === 'number'
+          ? rightResizeGestureCommands(current, input.clipId, hold, {}) : undefined
+        : [];
+      const moving = at !== undefined || track !== undefined;
+      const moveCommands = moving
+        ? isPinnedGroupClip(current, input.clipId) ? undefined
+          : toolMoveCommands(current, input.clipId,
+            typeof at === 'number' ? Math.max(0, roundTimelineValue(at)) : clip.at, track)
+        : [];
+      const editCommands = propertyCommands && moveCommands && durationCommands
+        ? [...moveCommands, ...durationCommands, ...propertyCommands] : undefined;
 
       return applyValidatedMutation(
         store,
@@ -651,6 +676,7 @@ export function createTimelineCommands(
         {
           selectedClipId: input.clipId,
           selectedTrackId: input.patch.track ?? clip.track,
+          editCommands: editCommands?.length ? editCommands : undefined,
         },
       );
     },
@@ -713,6 +739,7 @@ export function createTimelineCommands(
           selectedClipId: input.clipId,
           selectedTrackId: nextTrackId,
           semantic: true,
+          editCommands: toolMoveCommands(current, input.clipId, nextTime, nextTrackId),
         },
       );
     },
@@ -787,6 +814,8 @@ export function createTimelineCommands(
           selectedClipId: input.clipId,
           selectedTrackId: clip.track,
           semantic: true,
+          editCommands: isHoldClip(clip) && nextStart === currentStart
+            ? rightResizeGestureCommands(current, input.clipId, roundTimelineValue(nextEnd - nextStart), {}) : undefined,
         },
       );
     },
@@ -876,7 +905,7 @@ export function createTimelineCommands(
           metaDeletes: [input.clipId],
         },
         { clipId: input.clipId },
-        { semantic: true },
+        { semantic: true, editCommands: deleteGestureCommands(current, [input.clipId]) },
       );
     },
 

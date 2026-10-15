@@ -23,6 +23,8 @@ import { useTimelineTrackManagement } from './useTimelineTrackManagement.ts';
 import { buildKeyboardTimeNudgeEdit } from '../lib/keyboard-nudge.ts';
 import { expandTinyClip } from '../lib/expand-tiny-clip.ts';
 import { gestureCommandsFor } from '../commands/semanticGestures.ts';
+import { createTimelineCommands } from './useTimelineCommandsService.ts';
+import type { TimelineStoreApi } from './timelineStore.ts';
 import { useTimelineOps } from './useTimelineOps.ts';
 import { createProposalRuntime } from '../lib/proposal-runtime.ts';
 import { createTimelineReader } from '../lib/timeline-reader.ts';
@@ -753,6 +755,80 @@ describe('WRITERS tiny-clip context-menu writer', () => {
     const h = await setup(undefined, false, initial);
     act(() => expandTinyClip(h.result.current.dataRef, h.result.current.applyEdit, 'clip-1'));
     expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+});
+
+
+describe('WRITERS mounted tool command service', () => {
+  function commandsFor(h: Awaited<ReturnType<typeof setup>>) {
+    return createTimelineCommands({ getState: () => ({
+      data: { data: h.result.current.data, dataRef: h.result.current.dataRef },
+      ops: { applyEdit: h.result.current.applyEdit }, availability: { mounted: true },
+    }) } as unknown as TimelineStoreApi);
+  }
+  it.each(['updateClip', 'setClipParams', 'moveClip', 'deleteClip', 'combined update', 'trimClip', 'hold update'] as const)('%s reaches one generated commit from its actual public handler', async (writer) => {
+    const h = await setup();
+    const commands = commandsFor(h);
+    act(() => {
+      const result = writer === 'updateClip' ? commands.updateClip({ clipId: 'clip-1', patch: { opacity: 0.4 } })
+        : writer === 'setClipParams' ? commands.setClipParams({ clipId: 'clip-1', params: { data: 'Updated' } })
+        : writer === 'moveClip' ? commands.moveClip({ clipId: 'clip-1', time: 1.3, trackId: 'V2' })
+        : writer === 'deleteClip' ? commands.deleteClip({ clipId: 'clip-1' })
+        : writer === 'trimClip' ? commands.trimClip({ clipId: 'clip-1', endTime: 2.5 })
+        : writer === 'hold update' ? commands.updateClip({ clipId: 'clip-1', patch: { hold: 1.5 } })
+        : commands.updateClip({ clipId: 'clip-1', patch: { at: 1.3, track: 'V2', opacity: 0.4 } });
+      expect(result.ok).toBe(true);
+    });
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.compatibilityRequests).toEqual([]);
+    expect(h.requests[0].request.base_revision_id).toBe('parent-r1');
+    const scoped = { select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'] };
+    const property = { ...scoped, op: 'clip.set-look', args: { opacity: 0.4 }, expect: { opacity: { state: 'present', value: 0.9 } } };
+    const move = [
+      { ...scoped, op: 'clip.nudge', args: { frames: 9 }, expect: { at: { state: 'present', value: 1 }, 'app.astrid.on': { state: 'present', value: '"hello" +2f' }, 'app.astrid.until': { state: 'absent' } } },
+      { ...scoped, op: 'clip.set-track', args: { track: 'V2' }, expect: { track: { state: 'present', value: 'V1' } } },
+    ];
+    const expected = writer === 'updateClip' ? [property]
+      : writer === 'setClipParams' ? [{ ...scoped, op: 'clip.set-param', args: { path: 'data', value: 'Updated' }, expect: { 'params.data': { state: 'present', value: null } } }]
+      : writer === 'moveClip' ? move
+      : writer === 'deleteClip' ? [{ ...scoped, op: 'clip.remove', args: {}, expect: { '': { state: 'present', value: h.initial.config.clips[0] } } }]
+      : writer === 'trimClip' || writer === 'hold update' ? [{ ...scoped, op: 'clip.set-duration', args: { seconds: 1.5 }, expect: { hold: { state: 'present', value: 2 }, 'app.astrid.until': { state: 'absent' }, 'app.astrid.for': { state: 'absent' } } }]
+      : [...move, property];
+    expect(h.requests[0].request.change).toEqual({ commands: expected });
+    h.unmount();
+  });
+  it('keeps unsupported tool metadata on the whole-action fallback', async () => {
+    const h = await setup();
+    act(() => expect(commandsFor(h).updateClip({ clipId: 'clip-1', patch: { opacity: 0.3, text: { content: 'Legacy' } } }).ok).toBe(true));
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it('honors the existing read-only guard before building tool commands', async () => {
+    const h = await setup();
+    const commands = createTimelineCommands({ getState: () => ({ availability: { mounted: true } }) } as unknown as TimelineStoreApi,
+      { timelineEditability: { checkTimeline: () => ({ allowed: false, reason: 'read_only' }) } });
+    act(() => expect(commands.updateClip({ clipId: 'clip-1', patch: { opacity: 0.3 } }).ok).toBe(false));
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+});
+
+describe('WRITERS tool time precision', () => {
+  it('keeps a subframe tool move on its explicit fallback instead of silently rounding', async () => {
+    const h = await setup();
+    const commands = createTimelineCommands({ getState: () => ({
+      data: { data: h.result.current.data, dataRef: h.result.current.dataRef },
+      ops: { applyEdit: h.result.current.applyEdit }, availability: { mounted: true },
+    }) } as unknown as TimelineStoreApi);
+    act(() => expect(commands.moveClip({ clipId: 'clip-1', time: 1.31 }).ok).toBe(true));
+    expect(h.result.current.data!.config.clips[0].at).toBe(1.31);
     expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
     expect(h.requests).toHaveLength(0);
     h.unmount();
