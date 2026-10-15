@@ -1,4 +1,4 @@
-import { propertyGestureCommands } from '../../commands/semanticGestures.ts';
+import { detachAudioGestureCommands, propertyGestureCommands } from '../../commands/semanticGestures.ts';
 import { useCallback } from 'react';
 import { detachAudioFromVideo } from '@/tools/video-editor/lib/editor-utils.ts';
 import type { ClipMeta } from '@/tools/video-editor/lib/timeline-data.ts';
@@ -51,13 +51,29 @@ export function useClipAudioManagement(ctx: ClipEditingContext) {
       return;
     }
 
-    const nextConfig = detachAudioFromVideo(resolvedConfig, clipId);
+    let nextConfig = detachAudioFromVideo(resolvedConfig, clipId);
     if (nextConfig === resolvedConfig) {
       return;
     }
 
-    applyConfigEdit(nextConfig, { selectedClipId: clipId });
-  }, [applyConfigEdit, resolvedConfig]);
+    const current = dataRef.current;
+    const source = current?.config.clips.find((clip) => clip.id === clipId);
+    const child = nextConfig.clips.find((clip) => !resolvedConfig.clips.some((before) => before.id === clip.id));
+    const editCommands = current && child
+      ? detachAudioGestureCommands(current, clipId, child.id, child.track) : undefined;
+    if (source && child && editCommands) {
+      // Match clip.detach-audio: clone the authored source, retaining its anchor,
+      // range, gain, and opaque siblings; only cut/sequence ownership is removed.
+      const astrid = { ...(source.app?.astrid as Record<string, unknown> | undefined) };
+      for (const key of ['cut', 'layer', 'sequence', 'sequence_index']) delete astrid[key];
+      const detached = {
+        ...source, id: child.id, track: child.track,
+        ...(source.app ? { app: { ...source.app, ...(source.app.astrid ? { astrid } : {}) } } : {}),
+      };
+      nextConfig = { ...nextConfig, clips: nextConfig.clips.map((clip) => clip.id === child.id ? detached : clip) };
+    }
+    applyConfigEdit(nextConfig, { selectedClipId: clipId, semantic: true, editCommands });
+  }, [applyConfigEdit, dataRef, resolvedConfig]);
 
   return { handleToggleMuteClips, handleToggleMute, handleDetachAudioClip };
 }

@@ -1,4 +1,4 @@
-import { rightResizeGestureCommands } from '../commands/semanticGestures.ts';
+import { rightResizeGestureCommands, tiedEndResizeGesture } from '../commands/semanticGestures.ts';
 import { useCallback, useRef } from 'react';
 import { buildRowTrackPatches } from '@/tools/video-editor/lib/coordinate-utils.ts';
 import type {
@@ -357,6 +357,14 @@ export function useClipResize({
       session.edge,
     );
 
+    const tiedEnd = session.edge === 'right' && effectiveStart === primary.origin.start
+      ? tiedEndResizeGesture(current, session.clipId, effectiveEnd - effectiveStart) : undefined;
+    if (tiedEnd === null) {
+      clearResizeTracking(session.clipId);
+      return;
+    }
+    if (tiedEnd) primaryPatch.app = { ...primary.clipMeta.app, astrid: tiedEnd.astrid };
+
     applyEdit({
       type: 'rows',
       rows: resolvedRows,
@@ -369,10 +377,10 @@ export function useClipResize({
       ),
     }, {
       transactionId,
-      editCommands: session.edge === 'right' && effectiveStart === primary.origin.start
+      editCommands: tiedEnd?.commands ?? (session.edge === 'right' && effectiveStart === primary.origin.start
         && Object.keys(overlapPatches).length === 0
         ? rightResizeGestureCommands(current, session.clipId, effectiveEnd - effectiveStart, primaryPatch)
-        : undefined,
+        : undefined),
     });
 
     clearResizeTracking(session.clipId);

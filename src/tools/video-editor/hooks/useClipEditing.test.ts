@@ -55,10 +55,11 @@ const makePinnedGroup = (args: {
 });
 
 const makeTimelineData = (overrides?: {
+  config?: TimelineConfig;
   rows?: TimelineRow[];
   meta?: Record<string, ClipMeta>;
 }): TimelineData => ({
-  config: { output: { resolution: '1920x1080', fps: 30, file: 'out.mp4' }, clips: [] },
+  config: overrides?.config ?? { output: { resolution: '1920x1080', fps: 30, file: 'out.mp4' }, clips: [] },
   configVersion: 1,
   registry: { assets: {} },
   resolvedConfig: { output: { resolution: '1920x1080', fps: 30, file: 'out.mp4' }, tracks: [], clips: [], registry: {} },
@@ -133,6 +134,9 @@ describe('useClipEditing duration recalculation', () => {
     const applyEdit = vi.fn();
     const dataRef = {
       current: makeTimelineData({
+        config: { output: { resolution: '1920x1080', fps: 30, file: 'out.mp4' }, clips: [
+          { id: 'clip-1', at: 0, track: 'V1', clipType: 'media', from: 0, to: 4, speed: 1 },
+        ] },
         rows: [{ id: 'V1', actions: [{ id: 'clip-1', start: 0, end: 4, effectId: 'effect-clip-1' }] }],
         meta: { 'clip-1': { track: 'V1', from: 0, to: 4, speed: 1 } },
       }),
@@ -157,13 +161,18 @@ describe('useClipEditing duration recalculation', () => {
       type: 'rows',
       rows: [{ id: 'V1', actions: [{ id: 'clip-1', start: 0, end: 2, effectId: 'effect-clip-1' }] }],
       metaUpdates: { 'clip-1': { speed: 2 } },
-    });
+    }, { editCommands: [{ op: 'clip.set-look', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'],
+      args: { speed: 2 }, expect: { speed: { state: 'present', value: 1 } } }] });
   });
 
   it('recalculates action.end for bulk duration edits', () => {
     const applyEdit = vi.fn();
     const dataRef = {
       current: makeTimelineData({
+        config: { output: { resolution: '1920x1080', fps: 30, file: 'out.mp4' }, clips: [
+          { id: 'clip-1', at: 0, track: 'V1', clipType: 'media', from: 0, to: 4, speed: 1 },
+          { id: 'clip-2', at: 4, track: 'V1', clipType: 'media', from: 0, to: 3, speed: 1 },
+        ] },
         rows: [
           {
             id: 'V1',
@@ -210,7 +219,10 @@ describe('useClipEditing duration recalculation', () => {
         'clip-1': { speed: 2 },
         'clip-2': { speed: 2 },
       },
-    });
+    }, { editCommands: ['clip-1', 'clip-2'].map((id) => ({ op: 'clip.set-look',
+      select: `parent/clip:${id}`, resolved: [`parent/clip:${id}`], args: { speed: 2 },
+      expect: { speed: { state: 'present', value: 1 } },
+    })) });
   });
 });
 
@@ -262,7 +274,11 @@ describe('useClipEditing pinned group guards', () => {
       type: 'rows',
       rows: [{ id: 'V1', actions: [] }],
       metaDeletes: ['clip-1', 'clip-2'],
-    }, { semantic: true });
+    }, { semantic: true, editCommands: dataRef.current.config.clips.map((clip) => ({
+      op: 'clip.remove', select: `parent/clip:${clip.id}`, resolved: [`parent/clip:${clip.id}`],
+      args: {}, expect: { '': { state: 'present', value: clip } },
+    })) });
+    expect(applyEdit).toHaveBeenCalledOnce();
   });
 
   it('blocks grouped clip deletion outside the shot menu path', () => {

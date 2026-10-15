@@ -369,3 +369,190 @@ describe('main-editor semantic gesture wire adaptation', () => {
     h.unmount();
   });
 });
+
+
+const authoredRelations = [
+  ['word', { on: '"hello" +2f', until: 'after "hello"' }],
+  ['music', { on: 'beat 2', until: 'beat 4' }],
+  ['neighbour', { on: 'c2', until: 'end of c2' }],
+  ['sequence step', { on: 'c2 +2f', until: 'end of c2', sequence: { id: 'steps', index: 1 } }],
+] as const;
+async function relationData(astrid: Record<string, unknown>) {
+  const base = await initialData();
+  return buildTimelineData({ ...base.config, clips: base.config.clips.map((clip) => clip.id === 'clip-1'
+    ? { ...clip, app: { ...clip.app, astrid } } : clip) }, base.registry, undefined, 1, undefined, base.head);
+}
+function resizeFirst(h: Awaited<ReturnType<typeof setup>>, end = 6) {
+  const row = h.result.current.data!.rows[0];
+  const action = row.actions.find((candidate) => candidate.id === 'clip-1')!;
+  act(() => h.result.current.resize.onActionResizeStart({ action, row, dir: 'right' }));
+  act(() => h.result.current.resize.onClipEdgeResizeEnd({
+    session: { pointerId: 1, rowId: 'V1', clipId: 'clip-1', edge: 'right', cursorOffsetPx: 0,
+      initialBoundaryTime: 3, context: { kind: 'free', clipId: 'clip-1', initialStart: 1, initialEnd: 3 }, siblingTimes: [] },
+    updates: [{ clipId: 'clip-1', start: 1, end }], cancelled: false,
+  }));
+}
+describe('authored end relation choices through the main resize handler', () => {
+  for (const [relation, astrid] of authoredRelations) {
+    it.each(['keep', null, 'unknown'])(`${relation} overlap choice %s keeps the captured base and sends nothing`, async (choice) => {
+      const initial = await relationData(astrid);
+      const prompt = vi.spyOn(window, 'prompt').mockReturnValue(choice);
+      const h = await setup(undefined, false, initial);
+      resizeFirst(h);
+      expect(prompt).toHaveBeenCalledOnce();
+      expect(prompt.mock.calls[0][0]).toContain(astrid.until);
+      expect(h.result.current.data).toBe(initial);
+      expect(h.result.current.editSeqRef.current).toBe(0);
+      expect(h.requests).toHaveLength(0);
+      h.unmount();
+    });
+    it.each(['detach', 'adjust-offset', 're-anchor'])(`${relation} overlap choice %s sends one captured command`, async (choice) => {
+      const prompt = vi.spyOn(window, 'prompt').mockReturnValueOnce(choice).mockReturnValueOnce('beat 8');
+      const initial = await relationData(astrid);
+      const h = await setup(undefined, false, initial);
+      resizeFirst(h);
+      await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+      expect(h.requests).toHaveLength(1);
+      const op = choice === 'detach' ? 'clip.set-duration' : 'clip.until';
+      const args = choice === 'detach' ? { seconds: 4 }
+        : { moment: choice === 're-anchor' ? 'beat 8' : `${astrid.until} +60f` };
+      expect(h.requests[0].request.change).toEqual({ commands: [{
+        op, select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args,
+        expect: { at: { state: 'present', value: 1 }, hold: { state: 'present', value: 2 },
+          'app.astrid.on': { state: 'present', value: astrid.on },
+          'app.astrid.until': { state: 'present', value: astrid.until }, 'app.astrid.for': { state: 'absent' } },
+      }] });
+      const clip = h.result.current.data!.config.clips.find((clip) => clip.id === 'clip-1')!;
+      expect(clip.hold).toBe(4);
+      expect(clip.app?.clipSentinel).toBe(true);
+      const writtenIntent = clip.app?.astrid as Record<string, unknown> | undefined;
+      expect(writtenIntent?.on).toBe(astrid.on);
+      if (choice === 'detach') {
+        expect(clip.app?.astrid).not.toHaveProperty('until');
+        expect(writtenIntent?.for).toBe(4);
+      } else expect(writtenIntent?.until).toBe(args.moment);
+      expect(prompt).toHaveBeenCalledTimes(choice === 're-anchor' ? 2 : 1);
+      h.unmount();
+    });
+    it(`${relation} plain drag preserves its start tie without showing a choice`, async () => {
+      const { until: _until, ...startRelation } = astrid;
+      const initial = await relationData(startRelation);
+      const prompt = vi.spyOn(window, 'prompt');
+      const h = await setup(undefined, false, initial);
+      act(() => h.result.current.editing.handleSelectedClipChange({ at: 1.3 }));
+      await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+      expect(h.requests).toHaveLength(1);
+      expect(h.requests[0].request.change).toEqual({ commands: [expect.objectContaining({
+        op: 'clip.nudge', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args: { frames: 9 },
+        expect: { at: { state: 'present', value: 1 }, 'app.astrid.on': { state: 'present', value: astrid.on },
+          'app.astrid.until': { state: 'absent' } },
+      })] });
+      expect(prompt).not.toHaveBeenCalled();
+      h.unmount();
+    });
+  }
+  it('an unchanged tied end sends nothing without prompting', async () => {
+    const prompt = vi.spyOn(window, 'prompt');
+    const initial = await relationData({ on: 'beat 2', until: 'beat 4' });
+    const h = await setup(undefined, false, initial);
+    resizeFirst(h, 3);
+    expect(prompt).not.toHaveBeenCalled();
+    expect(h.result.current.data).toBe(initial);
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it('an end choice captures present-null for separately from absence', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('detach');
+    const h = await setup(undefined, false, await relationData({ on: 'beat 2', until: 'beat 4', for: null }));
+    resizeFirst(h, 3.5);
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.requests[0].request.change).toEqual({ commands: [expect.objectContaining({
+      op: 'clip.set-duration', args: { seconds: 2.5 },
+      expect: expect.objectContaining({ 'app.astrid.for': { state: 'present', value: null } }),
+    })] });
+    h.unmount();
+  });
+  it('cancelling a re-anchor sends nothing', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValueOnce('re-anchor').mockReturnValueOnce(null);
+    const initial = await relationData({ on: 'beat 2', until: 'beat 4' });
+    const h = await setup(undefined, false, initial);
+    resizeFirst(h);
+    expect(h.result.current.data).toBe(initial);
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it('an offset choice retains existing frame and second offsets as authored TimeRef text', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue('adjust-offset');
+    const h = await setup(undefined, false, await relationData({ on: 'beat 2', until: 'beat 4 +2f -0.1s' }));
+    resizeFirst(h, 2.5);
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests[0].request.change).toEqual({ commands: [expect.objectContaining({
+      op: 'clip.until', args: { moment: 'beat 4 +2f -0.1s -15f' },
+    })] });
+    h.unmount();
+  });
+});
+async function videoData(audioTrack: boolean) {
+  const base = await initialData(true);
+  return buildTimelineData({ ...base.config,
+    tracks: [...base.config.tracks!, ...(audioTrack ? [{ id: 'A1', kind: 'audio' as const, label: 'Audio' }] : [])],
+    clips: base.config.clips.map((clip) => clip.id === 'clip-1' ? { ...clip, asset: 'video', volume: 0.7,
+      app: { ...clip.app, astrid: { on: '"hello" +2f', cut: 'c2', layer: 'picture', sequence: { id: 'steps', index: 0 } } },
+    } : clip),
+  }, { assets: { video: { file: 'https://fixture.test/video.mp4', type: 'video/mp4', duration: 10 } } }, undefined, 1, undefined, base.head);
+}
+describe('supported detach and explicit unconverted structural seams', () => {
+  it('audio detach into an existing track emits one command with the exact allocated child and captured source', async () => {
+    const initial = await videoData(true);
+    const h = await setup(undefined, true, initial);
+    act(() => h.result.current.editing.handleDetachAudioClip('clip-1'));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    const child = h.result.current.data!.config.clips.find((clip) => !initial.config.clips.some((before) => before.id === clip.id))!;
+    expect(h.requests[0].request.change).toEqual({ commands: [{
+      op: 'clip.detach-audio', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'],
+      args: { track: 'A1' }, created: [`parent/clip:${child.id}`],
+      expect: { '': { state: 'present', value: initial.config.clips.find((clip) => clip.id === 'clip-1') } },
+    }] });
+    expect(child).toMatchObject({ asset: 'video', from: 2, to: 6, speed: 2, volume: 0.7, track: 'A1',
+      app: { clipSentinel: true, astrid: { on: '"hello" +2f' } } });
+    expect(child).toEqual({ ...initial.config.clips.find((clip) => clip.id === 'clip-1'),
+      id: child.id, track: 'A1', app: { clipSentinel: true, astrid: { on: '"hello" +2f' } },
+    });
+    for (const key of ['cut', 'layer', 'sequence', 'sequence_index']) expect(child.app?.astrid).not.toHaveProperty(key);
+    expect(h.result.current.data!.config.clips.find((clip) => clip.id === 'clip-1')?.volume).toBe(0);
+    h.unmount();
+  });
+  it('audio detach that creates a track retains its existing unconverted edit path', async () => {
+    const h = await setup(undefined, true, await videoData(false));
+    act(() => h.result.current.editing.handleDetachAudioClip('clip-1'));
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.result.current.data!.tracks.some((track) => track.id === 'A1')).toBe(true);
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it('split retains its existing local edit without inventing clip.split or cut.split', async () => {
+    const h = await setup();
+    act(() => h.result.current.editing.handleSplitClipAtTime('clip-1', 2));
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(h.result.current.data!.config.clips).toHaveLength(3);
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it.each(['add', 'reorder', 'remove', 'property'] as const)('track %s retains its explicit unconverted path', async (operation) => {
+    const h = await setup();
+    act(() => {
+      if (operation === 'add') h.result.current.tracks.handleAddTrack('audio');
+      if (operation === 'reorder') h.result.current.tracks.handleMoveTrack('V1', 'V2');
+      if (operation === 'remove') h.result.current.tracks.handleRemoveTrack('V2');
+      if (operation === 'property') h.result.current.tracks.handleTrackPopoverChange('V1', { label: 'Changed' });
+    });
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+});

@@ -72,6 +72,55 @@ export function deleteGestureCommands(data: TimelineData, ids: string[]): EditCo
     return command(id, 'clip.remove', {}, { '': state(clip, true) });
   });
 }
+
+/** The existing runner allocates this exact child via OpCall.created. */
+export function detachAudioGestureCommands(data: TimelineData, id: string, childId: string, track: string): EditCommand[] | undefined {
+  const clip = originalClip(data, id);
+  if (clip.clipType !== 'media' || !childId || childId.includes('/')
+    || !data.config.tracks?.some((candidate) => candidate.id === track && candidate.kind === 'audio')) return undefined;
+  const source = scopedGestureClipId(id);
+  const created = `${source.slice(0, source.lastIndexOf('/'))}/clip:${childId}`;
+  return [{ ...command(id, 'clip.detach-audio', { track }, { '': state(clip, true) }), created: [created] }];
+}
+
+/** Only a hold's authored end relation has the admitted duration/until choices.
+ * Moment parsing and resolving remain with Astrid. Its TimeRef grammar accepts
+ * successive offsets, so appending frames preserves the exact original anchor.
+ */
+export function tiedEndResizeGesture(data: TimelineData, id: string, duration: number): {
+  commands: EditCommand[]; astrid: Record<string, unknown>;
+} | null | undefined {
+  const clip = originalClip(data, id);
+  const intent = clip.app?.astrid as Record<string, unknown> | undefined;
+  if (typeof clip.hold !== 'number' || typeof intent?.until !== 'string' || !intent.until) return undefined;
+  const action = data.rows.flatMap((row) => row.actions).find((candidate) => candidate.id === id);
+  if (!action) return undefined;
+  if (Math.abs(duration - (action.end - action.start)) < 1e-7) return null;
+  const choice = window.prompt(`The end of ${id} is tied to ${intent.until}. Choose keep to leave it unchanged, detach for a fixed duration, adjust-offset to keep the anchor, or re-anchor to choose another end anchor. Cancel leaves the clip unchanged.`, 'keep');
+  if (choice === null || choice === 'keep') return null;
+  const expect = {
+    at: state(clip.at, hasOwn(clip, 'at')),
+    hold: state(clip.hold, true),
+    'app.astrid.on': state(intent.on, hasOwn(intent, 'on')),
+    'app.astrid.until': state(intent.until, true),
+    'app.astrid.for': state(intent.for, hasOwn(intent, 'for')),
+  };
+  if (choice === 'detach') {
+    const { until: _until, ...astrid } = intent;
+    return { commands: [command(id, 'clip.set-duration', { seconds: duration }, expect)], astrid: { ...astrid, for: duration } };
+  }
+  let moment: string;
+  if (choice === 'adjust-offset') {
+    const frames = Math.round((duration - (action.end - action.start)) * data.output.fps);
+    moment = `${intent.until} ${frames < 0 ? '' : '+'}${frames}f`;
+  } else if (choice === 're-anchor') {
+    const answer = window.prompt('New end anchor (for example "hello", beat 4, or end of c2)', intent.until);
+    if (!answer?.trim()) return null;
+    moment = answer.trim();
+  } else return null;
+  const { for: _for, ...astrid } = intent;
+  return { commands: [command(id, 'clip.until', { moment }, expect)], astrid: { ...astrid, until: moment } };
+}
 export function moveGestureCommands(data: TimelineData, id: string, start: number, track?: string): EditCommand[] | undefined {
   const clip = originalClip(data, id);
   const action = data.rows.flatMap((row) => row.actions).find((candidate) => candidate.id === id);
