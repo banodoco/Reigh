@@ -18,6 +18,10 @@ import {
   normalizeClipTransition,
 } from '@/tools/video-editor/transitions/catalog.ts';
 
+// Strict authoring admission is distinct from legacy validation/repair below:
+// shared ownership/overlap refusals must never become repair patches.
+export { prepareTransitionTrackForAuthoring } from './declaration.ts';
+
 // ---------------------------------------------------------------------------
 // Diagnostic codes
 // ---------------------------------------------------------------------------

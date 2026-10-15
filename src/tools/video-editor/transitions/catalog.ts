@@ -22,6 +22,10 @@ import type { TransitionRenderer } from '@/tools/video-editor/effects/transition
 import type { ClipTransition, ParameterSchema } from '@/tools/video-editor/types/index.ts';
 import type { ParameterDefinition } from '@/tools/video-editor/types/index.ts';
 
+// Explicit shared declaration conversion for new authoring. Legacy catalog
+// normalization below remains unchanged.
+export { declareClipTransition } from './declaration.ts';
+
 // ---------------------------------------------------------------------------
 // Built-in transition records
 // ---------------------------------------------------------------------------
