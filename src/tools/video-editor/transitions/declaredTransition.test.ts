@@ -127,6 +127,44 @@ function captureError(run: () => unknown): any {
 }
 
 describe('admitted App transition binding', () => {
+  it('forwards the persisted revision unchanged to a binding-aware six-argument producer', () => {
+    const { record } = registerContribution();
+    const binding = bindingFor(record);
+    const persisted = { type: TRANSITION_ID, revision: binding.revision, duration: 0.5, params: {} };
+    let calls = 0;
+    function bindingAwareProducer(
+      trackId: string,
+      clipId: string,
+      transition: { type: string; revision?: string; duration: number; params?: Record<string, unknown> },
+      fps: number,
+      host: string,
+      contribution?: typeof binding,
+    ) {
+      calls += 1;
+      expect(transition).toEqual(persisted);
+      expect(transition.revision).toBe(persisted.revision);
+      expect(contribution).toBe(binding);
+      // This App vendor still has the legacy API; the run-owned proof also
+      // exercises the current real six-argument producer without translation.
+      return assignedWorktreeProducer(trackId, clipId, {
+        ...transition,
+        type: binding.resource.implementation.id,
+      }, fps, host);
+    }
+    expect(bindingAwareProducer.length).toBe(6);
+    const declaration = declareRegisteredTransition({
+      record,
+      transition: persisted,
+      owner: { trackId: 'V1', clipId: 'outgoing' },
+      binding,
+      fps: 30,
+      host: 'timeline-composition',
+    }, bindingAwareProducer);
+    expect(calls).toBe(1);
+    expect(declaration.contribution).toBe(binding);
+    expect(declaration.spec).toEqual({ T: 15, kind: 'dissolve', align: 'end' });
+  });
+
   it('activates the declared contribution, freezes its resource and reaches the assigned producer and planner', () => {
     const { record, registry } = registerContribution();
     const binding = bindingFor(record);

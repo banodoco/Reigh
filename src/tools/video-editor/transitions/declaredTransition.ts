@@ -155,6 +155,7 @@ export function declareRegisteredTransition(
     owner.clipId,
     {
       type: bindingAwareProducer ? transition.type : binding.resource.implementation.id,
+      ...(bindingAwareProducer ? { revision: transition.revision } : {}),
       duration: transition.duration,
       ...(params !== undefined ? { params } : {}),
     },
