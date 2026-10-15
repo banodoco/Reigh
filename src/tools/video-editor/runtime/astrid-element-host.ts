@@ -9,6 +9,8 @@ export type AstridElementComponentProps = {
   params: Record<string, unknown>;
   theme: RuntimeTheme;
   fps: number;
+  /** Existing root frame; independent of clip-local/transition pose time. */
+  globalFrame?: number;
   assetEntry?: ResolvedTimelineClip['assetEntry'];
   children?: ReactNode;
 };

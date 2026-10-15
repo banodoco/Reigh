@@ -58,6 +58,9 @@ import { resolveEndSpanningLayerPreviewParams } from '@/tools/video-editor/seque
 import { projectOutputTimelineConfig } from '@/tools/video-editor/data/timelineOutputProjection.ts';
 
 const AstridElementHostContext = createContext<AstridElementHost | null>(null);
+// Preserve the root composition frame through clip Sequences and freezes.
+// Authored beat loops consume this frame; their pose keys keep the local clock.
+const MotionGlobalFrameContext = createContext<number | undefined>(undefined);
 const useAstridElementHost = () => requireAstridElementHost(useContext(AstridElementHostContext));
 const resolveHostComponent = (host: AstridElementHost, ref: NonNullable<ResolvedTimelineClip['elementRef']>) => (
   ref.packId ? host.resolveComponent(ref.id, ref.kind, ref.packId) : host.resolveComponent(ref.id, ref.kind)
@@ -300,17 +303,22 @@ const ThemePackageComponent: FC<{
     params: unknown;
     theme: RuntimeTheme;
     fps: number;
+    globalFrame?: number;
     assetEntry?: ResolvedTimelineClip['assetEntry'];
   }>;
   clip: ResolvedTimelineClip;
   fps: number;
 }> = ({ component: Component, clip, fps }) => {
   const theme = useTheme();
+  const rootFrame = useContext(MotionGlobalFrameContext);
+  // This host's Sequence premounts invisibly at local frame zero. Prepare the
+  // first own frame there; visible frames still sample the actual music time.
+  const globalFrame = rootFrame === undefined ? undefined : Math.max(Math.round(clip.at * fps), rootFrame);
   // `file` is the persisted locator; `src` is the host-resolved browser URL.
   // Pack effects consume the component contract's `assetEntry.file`, so make
   // the resolved URL the file presented to them without mutating timeline data.
   const assetEntry = resolveAstridComponentAssetEntry(clip.assetEntry);
-  return <Component clip={clip} params={clip.params} theme={theme} fps={fps} assetEntry={assetEntry} />;
+  return <Component clip={clip} params={clip.params} theme={theme} fps={fps} globalFrame={globalFrame} assetEntry={assetEntry} />;
 };
 
 const ThemeEffectSequence: FC<ThemeEffectSequenceProps> = ({ clip, fps, theme, dynamicEntries }) => {
@@ -325,6 +333,7 @@ const ThemeEffectSequence: FC<ThemeEffectSequenceProps> = ({ clip, fps, theme, d
       params: unknown;
       theme: RuntimeTheme;
       fps: number;
+      globalFrame?: number;
       assetEntry?: ResolvedTimelineClip['assetEntry'];
     }>
     | undefined;
@@ -460,10 +469,13 @@ const AstridEffectPreviewSequence: FC<{
     params: Record<string, unknown>;
     theme: RuntimeTheme;
     fps: number;
+    globalFrame?: number;
     assetEntry?: ResolvedTimelineClip['assetEntry'];
   }>;
 }> = ({ clip, fps, theme, assetEntry, resolvedAssets, component }) => {
   const host = useAstridElementHost();
+  const rootFrame = useContext(MotionGlobalFrameContext);
+  const globalFrame = rootFrame === undefined ? undefined : Math.max(0, Math.round(clip.at * fps), rootFrame);
   const Component = component ?? (clip.elementRef
     ? resolveHostComponent(host, clip.elementRef)
     : undefined);
@@ -491,6 +503,7 @@ const AstridEffectPreviewSequence: FC<{
           params={params}
           theme={theme}
           fps={fps}
+          globalFrame={globalFrame}
           assetEntry={resolveAstridComponentAssetEntry(assetEntry)}
         />
       </ThemeProvider>
@@ -1864,8 +1877,9 @@ const TimelineRendererBody: FC<{ config: ResolvedTimelineConfig }> = memo(({ con
 });
 
 export const TimelineRenderer: FC<{ config: ResolvedTimelineConfig; astridElementHost?: AstridElementHost }> = memo(({ config, astridElementHost }) => {
+  const globalFrame = useCurrentFrame();
   const runtime = useContext(VideoEditorRuntimeContext);
   const inheritedHost = useContext(AstridElementHostContext);
   const host = requireAstridElementHost(astridElementHost ?? inheritedHost ?? runtime?.astridElementHost);
-  return <AstridElementHostContext.Provider value={host}><TimelineRendererBody config={config} /></AstridElementHostContext.Provider>;
+  return <AstridElementHostContext.Provider value={host}><MotionGlobalFrameContext.Provider value={globalFrame}><TimelineRendererBody config={config} /></MotionGlobalFrameContext.Provider></AstridElementHostContext.Provider>;
 });
