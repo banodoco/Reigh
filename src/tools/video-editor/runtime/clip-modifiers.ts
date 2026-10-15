@@ -50,7 +50,7 @@ export function composeAppClipModifiers({ clip, content, frame, fps, bounds, hos
     context: {
       clip, fps, frame,
       keyframeFrame: spriteKeyframeFrame(clip, frame, fps),
-      keyframeTime: timelineKeyframeTime(clip, host.globalFrame / fps),
+      keyframeTime: timelineKeyframeTime(clip, clip.at + frame / fps),
       globalFrame: host.globalFrame,
       bounds,
       theme: host.theme,

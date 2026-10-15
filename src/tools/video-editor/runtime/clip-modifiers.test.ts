@@ -56,7 +56,17 @@ test('App adapter reuses supplied frozen and transition-handle frames without tr
     assert.ok(isValidElement<ModifierProps<{ strength: number }>>(output));
     assert.equal(output.props.context.frame, frame);
     assert.equal(output.props.context.keyframeFrame, frame - 5);
+    assert.ok(Math.abs(output.props.context.keyframeTime - (frame / 20 - .25)) < 1e-12);
     assert.equal(output.props.context.globalFrame, 50);
+  }
+  // Incoming/outgoing hosts can freeze the target at a boundary while the
+  // root music frame keeps moving. Every key clock follows that same target.
+  for (const [frame, globalFrame] of [[0, 35], [39, 100]]) {
+    const output = run(undefined, frame, { ...host, globalFrame });
+    assert.ok(isValidElement<ModifierProps<{ strength: number }>>(output));
+    assert.ok(Math.abs(output.props.context.keyframeTime - (frame / 20 - .25)) < 1e-12);
+    assert.equal(output.props.context.keyframeFrame, frame - 5);
+    assert.equal(output.props.context.globalFrame, globalFrame);
   }
 });
 
