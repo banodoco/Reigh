@@ -20,6 +20,7 @@ import type {
   TimelineShaderScope,
   TrackDefinition,
 } from '../types/index.ts';
+import { getAstridConfigCompatibilityIssues } from './astridConfigCompatibility.ts';
 import { validateAssetMetadata } from './assetMetadata';
 import { getAssetResolutionToken } from './asset-registry.ts';
 import {
@@ -66,6 +67,10 @@ export type TimelineDomainIssueCode =
   | 'live_binding_missing_source_kind'
   | 'live_binding_unsupported_source_kind'
   | 'live_binding_sample_payload_rejected'
+  | 'astrid_namespace_malformed'
+  | 'astrid_format_version_unsupported'
+  | 'astrid_music_beds_version_mismatch'
+  | 'astrid_music_beds_malformed'
   | 'shader_scope_occupied'
   | 'track_scale_positions_baked';
 
@@ -2525,6 +2530,16 @@ const validateSerializedConfig = (
   level: TimelineDomainContractLevel,
 ): TimelineDomainValidationResult => {
   const issues: TimelineDomainIssue[] = [];
+
+  for (const issue of getAstridConfigCompatibilityIssues(config)) {
+    issues.push(createIssue(
+      level,
+      'error',
+      issue.code as TimelineDomainIssueCode,
+      issue.message ?? 'Astrid timeline compatibility check failed.',
+      { ...(issue.pointer ? { path: issue.pointer } : {}) },
+    ));
+  }
 
   const topLevelKeys = Object.keys(config);
   for (const key of topLevelKeys) {

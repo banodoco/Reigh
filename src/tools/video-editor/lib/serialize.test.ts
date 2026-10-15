@@ -359,6 +359,88 @@ describe('video-editor serialization', () => {
     expect(serialized.app).not.toBe(config.app);
   });
 
+  it('preserves the v2 authored music carrier and nested opaque source fields', () => {
+    const config: TimelineConfig = {
+      output: { resolution: '1280x720', fps: 30, file: 'output.mp4' },
+      tracks: [{ id: 'A1', kind: 'audio', label: 'A1' }],
+      clips: [],
+      app: {
+        astrid: {
+          v: 2,
+          music_beds: {
+            'timeline:music-original': {
+              owner: 'timeline:music-original',
+              source: {
+                id: 'music-original',
+                track: 'A1',
+                asset: 'music-asset',
+                at: 0,
+                from: 0,
+                to: 12,
+                app: { vendor: { nested: { revision: { opaque: [1, 'x', null] } } } },
+              },
+              ripple_basis: [{ at_s: 4.25, delta_s: 2 }],
+              outputs: ['music-original', 'music-original:cut-1'],
+              future_metadata: { preserve: true },
+            },
+          },
+          vendor_extension: { clear: null, nested: [{ untouched: true }] },
+        },
+      },
+    };
+    const originalAstridJson = JSON.stringify(config.app?.astrid);
+
+    expect(validateTimelineConfigSnapshot(config).ok).toBe(true);
+    const serialized = serializeTimelineConfigSnapshot(config).config;
+    expect(JSON.stringify(serialized.app?.astrid)).toBe(originalAstridJson);
+    expect(serialized.app?.astrid).not.toBe(config.app?.astrid);
+  });
+
+  it('keeps legacy Astrid v0/v1 and carrier-absence serialization unchanged', () => {
+    const configFor = (version: number): TimelineConfig => ({
+      output: { resolution: '1280x720', fps: 30, file: 'output.mp4' },
+      tracks: [{ id: 'V1', kind: 'visual', label: 'V1' }],
+      clips: [{ id: 'clip-1', at: 0, track: 'V1', clipType: 'hold', hold: 1 }],
+      app: { astrid: { v: version, legacy_metadata: { keep: [1, 2, 3] } } },
+    });
+
+    for (const version of [0, 1]) {
+      const config = configFor(version);
+      const before = JSON.stringify(config.app);
+      const serialized = serializeTimelineConfigSnapshot(config).config;
+      expect(JSON.stringify(serialized.app)).toBe(before);
+      expect(serialized.app?.astrid).not.toHaveProperty('music_beds');
+    }
+
+    const absent = {
+      output: { resolution: '1280x720', fps: 30, file: 'output.mp4' },
+      tracks: [{ id: 'V1', kind: 'visual', label: 'V1' }],
+      clips: [],
+    } satisfies TimelineConfig;
+    expect(serializeTimelineConfigSnapshot(absent).config).not.toHaveProperty('app');
+  });
+
+  it('rejects unsupported or malformed Astrid version/carrier combinations', () => {
+    const base = {
+      output: { resolution: '1280x720', fps: 30, file: 'output.mp4' },
+      tracks: [{ id: 'V1', kind: 'visual', label: 'V1' }],
+      clips: [],
+    };
+    const invalidAstridValues = [
+      { v: 2 },
+      { v: 1, music_beds: {} },
+      { v: 3 },
+      { v: 2, music_beds: [] },
+      null,
+    ];
+
+    for (const astrid of invalidAstridValues) {
+      const config = { ...base, app: { astrid } } as unknown as TimelineConfig;
+      expect(validateTimelineConfigSnapshot(config).ok).toBe(false);
+      expect(() => serializeTimelineConfigSnapshot(config)).toThrow(TimelineDomainError);
+    }
+  });
+
   it('round-trips clip-level app extension data through validation and serialization', () => {
     const config: TimelineConfig = {
       output: { resolution: '1280x720', fps: 30, file: 'output.mp4' },

@@ -55,6 +55,7 @@ import {
 } from '@/shared/lib/media/localHandleStore.ts';
 import { generateUUID } from '@/shared/lib/taskCreation/ids.ts';
 import { withDefaultTimelineOutput } from '@/tools/video-editor/lib/defaults.ts';
+import { assertSupportedAstridConfig } from '@/tools/video-editor/lib/astridConfigCompatibility.ts';
 import {
   parseTimelineBundle,
   type TimelineBundleEnvelope,
@@ -210,6 +211,7 @@ const normalizeConfig = (value: unknown): TimelineConfig => {
   if (!value || typeof value !== 'object') {
     throw new Error('Astrid bridge timeline payload is missing config');
   }
+  assertSupportedAstridConfig(value);
   return withDefaultTimelineOutput(clone(value as TimelineConfig));
 };
 
@@ -573,6 +575,9 @@ export class AstridBridgeDataProvider implements DataProvider {
     registry?: AssetRegistry,
     bundle?: TimelineBundleEnvelope | null,
   ): Promise<number> {
+    // Refuse unsupported or malformed Astrid declarations before any pre-read,
+    // local asset materialization, or bridge write.
+    assertSupportedAstridConfig(config);
     if (isAstridWorkspaceV1) {
       throw new AstridBridgeReadOnlyError('timeline saving');
     }

@@ -546,6 +546,90 @@ describe('AstridBridgeDataProvider', () => {
     expect(getSupabaseClient).not.toHaveBeenCalled();
   });
 
+  it('round-trips v2 music_beds through the bridge load/save/reload path without rewriting opaque metadata', async () => {
+    const app = {
+      astrid: {
+        v: 2,
+        music_beds: {
+          'timeline:music-original': {
+            owner: 'timeline:music-original',
+            source: {
+              id: 'music-original',
+              track: 'A1',
+              asset: 'music-asset',
+              at: 0,
+              from: 0,
+              to: 12,
+              app: { vendor: { nested: { opaque: ['keep', null, 4] } } },
+            },
+            ripple_basis: [{ at_s: 4.25, delta_s: 2 }],
+            outputs: ['music-original', 'music-original:cut-1'],
+            extension_metadata: { future_field: true },
+          },
+        },
+        extension_metadata: { retained: [false, 7] },
+      },
+    };
+    let stored = {
+      ...makePayload(),
+      config: {
+        clips: [],
+        tracks: [{ id: 'A1', kind: 'audio', label: 'A1' }],
+        app,
+      },
+      registry: { assets: {} },
+      config_version: 1,
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/save')) {
+        const body = JSON.parse(String(init?.body)) as { config: typeof stored.config; expected_version: number };
+        expect(body.expected_version).toBe(1);
+        expect(JSON.stringify(body.config.app)).toBe(JSON.stringify(app));
+        stored = { ...stored, config: body.config, config_version: 2 };
+        return new Response(JSON.stringify(stored), { status: 200 });
+      }
+      return new Response(JSON.stringify(stored), { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const provider = new AstridBridgeDataProvider({
+      projectSlug: 'ados-talks',
+      timelineRef: 'intro-cut',
+      timelineId: '11111111-1111-1111-1111-111111111111',
+    });
+    const loaded = await provider.loadTimeline('11111111-1111-1111-1111-111111111111');
+    expect(JSON.stringify(loaded.config.app)).toBe(JSON.stringify(app));
+
+    await expect(provider.saveTimeline(
+      '11111111-1111-1111-1111-111111111111',
+      loaded.config,
+      loaded.configVersion,
+      { assets: {} },
+    )).resolves.toBe(2);
+
+    const reloaded = await provider.loadTimeline('11111111-1111-1111-1111-111111111111');
+    expect(JSON.stringify(reloaded.config.app)).toBe(JSON.stringify(app));
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('rejects unsupported Astrid format declarations before reading or writing', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = new AstridBridgeDataProvider({
+      projectSlug: 'ados-talks',
+      timelineRef: 'intro-cut',
+      timelineId: '11111111-1111-1111-1111-111111111111',
+    });
+
+    await expect(provider.saveTimeline('11111111-1111-1111-1111-111111111111', {
+      output: { resolution: '1280x720', fps: 30, file: 'output.mp4' },
+      clips: [],
+      tracks: [{ id: 'A1', kind: 'audio', label: 'A1' }],
+      app: { astrid: { v: 2 } },
+    }, 1)).rejects.toBeInstanceOf(TimelineSchemaIncompatibleError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('accepts a ULID/slug caller key when the payload carries a distinct canonical timeline_id', async () => {
     // Real Astrid timelines live under a ULID directory (01JM4K5N7P...)
     // while the bridge reports a canonical UUID as `timeline_id`. The
