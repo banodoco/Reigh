@@ -2,6 +2,8 @@
 // the boundary. Reigh keeps richer locally-typed shapes for editor-internal use
 // (ResolvedTimelineConfig, ClipMeta, etc.) — only the persisted on-disk shape
 // must match the shared schema.
+import type { TimelineClip as CanonicalTimelineClip } from '@banodoco/timeline-schema';
+
 export type {
   TimelineConfig as SharedTimelineConfig,
   TimelineClip as SharedTimelineClip,
@@ -396,6 +398,8 @@ export type TimelineClip = {
   /** Optional Astrid element identity; legacy clips remain valid without it. */
   elementRef?: TimelineElementRef;
   effects?: TimelineEffect[] | Record<string, number>;
+  /** Instances owned by this occurrence; shape comes from the admitted schema. */
+  modifiers?: CanonicalTimelineClip['modifiers'];
   // Sprint 2: schema-lift fields. All optional; existing timelines without them
   // round-trip unchanged. `params` carries effect/theme parameter blobs;
   // `pool_id` / `clip_order` are Banodoco-arrangement provenance fields.

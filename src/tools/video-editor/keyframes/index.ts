@@ -44,6 +44,15 @@ export interface KeyframeValidationDiagnostic {
   detail?: Record<string, unknown>;
 }
 
+function requireSupportedKeyframeInterpolation(keyframes: readonly ClipKeyframe[]): void {
+  for (const keyframe of keyframes) {
+    if (keyframe && typeof keyframe === 'object'
+      && ('easing' in keyframe || !['linear', 'hold'].includes(keyframe.interpolation))) {
+      throw new Error('App keyframes support only interpolation linear|hold; named easing is not supported by this consumer');
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Interpolation helpers
 // ---------------------------------------------------------------------------
@@ -314,6 +323,14 @@ export function validateKeyframes(
     }
 
     // time validation
+    if ('easing' in kf) {
+      diags.push({
+        severity: 'error',
+        code: 'keyframes/unsupported-easing',
+        message: `${kfCtx}: named easing is not supported by the App keyframe consumer; use interpolation linear or hold.`,
+        detail: { parameterName: definition.name, index: i },
+      });
+    }
     if (typeof kf.time !== 'number' || Number.isNaN(kf.time) || !Number.isFinite(kf.time)) {
       diags.push({
         severity: 'error',
@@ -427,6 +444,7 @@ export function resolveAnimatedParams(
 
   for (const definition of schema) {
     const entry = keyframes[definition.name];
+    if (entry) requireSupportedKeyframeInterpolation(entry);
 
     // No keyframes: use default value
     if (!entry || entry.length === 0) {
@@ -1036,6 +1054,7 @@ function interpolateAutomationCurve(
   keyframes: ClipKeyframe[],
   time: number,
 ): number | string | boolean | undefined {
+  requireSupportedKeyframeInterpolation(keyframes);
   if (keyframes.length === 0) return undefined;
 
   // Filter invalid entries and sort by time

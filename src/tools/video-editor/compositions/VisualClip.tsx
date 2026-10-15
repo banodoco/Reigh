@@ -31,6 +31,8 @@ import { PendingMaterialPlaceholder } from '@/tools/video-editor/components/Pend
 import type { CapabilityFinding, RenderMaterialRef } from '@reigh/editor-sdk';
 import type { RenderPlannerMaterialStatus } from '@/tools/video-editor/runtime/renderPlanner.ts';
 import { ClipShaderPreviewCanvas } from '@/tools/video-editor/shaders/preview/ClipShaderPreviewCanvas.tsx';
+import { mediaModifierBounds, type ModifierBounds } from '@banodoco/timeline-composition/theme-api';
+import { admitAppModifierTarget, composeAppClipModifiers, useAppModifierHost } from '@/tools/video-editor/runtime/clip-modifiers.ts';
 import {
   useOptionalShaderEffectRegistryContext,
   type ShaderEffectRegistrySnapshot,
@@ -289,17 +291,28 @@ function shouldRenderMaterialPlaceholder(status: RenderPlannerMaterialStatus): b
   return status.state === 'missing' || status.state === 'pending' || status.state === 'stale' || status.state === 'failed';
 }
 
-const VisualAsset: FC<VisualClipProps> = ({ clip, track, fps }) => {
+const VisualAsset: FC<VisualClipProps & { evaluatedFrame: number }> = ({ clip, track, fps, evaluatedFrame }) => {
   const { width: compositionWidth, height: compositionHeight } = useVideoConfig();
   const previewMediaFailure = useOptionalPreviewMediaFailure();
+  const modifierHost = useAppModifierHost();
+  const hasModifiers = Boolean(clip.modifiers?.length);
+  const wrapSpatialContent = (content: ReactNode, bounds: ModifierBounds): ReactNode => {
+    if (!hasModifiers) return content;
+    const modified = composeAppClipModifiers({ clip, content, frame: evaluatedFrame, fps, bounds, host: modifierHost });
+    // Spatial crop is inside the modifier. Alpha, animation/effects and the
+    // transition host remain outside it and still execute exactly once.
+    return <AbsoluteFill style={{ opacity: clip.opacity ?? 1 }}>{modified}</AbsoluteFill>;
+  };
   // SD-025: never silent-null when a built-in clip is missing its asset.
   // Render a labeled red band so the gap is obvious in preview/export.
   if (!clip.assetEntry) {
+    admitAppModifierTarget(clip, false);
     return <MissingAssetBody clipId={clip.id} clipType={clip.clipType ?? 'media'} />;
   }
 
   const mediaSrc = getSanitizedMediaSrc(clip.assetEntry.src);
   if (!mediaSrc) {
+    admitAppModifierTarget(clip, false);
     return <MissingAssetBody clipId={clip.id} clipType={clip.clipType ?? 'media'} />;
   }
 
@@ -331,6 +344,7 @@ const VisualAsset: FC<VisualClipProps> = ({ clip, track, fps }) => {
   const isImage = clip.assetEntry.type?.startsWith('image');
   const isVideo = clip.assetEntry.type?.startsWith('video');
   if (!isImage && !isVideo) {
+    admitAppModifierTarget(clip, false);
     return (
       <UnsupportedAssetBody
         clipId={clip.id}
@@ -353,17 +367,20 @@ const VisualAsset: FC<VisualClipProps> = ({ clip, track, fps }) => {
   const useViewportLayout = fit === 'manual' || hasPositionOverride;
 
   if (!useViewportLayout) {
-    const style = getClipBoxStyle(clip, track, compositionWidth, compositionHeight);
+    const style = getClipBoxStyle(hasModifiers ? { ...clip, opacity: 1 } : clip, track, compositionWidth, compositionHeight);
+    const bounds = hasModifiers ? mediaModifierBounds(clip, { ...track, scale: 1 },
+      { ...clip.assetEntry, file: mediaSrc }, compositionWidth, compositionHeight) : undefined;
     const sharedStyle: CSSProperties = {
       ...style,
       mixBlendMode: track.blendMode && track.blendMode !== 'normal' ? track.blendMode : undefined,
     };
 
     if (isImage) {
-      return <ReadinessImage src={mediaSrc} mediaId={clip.id} style={sharedStyle} crossOrigin="anonymous" />;
+      const content = <ReadinessImage src={mediaSrc} mediaId={clip.id} style={sharedStyle} crossOrigin="anonymous" />;
+      return bounds ? wrapSpatialContent(content, bounds) : content;
     }
 
-    return (
+    const content = (
       <ReadinessVideo
         clipId={clip.id}
         resetKey={`${clip.id}:${mediaSrc}:${trimProps.trimBefore}:${trimProps.trimAfter ?? 'none'}:${playbackRate}:${effectiveVolume}:${retryToken}`}
@@ -381,6 +398,7 @@ const VisualAsset: FC<VisualClipProps> = ({ clip, track, fps }) => {
         onLoadedData={mediaFailure?.onLoadedData}
       />
     );
+    return bounds ? wrapSpatialContent(content, bounds) : content;
   }
 
   const fullBounds = {
@@ -405,6 +423,7 @@ const VisualAsset: FC<VisualClipProps> = ({ clip, track, fps }) => {
   });
 
   if (!viewportLayout) {
+    admitAppModifierTarget(clip, false);
     return null;
   }
 
@@ -415,7 +434,7 @@ const VisualAsset: FC<VisualClipProps> = ({ clip, track, fps }) => {
     width: viewportLayout.renderBounds.width,
     height: viewportLayout.renderBounds.height,
     overflow: 'hidden',
-    opacity: clip.opacity ?? 1,
+    opacity: hasModifiers ? 1 : clip.opacity ?? 1,
   };
   const mediaStyle: CSSProperties = {
     position: 'absolute',
@@ -433,14 +452,14 @@ const VisualAsset: FC<VisualClipProps> = ({ clip, track, fps }) => {
   };
 
   if (isImage) {
-    return (
+    return wrapSpatialContent((
       <div style={viewportStyle}>
         <ReadinessImage src={mediaSrc} mediaId={clip.id} style={mediaStyle} crossOrigin="anonymous" />
       </div>
-    );
+    ), { status: 'known', rect: viewportLayout.renderBounds });
   }
 
-  return (
+  return wrapSpatialContent((
     <div style={viewportStyle}>
       <ReadinessVideo
         clipId={clip.id}
@@ -459,7 +478,7 @@ const VisualAsset: FC<VisualClipProps> = ({ clip, track, fps }) => {
         onLoadedData={mediaFailure?.onLoadedData}
       />
     </div>
-  );
+  ), { status: 'known', rect: viewportLayout.renderBounds });
 };
 
 const ClipFailurePoster: FC<{posterUrl: string | null; style: CSSProperties}> = ({posterUrl, style}) => {
@@ -536,6 +555,7 @@ export const VisualClip: FC<VisualClipProps> = ({
   const durationInFrames = getClipDurationInFrames(clip, fps);
   const frame = useCurrentFrame();
   const shader = getTimelineClipShader(clip);
+  if (shader) admitAppModifierTarget(clip, false);
   const shaderRecord = shader
     ? shaderSnapshot?.get(shader.shaderId, shader.extensionId)
     : undefined;
@@ -586,7 +606,7 @@ export const VisualClip: FC<VisualClipProps> = ({
 
   const content: ReactNode = (
     <AbsoluteFill style={{ overflow: 'hidden', ...transitionStyle }}>
-      <VisualAsset clip={clip} track={track} fps={fps} />
+      <VisualAsset clip={clip} track={track} fps={fps} evaluatedFrame={frame} />
       {renderUnsupportedShaderExport && shader ? (
         <UnsupportedClipShaderExportBody clipId={clip.id} shaderId={shader.shaderId} />
       ) : null}

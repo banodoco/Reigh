@@ -180,6 +180,15 @@ export const wrapWithClipEffects = (
   fps: number,
   effectRegistrySnapshot?: EffectRegistrySnapshot,
 ): ReactNode => {
+  // Native effect props have no host-progress contract. Preserve their legacy
+  // branch when absent; refuse explicit easing instead of discarding it or
+  // applying an extra component-specific curve after the shared host curve.
+  for (const reference of [clip.entrance, clip.exit, clip.continuous]) {
+    if (reference && ('easing' in reference
+      || (reference.params && Object.prototype.hasOwnProperty.call(reference.params, 'easing')))) {
+      throw new Error(`App native effects cannot consume explicit animation easing for clip ${clip.id}`);
+    }
+  }
   let wrapped = content;
   const legacyRegistry = effectRegistrySnapshot ? null : getEffectRegistry();
 

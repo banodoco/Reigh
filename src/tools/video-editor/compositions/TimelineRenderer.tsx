@@ -29,6 +29,7 @@ import { materializeResolvedSequenceConfig } from '@/tools/video-editor/sequence
 import {
   ThemeProvider,
   useTheme,
+  MODIFIER_REGISTRY,
   type RuntimeTheme,
 } from '@banodoco/timeline-composition/theme-api';
 import { requireAstridElementHost, type AstridElementHost, type AstridDynamicSequenceEntry as DynamicSequenceComponentEntry } from '@/tools/video-editor/runtime/astrid-element-host.ts';
@@ -56,6 +57,7 @@ import { tryCompileSequenceComponentAsync } from '@/tools/video-editor/sequences
 import { boundCanonicalConfigClips } from '@/tools/video-editor/lib/canonicalRenderBounds.ts';
 import { resolveEndSpanningLayerPreviewParams } from '@/tools/video-editor/sequences/components/EndSpanningLayerSequence.tsx';
 import { projectOutputTimelineConfig } from '@/tools/video-editor/data/timelineOutputProjection.ts';
+import { admitAppModifierTarget, AppModifierHostProvider, useAppModifierHost } from '@/tools/video-editor/runtime/clip-modifiers.ts';
 
 const AstridElementHostContext = createContext<AstridElementHost | null>(null);
 // Preserve the root composition frame through clip Sequences and freezes.
@@ -1430,6 +1432,14 @@ const VisualTrack: FC<VisualTrackProps> = ({
     >
       {sortedClips.map((clip, index) => {
         const liveBindingRecords = liveBindingRecordsByClip.get(clip.id) ?? Object.freeze([]);
+        if (clip.modifiers?.length) {
+          const nativeMedia = (!clip.clipType || ['media', 'hold', 'image'].includes(clip.clipType))
+            && !clip.elementRef && !isGeneratedRemotionModuleClip(clip)
+            && !shouldUseLiveFramePreview(clip, liveBindingRecords)
+            && !isSequenceComponentClipType(host, clip.clipType, dynamicEntries)
+            && !(clip.clipType && (host.resolveComponent(clip.clipType, 'effect') || clipTypeRegistry.get(clip.clipType)));
+          admitAppModifierTarget(clip, nativeMedia);
+        }
         if (shouldUseLiveFramePreview(clip, liveBindingRecords)) {
           return (
             <LiveFramePreviewSequence
@@ -1698,6 +1708,8 @@ const VisualTrack: FC<VisualTrackProps> = ({
 
 const TimelineRendererBody: FC<{ config: ResolvedTimelineConfig }> = memo(({ config }) => {
   const runtime = useContext(VideoEditorRuntimeContext);
+  const modifierHost = useAstridElementHost();
+  const inheritedModifierHost = useAppModifierHost();
   const environment = useRemotionEnvironment();
   const frame = useCurrentFrame();
   const liveDataRegistry = runtime?.liveDataRegistry;
@@ -1737,6 +1749,9 @@ const TimelineRendererBody: FC<{ config: ResolvedTimelineConfig }> = memo(({ con
       effectLayers: Record<string, ResolvedTimelineClip[]>;
       all: Record<string, ResolvedTimelineClip[]>;
     }>((groups, clip) => {
+      if (!visualTracks.some((track) => track.id === clip.track) || clip.clipType === 'automation' || clip.clipType === 'effect-layer') {
+        admitAppModifierTarget(clip, false);
+      }
       groups.all[clip.track] ??= [];
       groups.all[clip.track].push(clip);
       if (clip.clipType === 'automation') {
@@ -1751,7 +1766,7 @@ const TimelineRendererBody: FC<{ config: ResolvedTimelineConfig }> = memo(({ con
       }
       return groups;
     }, { regular: {}, effectLayers: {}, all: {} });
-  }, [renderConfig]);
+  }, [renderConfig, visualTracks]);
   // Memoized on purpose: this component re-renders on every frame during
   // playback (useCurrentFrame above), and `liveBindingRecordsByClip` is a
   // dependency of the `visualContent` memo. A fresh Map per frame invalidated
@@ -1840,7 +1855,14 @@ const TimelineRendererBody: FC<{ config: ResolvedTimelineConfig }> = memo(({ con
       <AbsoluteFill style={{ backgroundColor: 'black', overflow: 'hidden' }}>
         <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
           <AbsoluteFill style={{ position: 'relative', overflow: 'hidden' }}>
-            {visualContent}
+            <AppModifierHostProvider value={{
+              registry: modifierHost.modifierRegistry ?? inheritedModifierHost?.registry ?? MODIFIER_REGISTRY,
+              theme: runtimeTheme,
+              globalFrame: frame,
+              onFinding: modifierHost.onModifierFinding ?? inheritedModifierHost?.onFinding,
+            }}>
+              {visualContent}
+            </AppModifierHostProvider>
             {renderUnsupportedPostprocessExport && postprocessShader ? (
               <UnsupportedPostprocessShaderExportBody shaderId={postprocessShader.shaderId} />
             ) : null}
