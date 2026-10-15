@@ -29,6 +29,9 @@ import { TimelineSchemaIncompatibleError, TimelineVersionConflictError, type Dat
 import { StaleWriteError } from '../data/shotComposition';
 import { BRIDGE_REQUEST_TIMEOUT_MS } from '../data/bridgeContract';
 import { loadTimelineDraft, saveTimelineDraft, type TimelineDraftRecoveryMetadata } from '@/tools/video-editor/data/timelineDraftIndexedDb.ts';
+import { attachGestureCommands } from '../commands/semanticGestures.ts';
+import type { EditCommand } from '@/integrations/runtime/generated.ts';
+import { RuntimeUnavailableError } from '@/integrations/runtime/client.ts';
 import type { AssetRegistry } from '../types';
 import type { TimelineBundleEnvelope } from '../data/typed/timelineBundle';
 
@@ -122,6 +125,8 @@ interface SetupOptions {
   initialData?: TimelineData;
   persistenceEnabled?: boolean;
   saveTimelineImpl?: DataProvider['saveTimeline'];
+  saveTimelineAtHeadImpl?: DataProvider['saveTimelineAtHead'];
+  semanticCommandSaving?: boolean;
   loadTimelineImpl?: DataProvider['loadTimeline'];
   loadCanonicalTimelineImpl?: NonNullable<DataProvider['loadCanonicalTimeline']>;
   loadAssetRegistryImpl?: DataProvider['loadAssetRegistry'];
@@ -149,6 +154,8 @@ function setup(options?: SetupOptions): TestHarness {
       ? { loadCanonicalTimeline: options.loadCanonicalTimelineImpl }
       : {}),
     saveTimeline,
+    ...(options?.saveTimelineAtHeadImpl ? { saveTimelineAtHead: options.saveTimelineAtHeadImpl } : {}),
+    ...(options?.semanticCommandSaving ? { semanticCommandSaving: true } : {}),
     loadAssetRegistry,
     ...(loadReferencedTimeline
       ? { loadReferencedTimeline }
@@ -2175,5 +2182,129 @@ describe('useTimelinePersistence — write-ack watchdog', () => {
     await advance(0);
     expect(harness.result?.current.watchdogTripped).toBe(false);
     expect(harness.saveTimeline).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe('semantic suffix queue and recovery', () => {
+  beforeEach(() => { vi.useFakeTimers(); resetFakeIndexedDB(); });
+  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
+  const base = { projectId: 'project-suffix', timelineId: 'timeline-1', headRevisionId: 'head-source' };
+  const afterA = { ...base, headRevisionId: 'head-A' };
+  const afterB = { ...base, headRevisionId: 'head-B' };
+  const commands: EditCommand[] = [
+    { op: 'clip.set-look', select: 'parent/clip:fixture', args: { opacity: 0.4 },
+      expect: { opacity: { state: 'present', value: 0.8 } } },
+    { op: 'clip.clear', select: 'parent/clip:fixture', args: { keys: ['transition'] } },
+  ];
+  const key = 'realm:project-suffix:timeline-1:parent:session-one';
+  function semanticData(label: string) {
+    const data = { ...makeTimelineData(label), head: base };
+    attachGestureCommands(data, commands);
+    return data;
+  }
+  async function settle() {
+    await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); });
+  }
+
+  it('keeps queued commands and their draft on the authored base after A is acknowledged', async () => {
+    let acceptA!: () => void;
+    let acceptB!: () => void;
+    const save = vi.fn<NonNullable<DataProvider['saveTimelineAtHead']>>()
+      .mockImplementationOnce(async () => { await new Promise<void>((resolve) => { acceptA = resolve; }); return { configVersion: 2, head: afterA }; })
+      .mockImplementationOnce(async () => { await new Promise<void>((resolve) => { acceptB = resolve; }); return { configVersion: 3, head: afterB }; });
+    const harness = setup({ initialData: semanticData('A'), semanticCommandSaving: true,
+      saveTimelineAtHeadImpl: save, recoveryMetadata: { recoveryKey: key } });
+    const success = vi.fn();
+    harness.eventBus.on('saveSuccess', success);
+    harness.scheduleSave(semanticData('A'));
+    await settle();
+    harness.editSeqRef.current = 2;
+    const newer = semanticData('B');
+    harness.scheduleSave(newer);
+    await settle();
+    expect(save).toHaveBeenCalledTimes(1);
+    acceptA();
+    await settle();
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save.mock.calls[1][2]).toEqual(base);
+    expect(save.mock.calls[1][5]).toEqual(commands);
+    expect(success).not.toHaveBeenCalled();
+    expect(await loadTimelineDraft(key)).toMatchObject({ baseHeadRevisionId: 'head-source',
+      draft: { config: newer.config, editCommands: commands } });
+    acceptB();
+    await settle();
+    expect(await loadTimelineDraft(key)).toBeNull();
+    expect(success).toHaveBeenCalledTimes(1);
+    expect(harness.savedSeqRef.current).toBe(2);
+    expect(harness.result.current.saveStatus).toBe('saved');
+    harness.unmount();
+  });
+
+  it('retains the whole suffix during preview network retry and does not send a newer command save first', async () => {
+    let acceptA!: () => void;
+    const save = vi.fn<NonNullable<DataProvider['saveTimelineAtHead']>>()
+      .mockImplementationOnce(async () => {
+        await new Promise<void>((resolve) => { acceptA = resolve; }); return { configVersion: 2, head: afterA };
+      }).mockRejectedValueOnce(new RuntimeUnavailableError(new TypeError('preview network failure'), '/fixture'))
+      .mockResolvedValueOnce({ configVersion: 3, head: afterB })
+      .mockResolvedValueOnce({ configVersion: 4, head: { ...base, headRevisionId: 'head-C' } });
+    const harness = setup({ initialData: semanticData('A'), semanticCommandSaving: true,
+      saveTimelineAtHeadImpl: save, recoveryMetadata: { recoveryKey: key } });
+    harness.scheduleSave(semanticData('A'));
+    await settle();
+    harness.editSeqRef.current = 2;
+    const b = semanticData('B');
+    harness.scheduleSave(b);
+    acceptA();
+    await settle();
+    expect(harness.result.current.saveStatus).toBe('retrying');
+    expect(await loadTimelineDraft(key)).toMatchObject({ baseHeadRevisionId: 'head-source', draft: { editCommands: commands, config: b.config } });
+    harness.editSeqRef.current = 3;
+    harness.scheduleSave(semanticData('C'));
+    expect(save).toHaveBeenCalledTimes(2);
+    await act(async () => { vi.advanceTimersByTime(600); });
+    await settle();
+    expect(save).toHaveBeenCalledTimes(4);
+    expect(save.mock.calls[2]).toEqual(save.mock.calls[1]);
+    expect(save.mock.calls[2][1]).toBe(save.mock.calls[1][1]);
+    expect(await loadTimelineDraft(key)).toBeNull();
+    harness.unmount();
+  });
+
+  it('retains every suffix command after a failed expect and leaves another session draft isolated', async () => {
+    let acceptA!: () => void;
+    const save = vi.fn<NonNullable<DataProvider['saveTimelineAtHead']>>()
+      .mockImplementationOnce(async () => { await new Promise<void>((resolve) => { acceptA = resolve; }); return { configVersion: 2, head: afterA }; })
+      .mockRejectedValueOnce(new TimelineVersionConflictError('suffix expect failed'));
+    const harness = setup({ initialData: semanticData('A'), semanticCommandSaving: true,
+      saveTimelineAtHeadImpl: save, recoveryMetadata: { recoveryKey: key } });
+    const otherKey = key.replace('session-one', 'session-two');
+    const other = setup({ initialData: semanticData('other'), semanticCommandSaving: true,
+      saveTimelineAtHeadImpl: async () => { throw new TimelineVersionConflictError('other session offline'); },
+      recoveryMetadata: { recoveryKey: otherKey } });
+    other.scheduleSave(semanticData('other'));
+    harness.scheduleSave(semanticData('A'));
+    await settle();
+    harness.editSeqRef.current = 2;
+    const b = semanticData('B');
+    harness.scheduleSave(b);
+    acceptA();
+    await settle();
+    expect(harness.result.current.isConflictExhausted).toBe(true);
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(harness.savedSeqRef.current).toBe(1);
+    expect(await loadTimelineDraft(key)).toMatchObject({ baseHeadRevisionId: 'head-source', draft: { config: b.config, editCommands: commands } });
+    expect(await loadTimelineDraft(otherKey)).toMatchObject({ draft: { config: semanticData('other').config, editCommands: commands } });
+    // Clearing this session after a later successful save cannot clear the other.
+    harness.unmount();
+    other.unmount();
+    const accepted = setup({ initialData: semanticData('resolved'), semanticCommandSaving: true,
+      saveTimelineAtHeadImpl: async () => ({ configVersion: 3, head: afterB }), recoveryMetadata: { recoveryKey: key } });
+    accepted.scheduleSave(semanticData('resolved'));
+    await settle();
+    expect(await loadTimelineDraft(key)).toBeNull();
+    expect(await loadTimelineDraft(otherKey)).not.toBeNull();
+    accepted.unmount();
   });
 });

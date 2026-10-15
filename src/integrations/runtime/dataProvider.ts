@@ -101,7 +101,7 @@ interface TimelineCommitAttemptOwner {
 
 interface PendingTimelineCommit {
   readonly owner: TimelineCommitAttemptOwner;
-  readonly request: CommitRequest;
+  request: CommitRequest;
   readonly settled: Promise<void>;
   readonly release: () => void;
   flight?: Promise<TimelineSaveReceipt>;
@@ -644,7 +644,12 @@ export class RuntimeDataProvider implements DataProvider {
       }
       let release!: () => void;
       const settled = new Promise<void>((resolve) => { release = resolve; });
-      pending = { owner, request, settled, release };
+      const currentHead = this.canonicalTimelineState.get(timelineId)?.headRevisionId;
+      // Commands keep their authored base. Only Astrid may rebase a suffix
+      // after an earlier save (or another writer) advanced the canonical head.
+      const needsPreview = currentHead !== undefined && currentHead !== request.base_revision_id;
+      pending = { owner, request: needsPreview
+        ? freezeCommitValue({ ...request, dry_run: true }) : request, settled, release };
       this.pendingCommits.set(timelineId, pending);
     }
     if (pending.flight) return pending.flight;
@@ -655,17 +660,31 @@ export class RuntimeDataProvider implements DataProvider {
     };
     attempt.flight = this.withTimelineOperation(timelineId, async () => {
       try {
+        if (attempt.request.dry_run) {
+          const preview = await this.client.commitTimeline(attempt.request);
+          this.validateCommitResponse(attempt.request, preview);
+          if (preview.status !== 'preview' || preview.accepted_revision_id !== null
+            || preview.accepted_publication_id !== null || preview.schema_report !== null
+            || !Array.isArray(preview.change?.commands)) {
+            throw new TimelineSchemaIncompatibleError('Runtime did not return a complete timeline suffix preview.');
+          }
+          const targetHead = preview.rebased_onto ?? preview.base_revision_id;
+          if (typeof targetHead !== 'string' || targetHead.length === 0) {
+            throw new TimelineSchemaIncompatibleError('Runtime suffix preview omitted its target head.');
+          }
+          // This is a new real transaction, not a retry of the dry-run key.
+          // Capture it before sending: uncertain transport always retries these
+          // exact commands, target and identity, even if the head later moves.
+          this.commitSessionSequence = Math.max(this.commitSessionSequence, attempt.request.session_sequence) + 1;
+          attempt.request = freezeCommitValue(JSON.parse(JSON.stringify({
+            ...attempt.request, request_id: generateUUID(),
+            session_sequence: this.commitSessionSequence,
+            base_revision_id: targetHead, base_publication_id: null,
+            change: { commands: preview.change.commands }, dry_run: false,
+          })) as CommitRequest);
+        }
         const result = await this.client.commitTimeline(attempt.request);
-        if (result.request_id !== attempt.request.request_id
-          || result.base_revision_id !== attempt.request.base_revision_id) {
-          throw new TimelineSchemaIncompatibleError('Runtime commit response does not identify this request.');
-        }
-        if (result.status === 'error' && result.error?.code === 'runtime_unavailable') {
-          throw new RuntimeUnavailableError(new ApiError(503, result.error.code, result.error.message), this.apiBaseUrl);
-        }
-        if (result.status === 'conflict') {
-          throw new TimelineVersionConflictError('Runtime commit requires conflict resolution.');
-        }
+        this.validateCommitResponse(attempt.request, result);
         if (result.status !== 'accepted' && result.status !== 'no_change') {
           throw new TimelineSchemaIncompatibleError(result.error?.message ?? 'Runtime did not accept the timeline commit.');
         }
@@ -682,6 +701,22 @@ export class RuntimeDataProvider implements DataProvider {
       }
     }).finally(() => { attempt.flight = undefined; });
     return attempt.flight;
+  }
+
+  private validateCommitResponse(request: CommitRequest, result: CommitResult): void {
+    if (!result || result.request_id !== request.request_id || result.base_revision_id !== request.base_revision_id
+      || !Array.isArray(result.conflicts) || !Array.isArray(result.choices)) {
+      throw new TimelineSchemaIncompatibleError('Runtime commit response does not identify this request.');
+    }
+    if (result.status === 'error' && result.error?.code === 'runtime_unavailable') {
+      throw new RuntimeUnavailableError(new ApiError(503, result.error.code, result.error.message), this.apiBaseUrl);
+    }
+    if (result.status === 'conflict' || result.conflicts?.length || result.choices?.length) {
+      throw new TimelineVersionConflictError('Runtime commit requires conflict resolution.');
+    }
+    if (result.error || result.status === 'refused' || result.status === 'error') {
+      throw new TimelineSchemaIncompatibleError(result.error?.message ?? 'Runtime refused the timeline commit.');
+    }
   }
 
   private async readCommittedTimeline(

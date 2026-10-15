@@ -727,15 +727,13 @@ export function useTimelinePersistence({
             completedSeqRef.current = attempt.seq;
             attempt.session.acknowledgedSeq = Math.max(attempt.session.acknowledgedSeq, attempt.seq);
 
-            // If a newer edit was queued while this CAS was in flight, its
-            // payload was necessarily authored against the old head. Advance
-            // that descendant to this receipt before it is sent. The current
-            // attempt keeps its original tuple for transport retries; only the
-            // queued descendant is rebased after a confirmed ACK.
+            // Legacy document saves advance their recovery base after an ACK.
+            // Semantic commands retain the exact authored base in both the
+            // queue and draft; the provider asks Astrid for their rebased suffix.
             if (typeof receipt !== 'number' && attempt.expectedHead) {
               let pendingSave = pendingSaveRef.current;
               while (pendingSave) {
-                if (sameHead(pendingSave.baseHead, attempt.expectedHead)) {
+                if (pendingSave.editCommands === undefined && sameHead(pendingSave.baseHead, attempt.expectedHead)) {
                   const acknowledgedHead = cloneAttemptValue(receipt.head);
                   const queuedSave = pendingSave;
                   queuedSave.baseHead = acknowledgedHead;
@@ -976,7 +974,13 @@ export function useTimelinePersistence({
             itemsBySchemaRef: cloneAttemptValue(nextData.sourceItemsBySchemaRef) as TimelineBundleEnvelope['itemsBySchemaRef'],
           }
         : null;
+    const previous = latestScheduledSaveRef.current;
+    const hasUnconvertedPredecessor = previous?.session === session
+      && previous.seq > savedSeqRef.current && !previous.editCommands;
+    const editCommands = provider.semanticCommandSaving && !hasUnconvertedPredecessor
+      ? gestureCommandsFor(nextData) : undefined;
     const draft = {
+      ...(editCommands !== undefined ? { editCommands: cloneAttemptValue(editCommands) } : {}),
       config: cloneAttemptValue(nextData.config),
       registry: cloneAttemptValue(nextData.registry),
       bundle: effectiveBundle,
@@ -1000,15 +1004,11 @@ export function useTimelinePersistence({
       ));
     draftWriteChainRef.current = draftWrite;
     void draftWrite.catch(() => {});
-    const previous = latestScheduledSaveRef.current;
-    const hasUnconvertedPredecessor = previous?.session === session
-      && previous.seq > savedSeqRef.current && !previous.editCommands;
     const scheduledSave: ScheduledSave = {
       session,
       generation: session.generation,
       data: nextData,
-      ...(provider.semanticCommandSaving && !hasUnconvertedPredecessor && gestureCommandsFor(nextData)
-        ? { editCommands: cloneAttemptValue(gestureCommandsFor(nextData)!) } : {}),
+      ...(editCommands !== undefined ? { editCommands: cloneAttemptValue(editCommands) } : {}),
       seq,
       draftOwnerId,
       draftRecoveryKey,

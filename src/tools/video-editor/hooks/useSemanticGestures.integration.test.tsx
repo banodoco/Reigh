@@ -37,6 +37,9 @@ const json = (value: unknown) => new TextEncoder().encode(JSON.stringify(value))
 function wireFixture(initial: TimelineData, reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable'>) {
   const requests: Array<{ request: CommitRequest; bytes: string; headers: Record<string, string> }> = [];
   const compatibilityRequests: string[] = [];
+  let currentHead = initial.head!.headRevisionId!;
+  let acceptanceSequence = 1;
+  const acceptedHeads = new Map<string, string>();
   const transport: Transport = async (method, path, headers, body) => {
     if (method === 'POST' && (/\/(?:publish-document|publish|composition-revisions)(?:$|\?)/.test(path))) {
       compatibilityRequests.push(path);
@@ -50,12 +53,17 @@ function wireFixture(initial: TimelineData, reply?: (request: CommitRequest, cal
       const request = JSON.parse(bytes) as CommitRequest;
       requests.push({ request, bytes, headers: { ...headers } });
       const unavailable = await reply?.(request, requests.length) === 'unavailable';
+      if (!unavailable && !request.dry_run && !acceptedHeads.has(request.request_id)) {
+        currentHead = `parent-r${++acceptanceSequence}`;
+        acceptedHeads.set(request.request_id, currentHead);
+      }
       const response: CommitResult = {
-        status: unavailable ? 'error' : 'accepted', request_id: request.request_id, request_hash: 'fixture',
-        base_revision_id: request.base_revision_id, accepted_revision_id: `parent-r${request.session_sequence + 1}`,
-        accepted_publication_id: null, previous_revision_id: request.base_revision_id, rebased_onto: null,
+        status: unavailable ? 'error' : request.dry_run ? 'preview' : 'accepted', request_id: request.request_id, request_hash: 'fixture',
+        base_revision_id: request.base_revision_id, accepted_revision_id: unavailable || request.dry_run ? null : acceptedHeads.get(request.request_id)!,
+        accepted_publication_id: null, previous_revision_id: request.base_revision_id, rebased_onto: request.dry_run ? currentHead : null,
         canonical_document: null, projection_version: 1, document_digest: null, id_map: {},
-        change: { changes: [], commands: [], direct_writes: [], consequences: [], affected: [] },
+        change: { changes: [], commands: request.dry_run && 'commands' in request.change
+          ? structuredClone(request.change.commands) : [], direct_writes: [], consequences: [], affected: [] },
         conflicts: [], choices: [], provenance: null, evidence: null, schema_report: null, runtime_receipt: null, error: unavailable ? { code: 'runtime_unavailable', message: 'fixture unavailable', hint: 'retry', next_action: 'retry' } : null,
       };
       return { status: unavailable ? 503 : 200, headers: {}, body: json(response) };
@@ -270,7 +278,7 @@ describe('main-editor semantic gesture wire adaptation', () => {
     off();
     h.unmount();
   });
-  it('retains three independent gestures behind one flight and advances only their acknowledged base', async () => {
+  it('retains three independent gestures behind one flight and previews each captured authored base', async () => {
     let release!: () => void;
     const paused = new Promise<void>((resolve) => { release = resolve; });
     const h = await setup(async (_request, call) => { if (call === 1) await paused; });
@@ -281,10 +289,12 @@ describe('main-editor semantic gesture wire adaptation', () => {
     expect(h.requests).toHaveLength(1);
     release();
     await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
-    expect(h.requests).toHaveLength(3);
-    expect(h.requests.map(({ request }) => request.base_revision_id)).toEqual(['parent-r1', 'parent-r2', 'parent-r3']);
-    expect(h.requests.map(({ request }) => (request.change as { commands: unknown[] }).commands[0])).toEqual([0.1, 0.2, 0.3].map((opacity) => expect.objectContaining({ args: { opacity } })));
-    expect(new Set(h.requests.map(({ request }) => request.request_id)).size).toBe(3);
+    expect(h.requests).toHaveLength(5);
+    expect(h.requests.map(({ request }) => request.dry_run)).toEqual([false, true, false, true, false]);
+    expect(h.requests.map(({ request }) => request.base_revision_id)).toEqual(['parent-r1', 'parent-r1', 'parent-r2', 'parent-r1', 'parent-r3']);
+    expect(h.requests.filter(({ request }) => !request.dry_run).map(({ request }) => (request.change as { commands: unknown[] }).commands[0]))
+      .toEqual([0.1, 0.2, 0.3].map((opacity) => expect.objectContaining({ args: { opacity } })));
+    expect(new Set(h.requests.map(({ request }) => request.request_id)).size).toBe(5);
     h.unmount();
   });
   it('retries a real handler request with identical bytes and key before sending newer edits', async () => {
@@ -295,10 +305,10 @@ describe('main-editor semantic gesture wire adaptation', () => {
     act(() => h.result.current.editing.handleSelectedClipChange({ opacity: 0.3 }));
     expect(h.requests).toHaveLength(1);
     await waitFor(() => expect(h.savedSeqRef.current).toBe(3), { timeout: 2500 });
-    expect(h.requests).toHaveLength(4);
+    expect(h.requests).toHaveLength(6);
     expect(h.requests[0].bytes).toBe(h.requests[1].bytes);
     expect(h.requests[0].headers).toEqual(h.requests[1].headers);
-    expect(h.requests.map(({ request }) => request.session_sequence)).toEqual([1, 1, 2, 3]);
+    expect(h.requests.map(({ request }) => request.session_sequence)).toEqual([1, 1, 2, 3, 4, 5]);
     h.unmount();
   });
   it('retains command transactions while an interaction defers saves', async () => {
@@ -312,8 +322,9 @@ describe('main-editor semantic gesture wire adaptation', () => {
       notifyInteractionEndIfIdle(h.interactionStateRef);
     });
     await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
-    expect(h.requests).toHaveLength(2);
-    expect(h.requests.map(({ request }) => request.session_sequence)).toEqual([1, 2]);
+    expect(h.requests).toHaveLength(3);
+    expect(h.requests.map(({ request }) => request.dry_run)).toEqual([false, true, false]);
+    expect(h.requests.map(({ request }) => request.session_sequence)).toEqual([1, 2, 3]);
     h.unmount();
   });
   it('multi-move emits one commit containing the selected clips explicit frame nudges', async () => {
@@ -342,26 +353,32 @@ describe('main-editor semantic gesture wire adaptation', () => {
     expect(h.requests[1].request.change).toEqual({ commands: [expect.objectContaining({ op: 'clip.set-look', args: { volume: 0.5 } })] });
     h.unmount();
   });
-  it('keeps a queued gesture ahead of a later gesture while its draft base write is pending', async () => {
+  it('keeps a queued gesture ahead of a later gesture while its server preview is pending', async () => {
     let releaseNetwork!: () => void;
-    let releaseDraft!: () => void;
+    let releasePreview!: () => void;
     const network = new Promise<void>((resolve) => { releaseNetwork = resolve; });
-    const draft = new Promise<void>((resolve) => { releaseDraft = resolve; });
-    const realAdvance = draftStorage.advanceTimelineDraftBaseAfterHeadAcknowledgement;
-    const advance = vi.spyOn(draftStorage, 'advanceTimelineDraftBaseAfterHeadAcknowledgement')
-      .mockImplementationOnce(async (...args) => { await draft; return realAdvance(...args); });
-    const h = await setup(async (_request, call) => { if (call === 1) await network; });
+    const preview = new Promise<void>((resolve) => { releasePreview = resolve; });
+    const advance = vi.spyOn(draftStorage, 'advanceTimelineDraftBaseAfterHeadAcknowledgement');
+    const h = await setup(async (request, call) => {
+      if (call === 1) await network;
+      if (request.dry_run && call === 2) await preview;
+    });
     act(() => h.result.current.editing.handleSelectedClipChange({ opacity: 0.1 }));
     await waitFor(() => expect(h.requests).toHaveLength(1));
     act(() => h.result.current.editing.handleSelectedClipChange({ opacity: 0.2 }));
     releaseNetwork();
-    await waitFor(() => expect(advance).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(h.requests).toHaveLength(2));
+    expect(h.requests[1].request).toMatchObject({ dry_run: true, base_revision_id: 'parent-r1' });
     act(() => h.result.current.editing.handleSelectedClipChange({ opacity: 0.3 }));
-    expect(h.requests).toHaveLength(1);
-    releaseDraft();
+    expect(h.requests).toHaveLength(2);
+    expect(advance).not.toHaveBeenCalled();
+    releasePreview();
     await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
-    expect(h.requests.map(({ request }) => (request.change as { commands: Array<{ args: unknown }> }).commands[0].args))
+    expect(h.requests.filter(({ request }) => !request.dry_run)
+      .map(({ request }) => (request.change as { commands: Array<{ args: unknown }> }).commands[0].args))
       .toEqual([{ opacity: 0.1 }, { opacity: 0.2 }, { opacity: 0.3 }]);
+    expect(h.requests.map(({ request }) => request.base_revision_id))
+      .toEqual(['parent-r1', 'parent-r1', 'parent-r2', 'parent-r2', 'parent-r3']);
     h.unmount();
   });
   it('keyboard time nudge emits one commit from the same explicit planner used by the editor shell', async () => {

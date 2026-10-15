@@ -1,7 +1,7 @@
 import gesturePreservation from './fixtures/gesture-preservation.json';
 import { describe, expect, it, vi } from 'vitest';
 import { ReighRuntimeClient, RuntimeAuthenticationError, RUNTIME_CLIENT_SCOPES } from './client.ts';
-import type { CommitRequest, CommitResult, RequestBody, Transport } from './generated.ts';
+import type { CommitRequest, CommitResult, EditCommand, RequestBody, Transport } from './generated.ts';
 import { RuntimeDataProvider, toRuntimePublication, type TimelineCommitSaveContext } from './dataProvider.ts';
 import { TimelineSchemaIncompatibleError, TimelineVersionConflictError } from '@/tools/video-editor/data/DataProvider.ts';
 import { createTimelineReader } from '@/tools/video-editor/lib/timeline-reader.ts';
@@ -1757,16 +1757,33 @@ describe('RuntimeDataProvider commit save routing', () => {
   function commitFixture(reply: (body: CommitRequest, call: number) => Promise<CommitResult>) {
     const fixture = runtimeFixture();
     const commits: Array<{ bytes: string; headers: Record<string, string> }> = [];
+    const acceptedHeads = new Set<string>();
+    let polledHead = 'parent-r1';
+    const setHead = (head: string) => { acceptedHeads.add(head); polledHead = head; };
     const transport: Transport = async (method, path, headers, body) => {
       if (method === 'POST' && path === commitPath) {
         const bytes = new TextDecoder().decode(await requestBodyBytes(body!));
         commits.push({ bytes, headers: { ...headers } });
         const response = await reply(JSON.parse(bytes), commits.length);
+        if (response.status === 'accepted' && response.accepted_revision_id) setHead(response.accepted_revision_id);
         return { status: response.error?.code === 'runtime_unavailable' ? 503 : 200, headers: {}, body: json(response) };
+      }
+      if (method === 'POST' && path.endsWith('/inspect')) {
+        const response = await fixture.transport(method, path, headers, body);
+        const record = JSON.parse(new TextDecoder().decode(response.body));
+        return { ...response, body: json({ ...record, revision_id: polledHead, head_revision_id: polledHead }) };
+      }
+      const revision = path.split('/composition-revisions/')[1];
+      if (method === 'GET' && acceptedHeads.has(revision)) {
+        // Bounded protocol fixture: immutable revision identity only. This is
+        // not a semantic command executor or real Runtime publication proof.
+        const response = await fixture.transport(method, path.replace(revision, 'parent-r1'), headers, body);
+        const record = JSON.parse(new TextDecoder().decode(response.body));
+        return { ...response, body: json({ ...record, revision_id: revision }) };
       }
       return fixture.transport(method, path, headers, body);
     };
-    return { ...fixture, transport, commits };
+    return { ...fixture, transport, commits, setHead };
   }
 
   it('keeps flag-off publication bytes and headers equal to the unchanged default route', async () => {
@@ -1888,6 +1905,120 @@ describe('RuntimeDataProvider commit save routing', () => {
     expect(fixture.commits.map((entry) => JSON.parse(entry.bytes).request_id))
       .toEqual(['save-request-1', 'save-request-2']);
   });
+
+  const suffix: EditCommand[] = [
+    { op: 'clip.set-look', select: 'parent/clip:fixture', args: { opacity: 0.4 },
+      expect: { opacity: { state: 'present', value: 0.8 } } },
+    { op: 'clip.clear', select: 'parent/clip:fixture', args: { keys: ['transition'] },
+      expect: { transition: { state: 'present', value: { type: 'fade' } } } },
+  ];
+  const rebased: EditCommand[] = [{ ...suffix[1], resolved: ['parent/clip:fixture'] }];
+  function accepted(sent: CommitRequest, head: string): CommitResult {
+    return { ...result(sent), status: 'accepted', accepted_revision_id: head };
+  }
+  function preview(sent: CommitRequest): CommitResult {
+    return { ...result(sent), status: 'preview', accepted_revision_id: null,
+      rebased_onto: 'parent-r2', change: { ...result(sent).change, commands: rebased } };
+  }
+
+  it('holds A and queued B, previews the captured source base and commits only the returned suffix on its target', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let started!: () => void;
+    const running = new Promise<void>((resolve) => { started = resolve; });
+    const fixture = commitFixture(async (sent, call) => {
+      if (call === 1) { started(); await held; return accepted(sent, 'parent-r2'); }
+      if (sent.dry_run) return preview(sent);
+      expect(sent.base_revision_id).toBe('parent-r2');
+      expect(sent.change).toEqual({ commands: rebased });
+      return accepted(sent, 'parent-r3');
+    });
+    const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport, commitRouting: { enabled: true } });
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+    const first = provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!, undefined, undefined, []);
+    await running;
+    const next = structuredClone(loaded.config);
+    const commands = structuredClone(suffix);
+    const second = provider.saveTimelineAtHead(TIMELINE_ID, next, loaded.head!, undefined, undefined, commands);
+    commands.splice(0);
+    await Promise.resolve();
+    expect(fixture.commits).toHaveLength(1);
+    release();
+    expect((await first).head.headRevisionId).toBe('parent-r2');
+    expect((await second).head.headRevisionId).toBe('parent-r3');
+    const [a, b, actual] = fixture.commits.map((entry) => JSON.parse(entry.bytes) as CommitRequest);
+    expect(b).toMatchObject({ dry_run: true, base_revision_id: 'parent-r1', change: { commands: suffix } });
+    expect(actual.request_id).not.toBe(b.request_id);
+    expect(actual.request_id).not.toBe(a.request_id);
+    expect(actual.session_id).toBe(b.session_id);
+    expect(actual.session_sequence).toBeGreaterThan(b.session_sequence);
+    expect(fixture.commits[2].headers['Idempotency-Key']).toBe(actual.request_id);
+    expect(fixture.commits.filter((entry) => !JSON.parse(entry.bytes).dry_run)).toHaveLength(2);
+  });
+
+  it.each(['preview', 'actual'] as const)('retries identical %s bytes and key without letting a newer save overtake', async (failurePhase) => {
+    let failed = false;
+    let suffixAccepted = false;
+    const fixture = commitFixture(async (sent, call) => {
+      if (call === 1) return accepted(sent, 'parent-r2');
+      if (!failed && (sent.dry_run ? 'preview' : 'actual') === failurePhase) {
+        failed = true;
+        if (failurePhase === 'preview') throw new TypeError('fixture preview network failure');
+        return result(sent, true);
+      }
+      if (sent.dry_run) return preview(sent);
+      suffixAccepted = true;
+      return accepted(sent, 'parent-r3');
+    });
+    const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport, commitRouting: { enabled: true } });
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+    await provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!, undefined, undefined, []);
+    const next = structuredClone(loaded.config);
+    await expect(provider.saveTimelineAtHead(TIMELINE_ID, next, loaded.head!, undefined, undefined, suffix)).rejects.toThrow();
+    const failedIndex = fixture.commits.length - 1;
+    const newer = provider.saveTimelineAtHead(TIMELINE_ID, structuredClone(next), loaded.head!, undefined, undefined, suffix);
+    await Promise.resolve();
+    expect(fixture.commits).toHaveLength(failedIndex + 1);
+    expect(suffixAccepted).toBe(false);
+    // A lost actual ACK may already have advanced the canonical head.
+    if (failurePhase === 'actual') fixture.setHead('parent-r3');
+    await provider.loadTimeline(TIMELINE_ID);
+    await provider.saveTimelineAtHead(TIMELINE_ID, next, loaded.head!, undefined, undefined, suffix);
+    await newer;
+    expect(fixture.commits[failedIndex + 1]).toEqual(fixture.commits[failedIndex]);
+    expect(fixture.commits[failedIndex].headers['Idempotency-Key'])
+      .toBe(JSON.parse(fixture.commits[failedIndex].bytes).request_id);
+    if (failurePhase === 'preview') {
+      expect(fixture.commits.slice(1, failedIndex + 2).every((entry) => JSON.parse(entry.bytes).dry_run)).toBe(true);
+    }
+  });
+
+  it.each(['expect', 'choices', 'refused', 'identity', 'base', 'status', 'commands', 'target'] as const)(
+    'rejects a suffix preview with %s without committing a partial command list', async (failure) => {
+      const fixture = commitFixture(async (sent, call) => {
+        if (call === 1) return accepted(sent, 'parent-r2');
+        const response = preview(sent);
+        if (failure === 'expect') {
+          response.status = 'conflict';
+          response.conflicts = [{ id: 'parent/clip:fixture', path: 'opacity', base: 0.8, theirs: 0.2, ours: 0.4, kind: 'same-property' }];
+        }
+        if (failure === 'choices') response.choices = [{ for: 'expect', options: [{ label: 'partial', commands: rebased }] }];
+        if (failure === 'refused') response.status = 'refused';
+        if (failure === 'identity') response.request_id = 'wrong-request';
+        if (failure === 'base') response.base_revision_id = 'wrong-base';
+        if (failure === 'status') response.status = 'no_change';
+        if (failure === 'commands') response.change.commands = null as unknown as EditCommand[];
+        if (failure === 'target') response.rebased_onto = '';
+        return response;
+      });
+      const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport, commitRouting: { enabled: true } });
+      const loaded = await provider.loadTimeline(TIMELINE_ID);
+      await provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!, undefined, undefined, []);
+      await expect(provider.saveTimelineAtHead(TIMELINE_ID, structuredClone(loaded.config), loaded.head!, undefined, undefined, suffix)).rejects.toThrow();
+      expect(fixture.commits).toHaveLength(2);
+      expect(JSON.parse(fixture.commits[1].bytes)).toMatchObject({ dry_run: true, change: { commands: suffix } });
+    },
+  );
 
   it('fails closed on a producer with another timeline identity', async () => {
     const fixture = runtimeFixture();
