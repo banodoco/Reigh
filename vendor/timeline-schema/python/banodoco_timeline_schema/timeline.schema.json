@@ -391,7 +391,12 @@
         },
         "keyframes": {
           "type": "object",
-          "additionalProperties": {}
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/ClipKeyframe"
+            }
+          }
         },
         "derived_output": {
           "type": "object",
@@ -404,6 +409,44 @@
         "track"
       ],
       "additionalProperties": false
+    },
+    "ClipKeyframe": {
+      "type": "object",
+      "properties": {
+        "time": {
+          "type": "number"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            }
+          ]
+        },
+        "interpolation": {
+          "type": "string",
+          "enum": [
+            "linear",
+            "hold"
+          ]
+        },
+        "easing": {
+          "type": "string",
+          "description": "Optional named easing; absence preserves the prior interpolation behavior."
+        }
+      },
+      "required": [
+        "time",
+        "value",
+        "interpolation"
+      ],
+      "additionalProperties": {}
     },
     "TimelineClipModifier": {
       "type": "object",

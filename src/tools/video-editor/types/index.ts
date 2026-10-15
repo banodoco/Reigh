@@ -151,6 +151,8 @@ export type ClipKeyframe = {
   value: number | string | boolean;
   /** Interpolation mode from this keyframe to the next. */
   interpolation: KeyframeInterpolation;
+  /** Optional named easing; absent preserves the prior interpolation behavior. */
+  easing?: string;
 };
 
 // M11: Timeline-resident live binding metadata. Runtime samples remain

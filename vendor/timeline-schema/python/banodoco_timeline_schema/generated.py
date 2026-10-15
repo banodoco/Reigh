@@ -9,7 +9,14 @@
 
 from __future__ import annotations
 
-from typing import Any, NotRequired, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict
+
+
+class ClipKeyframe(TypedDict):
+    time: float
+    value: float | str | bool
+    interpolation: Literal["linear", "hold"]
+    easing: NotRequired[str]
 
 
 class TimelineClipModifier(TypedDict):
@@ -51,7 +58,7 @@ class TimelineClip(TypedDict, total=False):
     clip_order: int
     source_uuid: str
     label: str
-    keyframes: dict[str, Any]
+    keyframes: dict[str, list[ClipKeyframe]]
     derived_output: dict[str, Any]
     app: dict[str, Any]
 

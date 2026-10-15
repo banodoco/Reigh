@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from .generated import (
     AssetEntry,
+    ClipKeyframe,
     Theme,
     ThemeOverrides,
     TimelineClip,
@@ -24,6 +25,7 @@ from .validate import load_schema, validate_timeline
 
 __all__ = [
     "AssetEntry",
+    "ClipKeyframe",
     "OUTPUT_FILE_DEFAULT",
     "Theme",
     "ThemeOverrides",

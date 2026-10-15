@@ -39,7 +39,7 @@ import jsonschema
 path = sys.argv[1]
 schema = json.load(open(path))
 jsonschema.validate(schema, jsonschema.Draft7Validator.META_SCHEMA)
-required = ["TimelineClip", "Theme", "ThemeOverrides", "TimelineOutput", "AssetEntry"]
+required = ["TimelineClip", "ClipKeyframe", "Theme", "ThemeOverrides", "TimelineOutput", "AssetEntry"]
 defs = schema.get("definitions", {})
 missing = [name for name in required if not defs.get(name)]
 if missing:
@@ -73,7 +73,7 @@ import { readFileSync } from 'node:fs';
 const tiny = JSON.parse(readFileSync('$TMP_SCHEMA', 'utf8'));
 const defs = tiny.definitions ?? {};
 const ok = tiny.type && tiny.properties && Object.keys(tiny.properties).length > 0
-  && ['TimelineClip','Theme','ThemeOverrides','TimelineOutput','AssetEntry'].every(n => defs[n] && Object.keys(defs[n]).length > 0);
+  && ['TimelineClip','ClipKeyframe','Theme','ThemeOverrides','TimelineOutput','AssetEntry'].every(n => defs[n] && Object.keys(defs[n]).length > 0);
 if (ok) { console.error('degenerate artifact NOT rejected'); process.exit(1); }
 console.log('degenerate artifact correctly rejected');
 "; then

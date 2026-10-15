@@ -37,6 +37,26 @@ test("TimelineConfig type accepts persisted no-theme timelines", () => {
     const out = { clips: [], tracks: [] };
     assert.deepEqual(out, { clips: [], tracks: [] });
 });
+test("TimelineClip type carries named keyframe easing without adding defaults", () => {
+    const keyframes = [
+        { time: 0, value: 0, interpolation: "linear", easing: "in" },
+        { time: 1, value: 1, interpolation: "hold", easing: "linear" },
+        { time: 2, value: 2, interpolation: "linear" },
+    ];
+    const clip = {
+        id: "clip-keyframe-easing",
+        at: 0,
+        track: "V1",
+        keyframes: { opacity: keyframes },
+    };
+    const roundTripped = JSON.parse(JSON.stringify(clip));
+    const roundTrippedKeyframes = roundTripped.keyframes?.opacity;
+    assert.deepEqual(roundTripped, clip);
+    assert.ok(roundTrippedKeyframes);
+    assert.equal(roundTrippedKeyframes[0].easing, "in");
+    assert.equal(roundTrippedKeyframes[1].easing, "linear");
+    assert.equal(Object.hasOwn(roundTrippedKeyframes[2], "easing"), false);
+});
 test("TimelineClip type carries declared clip modifiers", () => {
     const modifier = {
         id: "modifier-instance-1",
