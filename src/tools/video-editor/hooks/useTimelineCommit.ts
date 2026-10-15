@@ -21,6 +21,9 @@ import { buildTrackClipOrder } from '@/tools/video-editor/lib/coordinate-utils.t
 import { migrateToFlatTracks } from '@/tools/video-editor/lib/migrate.ts';
 import { serializeForDisk } from '@/tools/video-editor/lib/serialize.ts';
 import { getConfigSignature } from '@/tools/video-editor/lib/config-utils.ts';
+import {admitTransitionMutation, admitTransitionRowsMutation} from '../transitions/authoring-mutation.ts';
+import {toast} from '@/shared/components/ui/runtime/sonner.tsx';
+
 import { buildDataFromCurrentRegistry } from '@/tools/video-editor/lib/timeline-save-utils.ts';
 import { buildAssetReferenceMap, getAssetMediaId, getAssetResolutionToken, getAssetSourceForLocalEdit } from '@/tools/video-editor/lib/asset-registry.ts';
 import {
@@ -42,6 +45,19 @@ import {
 import type { TimelineRow } from '@/tools/video-editor/types/timeline-canvas.ts';
 import type { AssetRegistryEntry } from '@/tools/video-editor/types/index.ts';
 import type { TimelineEditability } from '@/tools/video-editor/lib/timeline-editability.ts';
+
+// The UI's void applyEdit contract reports a refusal visibly and returns before
+// commit/history/save. Command callers also use the preflight result channel.
+const admitTransitionEdit = (check: () => void): boolean => {
+  try { check(); return true; }
+  catch (error) {
+    if (error instanceof Error && 'code' in error && String(error.code).startsWith('transition/')) {
+      toast.error(error.message);
+      return false;
+    }
+    throw error;
+  }
+};
 
 export type CommandHistoryCommitMetadata = {
   transaction: TimelineCommandTransaction;
@@ -427,6 +443,8 @@ export function useTimelineCommit({
         return;
       }
 
+      if (!admitTransitionEdit(() => admitTransitionMutation(current.resolvedConfig, prepared.nextData.resolvedConfig))) return;
+
       commitData(prepared.nextData, {
         save: options?.save,
         selectedClipId: options?.selectedClipId,
@@ -490,6 +508,8 @@ export function useTimelineCommit({
         mutation.clipOrderOverride ?? buildTrackClipOrder(current.tracks, current.clipOrder, mutation.metaDeletes),
         mutation.registryOverride,
       );
+      if (!admitTransitionEdit(() => admitTransitionRowsMutation(current.resolvedConfig,
+        baseNextData.resolvedConfig, mutation.metaUpdates))) return;
       const nextData = mutation.pinnedShotGroupsOverride === undefined
         ? baseNextData
         : preserveUploadingClips(
@@ -519,6 +539,7 @@ export function useTimelineCommit({
       return;
     }
 
+    if (!admitTransitionEdit(() => admitTransitionMutation(current.resolvedConfig, mutation.resolvedConfig))) return;
     commitData(
       preserveUploadingClips(
         current,

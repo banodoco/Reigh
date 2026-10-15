@@ -127,6 +127,7 @@ export function ClipTransitionSection({
   return (
     <div className="space-y-2 md:col-span-2">
       <FieldLabel>Transition</FieldLabel>
+      <p className="text-xs text-muted-foreground">Applies from this clip to the next clip on its track.</p>
       <Select
         value={clip.transition?.type ?? NO_TRANSITION}
         onValueChange={(value) => {

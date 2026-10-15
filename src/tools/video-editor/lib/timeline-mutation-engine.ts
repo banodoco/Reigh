@@ -12,6 +12,7 @@ import {
 } from '@/tools/video-editor/lib/timeline-data.ts';
 import type { TimelineDomainContractLevel, TimelineDomainIssue } from '@/tools/video-editor/lib/timeline-domain.ts';
 import type { TimelineRow } from '@/tools/video-editor/types/timeline-canvas.ts';
+import {admitTransitionMutation, admitTransitionRowsMutation} from '../transitions/authoring-mutation.ts';
 
 export type TimelineEditMutation =
   | {
@@ -138,6 +139,7 @@ const buildDataFromSerializedConfig = (
 export const previewTimelineMutation = (
   current: TimelineData,
   mutation: TimelineEditMutation,
+  admission: {transitionHost?: string} = {},
 ): TimelineMutationResult => {
   try {
     if (mutation.type === 'pinnedShotGroups') {
@@ -183,6 +185,10 @@ export const previewTimelineMutation = (
         nextMeta,
         nextClipOrder,
       );
+      // Row materialization includes legacy repairs. Validate the actual raw
+      // authoring transition patch so repair cannot turn a refusal into a cut.
+      admitTransitionRowsMutation(current.resolvedConfig, baseNextData.resolvedConfig,
+        mutation.metaUpdates, admission.transitionHost);
       const nextData = mutation.pinnedShotGroupsOverride === undefined
         ? baseNextData
         : preserveUploadingClips(
@@ -202,6 +208,8 @@ export const previewTimelineMutation = (
       };
     }
 
+    // Normal command/inspector edits reach this before legacy serialization.
+    admitTransitionMutation(current.resolvedConfig, mutation.resolvedConfig, admission.transitionHost);
     const nextData = buildDataFromSerializedConfig(
       current,
       serializeForDisk(
