@@ -46,19 +46,23 @@ export const requirePlayerTransitionRecord = (
 export const playerTransitionProjection = (record: TransitionRegistryRecord): {
   resource: TransitionContributionResource; reference: TransitionContributionReference;
 } => {
-  const projection = 'implementationBinding' in record ? record.implementationBinding : undefined;
-  if (!projection || typeof projection !== 'object' || !('resource' in projection) || !('reference' in projection)) {
-    return refusePlayerTransition('transition/invalid-binding', `Transition '${record.transitionId}' has no exact resource/reference projection.`);
-  }
-  const {resource, reference} = projection as {
-    resource: TransitionContributionResource; reference: TransitionContributionReference;
+  // These are J's actual catalog fields. Read transport data only; package-local
+  // admission is always performed below, even if the record came from another host.
+  const projection = record as TransitionRegistryRecord & {
+    implementationResource?: TransitionContributionResource;
+    implementationRevision?: string;
   };
-  if (!resource || !reference || !record.ownerExtensionId || record.ownerExtensionId !== reference.owner
-    || record.contributionId !== reference.id || record.transitionId !== reference.transitionId
-    || resource.owner !== reference.owner || resource.id !== reference.id || resource.transitionId !== reference.transitionId) {
+  const resource = projection.implementationResource;
+  const reference = {owner: record.ownerExtensionId, id: record.contributionId,
+    transitionId: record.transitionId, revision: projection.implementationRevision};
+  if (!resource || typeof reference.revision !== 'string') {
+    return refusePlayerTransition('transition/invalid-binding', `Transition '${record.transitionId}' has no exact resource/revision projection.`);
+  }
+  if (!reference.owner || resource.owner !== reference.owner || resource.id !== reference.id
+    || resource.transitionId !== reference.transitionId) {
     return refusePlayerTransition('transition/reference-mismatch', `Transition '${record.transitionId}' differs from its registered owner or identity.`);
   }
-  return {resource, reference};
+  return {resource, reference: {...reference, owner: reference.owner, revision: reference.revision}};
 };
 
 export const requireCurrentPlayerTransitionBinding = (

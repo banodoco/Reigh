@@ -16,9 +16,9 @@ function fixture() {
     implementation:{host:'timeline-composition',id:'cross-fade'},supportedParams:[],defaults:{}};
   const revision = 'sha256:' + createHash('sha256').update(transitionContributionIdentity(resource)).digest('hex');
   const registry = createTransitionRegistry();
-  const rec: TransitionRegistryRecord & {implementationBinding: unknown} = {transitionId:resource.transitionId,
+  const rec: TransitionRegistryRecord & {implementationResource: TransitionContributionResource; implementationRevision: string} = {transitionId:resource.transitionId,
     contributionId:resource.id, ownerExtensionId:resource.owner, renderer:()=>({}),provenance:'bundled-extension',status:'active',
-    implementationBinding: {resource,reference:{owner:resource.owner,id:resource.id,transitionId:resource.transitionId,revision}},
+    implementationResource: resource, implementationRevision: revision,
     renderability:{determinism:'deterministic',capabilities:['preview','browser-export','worker-export'].map(route=>({
       route:route as 'preview'|'browser-export'|'worker-export',status:'supported',determinism:'deterministic'}))}};
   registry.register(rec);

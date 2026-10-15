@@ -19,18 +19,19 @@ const resource = (id: 'cross-fade' | 'fade' = 'cross-fade'): TransitionContribut
 });
 const reference = (r: TransitionContributionResource): TransitionContributionReference => ({owner: r.owner, id: r.id,
   transitionId: r.transitionId, revision: 'sha256:' + createHash('sha256').update(transitionContributionIdentity(r)).digest('hex')});
-type ProjectedRecord = Omit<TransitionRegistryRecord, 'renderability'> & {renderability: TransitionRegistryRecord['renderability']; implementationBinding: {
-  resource: TransitionContributionResource; reference: TransitionContributionReference;
-}};
+type ProjectedRecord = Omit<TransitionRegistryRecord, 'renderability'> & {
+  renderability: TransitionRegistryRecord['renderability'];
+  implementationResource: TransitionContributionResource; implementationRevision: string;
+};
 const record = (r = resource()): ProjectedRecord => ({transitionId: r.transitionId, contributionId: r.id,
   ownerExtensionId: r.owner, renderer: () => {throw new Error('Contributed renderer must never run');}, provenance: 'bundled-extension', status: 'active',
-  implementationBinding: {resource: r, reference: reference(r)},
+  implementationResource: r, implementationRevision: reference(r).revision,
   renderability: {determinism: 'deterministic', capabilities: ['preview', 'browser-export', 'worker-export'].map(route => ({
     route: route as RenderRoute, status: 'supported', determinism: 'deterministic'}))},
 });
 const clips = (rec = record()): ResolvedTimelineClip[] => [{id: 'out', track: 'V1', at: 0, hold: 2, clipType: 'media'},
   {id: 'in', track: 'V1', at: 2, hold: 2, clipType: 'media', transition: {type: rec.transitionId,
-    revision: rec.implementationBinding.reference.revision, duration: 1, params: {easing: 'linear'}}}];
+    revision: rec.implementationRevision, duration: 1, params: {easing: 'linear'}}}];
 const context = (rec: TransitionRegistryRecord, route: RenderRoute = 'preview'): PlayerTransitionContext => {
   const registry = createTransitionRegistry();
   registry.register(rec);
@@ -48,7 +49,7 @@ describe('Player/export exact declared transition consumption', () => {
     const result = preparePlayerTrack(track, cs, 30, 1280, 720, {...ctx, contributions});
     const declaration = result.declarations[0]; const admitted = contributions.get(rec.transitionId)!;
     expect(declaration.contribution).toBe(admitted);
-    expect(declaration.contribution!.resource).toEqual(rec.implementationBinding.resource);
+    expect(declaration.contribution!.resource).toEqual(rec.implementationResource);
     expect(declaration.implementation).toBe(admitted.resource.implementation);
     expect(Object.isFrozen(admitted.resource)).toBe(true);
     expect(result.legacyTiming.size).toBe(0);
@@ -110,11 +111,13 @@ describe('Player/export exact declared transition consumption', () => {
     await expect(prepare(clips(), ctx)).rejects.toMatchObject({code: 'transition/reference-mismatch'});
   });
   it.each(['owner', 'id', 'transitionId', 'revision'] as const)('refuses resource reference %s mismatch', async key => {
-    const rec = record(); rec.implementationBinding.reference = {...rec.implementationBinding.reference, [key]: 'wrong'};
+    const rec = record();
+    if (key === 'revision') rec.implementationRevision = 'wrong';
+    else rec.implementationResource = {...rec.implementationResource, [key]: 'wrong'};
     await expect(prepare(clips(), context(rec))).rejects.toMatchObject({code: 'transition/reference-mismatch'});
   });
   it('refuses a resource change without an explicit revision repin', async () => {
-    const rec = record(); rec.implementationBinding.resource = resource('fade');
+    const rec = record(); rec.implementationResource = resource('fade');
     await expect(prepare(clips(), context(rec))).rejects.toMatchObject({code: 'transition/revision-mismatch'});
   });
   it('refuses a saved stale revision even after the current resource was repinned', async () => {
@@ -133,7 +136,7 @@ describe('Player/export exact declared transition consumption', () => {
     expect(() => declareAppTransition('V1','out', cs[1].transition!, 30, 'timeline-composition', forged)).toThrow(/has not been admitted/);
   });
   it.each(['host', 'id'] as const)('refuses unsupported implementation %s without fallback', async key => {
-    const rec = record(); rec.implementationBinding.resource = {...resource(), implementation: {...resource().implementation, [key]: 'unsupported'}} as TransitionContributionResource;
+    const rec = record(); rec.implementationResource = {...resource(), implementation: {...resource().implementation, [key]: 'unsupported'}} as TransitionContributionResource;
     await expect(prepare(clips(), context(rec))).rejects.toMatchObject({code: key === 'host' ? 'transition/unsupported-host' : 'transition/unsupported-implementation'});
   });
   it.each(['browser-export', 'worker-export'] as const)('keeps preview support separate from blocked %s', async route => {
@@ -167,13 +170,13 @@ describe('Player/export exact declared transition consumption', () => {
   it('accepts the saved exact transition element reference without turning the media into an injected target', async () => {
     const rec = record(); const cs = clips(rec);
     cs[1].elementRef = {kind: 'transition', id: rec.transitionId, packId: rec.ownerExtensionId,
-      revision: rec.implementationBinding.reference.revision};
+      revision: rec.implementationRevision};
     expect((await prepare(cs, context(rec))).declarations[0].contribution!.resource.id).toBe(rec.contributionId);
   });
   it.each(['kind', 'id', 'packId', 'revision'] as const)('refuses mismatched incoming element reference %s', async key => {
     const rec = record(); const cs = clips(rec);
     cs[1].elementRef = {kind: 'transition', id: rec.transitionId, packId: rec.ownerExtensionId,
-      revision: rec.implementationBinding.reference.revision, [key]: 'wrong'} as never;
+      revision: rec.implementationRevision, [key]: 'wrong'} as never;
     await expect(prepare(cs, context(rec))).rejects.toMatchObject({code: 'transition/invalid-owner'});
   });
   it.each([0, -1, NaN, Infinity])('refuses invalid contributed duration %s', async duration => {
@@ -185,11 +188,12 @@ describe('Player/export exact declared transition consumption', () => {
     await expect(prepare(clips(rec), context(rec))).rejects.toMatchObject({code: 'transition/invalid-params'});
   });
   it('refuses an unsupported declared resource default', async () => {
-    const rec = record(); rec.implementationBinding.resource = {...resource(), defaults: {easing: 'ease-in'}} as never;
+    const rec = record(); rec.implementationResource = {...resource(), defaults: {easing: 'ease-in'}} as never;
     await expect(prepare(clips(), context(rec))).rejects.toMatchObject({code: 'transition/invalid-params'});
   });
   it('refuses legacy implementation-only bindings explicitly', async () => {
-    const rec = {...record(), implementationBinding: {implementation: {host:'timeline-composition',id:'cross-fade'},resourceDigest:'fnv1a-12345678'}};
+    const rec = {...record(), implementationResource: undefined, implementationRevision: undefined,
+      implementationBinding: {implementation: {host:'timeline-composition',id:'cross-fade'},resourceDigest:'fnv1a-12345678'}};
     await expect(prepare(clips(), context(rec))).rejects.toMatchObject({code:'transition/invalid-binding'});
   });
 });
