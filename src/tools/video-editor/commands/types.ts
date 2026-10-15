@@ -1,3 +1,8 @@
+// Shared wire envelope is generated from Astrid's existing OpCall schema.
+// Internal TimelineCommand handlers remain a separate local implementation detail.
+export type { EditCommand } from '../../../integrations/runtime/generated';
+export { validateEditCommand as parseEditCommand } from '../../../integrations/runtime/generated';
+
 import type { ClipMeta, ClipOrderMap, TimelineData } from '@/tools/video-editor/lib/timeline-data.ts';
 import type { TimelineRow } from '@/tools/video-editor/types/timeline-canvas.ts';
 

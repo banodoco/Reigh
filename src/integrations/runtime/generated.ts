@@ -1,7 +1,8 @@
 /** Generated from contract/openapi/workspace-v1.yaml; do not edit by hand. */
 // BEGIN GENERATED TIMELINE COMMIT
+export type EditCommand = { "op": string; "select": string | null; "args": Record<string, unknown>; "version"?: string | null; "resolved"?: Array<string> };
 export type CommitJson = unknown;
-export type CommitCommand = Record<string, unknown>;
+export type CommitCommand = EditCommand;
 export type CommitActor = { "kind": "user" | "agent" | "script"; "id": string };
 export type CommitSource = { "via": "cli" | "python" | "app" | "script"; "detail"?: string };
 export type CommitScope = { "target": string; "content"?: "this-occurrence" | "shared-shot"; "shot_id"?: string; "shot_revision_id"?: string; "internal_revision_id"?: string; "complete": Array<"clips" | "tracks">; "projection_version": 1 };
@@ -41,6 +42,33 @@ export interface RuntimeAcceptance {
   revisions(project_id: string, timeline_id: string, options: CommitRevisionQuery): Promise<Array<CommitRevisionSummary>>;
   evidence(digest: string): Promise<CommitEvidence>;
 }
+export const OPCALL_SCHEMA = {"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://astrid.local/schemas/change-contract/opcall.schema.json", "title": "OpCall", "description": "Candidate single EditCommand envelope (SDK executable name: EditCommand). D RUNNER emits canonical OpCalls in Plan.calls and journal calls. Handler ids remain open. This increment is not a schema freeze.", "type": "object", "required": ["op", "select", "args"], "additionalProperties": false, "properties": {"op": {"type": "string", "description": "Qualified operation id, e.g. timeline.opacity or myteam.stagger.", "pattern": "^[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)+$"}, "select": {"type": ["string", "null"], "description": "Authoring selector; executed calls use the canonical stable selector resolved by the runner. null for timeline-level operations."}, "args": {"type": "object", "description": "Opaque finite JSON operation arguments in authoring units. Omitted keys, JSON null, explicit clip.clear keys, and ordinary objects (including {$absent:true} or {op:clear}) remain distinct. Only the selected handler interprets these values.", "additionalProperties": true}, "version": {"type": ["string", "null"], "description": "The tool version when it ran (filled by the runner)."}, "resolved": {"type": "array", "description": "Runner-populated stable string identities. The admitted producer uses local identities; globally scoped ScopedId mapping remains unresolved and is not imposed here.", "items": {"type": "string"}, "default": []}}} as const;
+
+export function validateEditCommand(value: unknown): EditCommand {
+  const object = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v) && Object.getPrototypeOf(v) === Object.prototype;
+  const seen = new Set<object>();
+  const finiteJson = (v: unknown): boolean => {
+    if (v === null || typeof v === "string" || typeof v === "boolean") return true;
+    if (typeof v === "number") return Number.isFinite(v);
+    if (typeof v !== "object" || seen.has(v)) return false;
+    seen.add(v);
+    const valid = Array.isArray(v) ? v.every(finiteJson) : object(v) && Object.values(v).every(finiteJson);
+    seen.delete(v);
+    return valid;
+  };
+  if (!object(value)) throw new TypeError("OpCall must be an object");
+  const fields = OPCALL_SCHEMA.properties as Record<string, { type: string | readonly string[]; pattern?: string; items?: { type: string } }>;
+  if (Object.keys(value).some(key => !(key in fields)) || OPCALL_SCHEMA.required.some(key => !(key in value))) throw new TypeError("OpCall missing or unknown field");
+  if (!finiteJson(value)) throw new TypeError("OpCall requires finite JSON values");
+  const types: Record<string, (v: unknown) => boolean> = { string: v => typeof v === "string", null: v => v === null, object, array: Array.isArray };
+  for (const [key, item] of Object.entries(value)) {
+    const field = fields[key];
+    const kinds = typeof field.type === "string" ? [field.type] : field.type;
+    if (!kinds.some(kind => types[kind](item)) || (field.pattern && !new RegExp(field.pattern).test(item as string)) || (field.items && (item as unknown[]).some(v => !types[field.items!.type](v)))) throw new TypeError("OpCall invalid " + key);
+  }
+  return value as EditCommand;
+}
+
 // END GENERATED TIMELINE COMMIT
 export const PROTOCOL = "workspace.v1" as const;
 export type HeadersLike = Record<string, string>;
