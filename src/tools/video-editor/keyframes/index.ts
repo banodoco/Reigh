@@ -1,7 +1,7 @@
 /**
  * M9: Deterministic keyframe utilities.
  *
- * Provides linear/hold interpolation, ParameterDefinition validation
+ * Provides named easing and legacy linear/hold interpolation, ParameterDefinition validation
  * diagnostics for keyframe values, resolveAnimatedParams() which
  * computes interpolated parameter values at a given time from
  * host-owned keyframe data, and automation recorder utilities that
@@ -12,7 +12,7 @@
  * All functions are deterministic — same inputs always produce same outputs.
  */
 
-import {timelineKeyframeTime} from '@banodoco/timeline-composition/evaluation';
+import {interpolateKeyframeInterval, motionCurveName, timelineKeyframeTime} from '@banodoco/timeline-composition/evaluation';
 export {declareKeyframeOrigin, timelineKeyframeTime} from '@banodoco/timeline-composition/evaluation';
 
 import type {
@@ -44,13 +44,51 @@ export interface KeyframeValidationDiagnostic {
   detail?: Record<string, unknown>;
 }
 
-function requireSupportedKeyframeInterpolation(keyframes: readonly ClipKeyframe[]): void {
+// Validate explicit easing before boundary/clamp returns. Legacy malformed-time
+// filtering remains unchanged when easing is absent.
+function requireSupportedKeyframeInterpolation(keyframes: readonly ClipKeyframe[], time: number): void {
   for (const keyframe of keyframes) {
-    if (keyframe && typeof keyframe === 'object'
-      && ('easing' in keyframe || !['linear', 'hold'].includes(keyframe.interpolation))) {
-      throw new Error('App keyframes support only interpolation linear|hold; named easing is not supported by this consumer');
+    if (!keyframe || typeof keyframe !== 'object') continue;
+    if (!['linear', 'hold'].includes(keyframe.interpolation)) {
+      throw new Error('App keyframes support only interpolation linear|hold');
+    }
+    if ('easing' in keyframe) requireNamedKeyframe(keyframe, time);
+  }
+}
+
+function requireNamedKeyframe(keyframe: ClipKeyframe, time: number, next?: ClipKeyframe): void {
+  if (typeof keyframe.easing !== 'string') throw new Error('Keyframe easing must be a named string');
+  const name = motionCurveName(keyframe.easing);
+  if (![time, keyframe.time, next?.time ?? keyframe.time].every(Number.isFinite)) {
+    throw new Error('Named keyframes require finite time');
+  }
+  const values = next ? [keyframe.value, next.value] : [keyframe.value];
+  for (const value of values) {
+    if (!['number', 'string', 'boolean'].includes(typeof value)
+      || (typeof value === 'number' && !Number.isFinite(value))) {
+      throw new Error('Named keyframe values must be finite numbers, strings or booleans');
     }
   }
+  if (values.some(value => typeof value !== 'number') && name !== 'linear' && name !== 'step') {
+    throw new Error('Nonlinear easing requires numeric keyframe values');
+  }
+}
+
+function requireNamedIntervals(keyframes: readonly ClipKeyframe[], time: number): void {
+  keyframes.forEach((keyframe, index) => {
+    if ('easing' in keyframe) requireNamedKeyframe(keyframe, time, keyframes[index + 1]);
+  });
+}
+
+// Keep the absent-easing path exactly as before; only explicit outgoing easing
+// delegates local progress and interpolation to the canonical shared consumer.
+function interpolateSegment(a: ClipKeyframe, b: ClipKeyframe, time: number): number | string | boolean {
+  if ('easing' in a) {
+    return interpolateKeyframeInterval(a.value, b.value, time, a.time, b.time, a.interpolation, a.easing);
+  }
+  const range = b.time - a.time;
+  const factor = range > 0 ? (time - a.time) / range : 0;
+  return interpolatePair(a.value, b.value, factor, a.interpolation);
 }
 
 // ---------------------------------------------------------------------------
@@ -322,15 +360,20 @@ export function validateKeyframes(
       continue;
     }
 
-    // time validation
     if ('easing' in kf) {
-      diags.push({
-        severity: 'error',
-        code: 'keyframes/unsupported-easing',
-        message: `${kfCtx}: named easing is not supported by the App keyframe consumer; use interpolation linear or hold.`,
-        detail: { parameterName: definition.name, index: i },
-      });
+      try {
+        requireNamedKeyframe(kf, kf.time);
+      } catch (error) {
+        diags.push({
+          severity: 'error',
+          code: 'keyframes/invalid-easing',
+          message: `${kfCtx}: ${error instanceof Error ? error.message : String(error)}`,
+          detail: { parameterName: definition.name, index: i, easing: kf.easing },
+        });
+      }
     }
+
+    // time validation
     if (typeof kf.time !== 'number' || Number.isNaN(kf.time) || !Number.isFinite(kf.time)) {
       diags.push({
         severity: 'error',
@@ -419,7 +462,7 @@ export function validateKeyframes(
  * 2. If no keyframes exist, falls back to the parameter's default value.
  * 3. Sorts keyframes by time (handling duplicate times by taking the first occurrence).
  * 4. Clamps the requested time to the keyframe range.
- * 5. Applies the appropriate interpolation mode (linear or hold) between adjacent keyframes.
+ * 5. Applies outgoing named easing, or the legacy linear/hold mode, between adjacent keyframes.
  *
  * This is deterministic: identical inputs always produce identical outputs.
  *
@@ -444,7 +487,7 @@ export function resolveAnimatedParams(
 
   for (const definition of schema) {
     const entry = keyframes[definition.name];
-    if (entry) requireSupportedKeyframeInterpolation(entry);
+    if (entry) requireSupportedKeyframeInterpolation(entry, time);
 
     // No keyframes: use default value
     if (!entry || entry.length === 0) {
@@ -484,6 +527,8 @@ export function resolveAnimatedParams(
         seenTimes.add(kf.time);
       }
     }
+
+    requireNamedIntervals(deduped, t);
 
     const first = deduped[0];
     const last = deduped[deduped.length - 1];
@@ -528,17 +573,8 @@ export function resolveAnimatedParams(
       continue;
     }
 
-    // Compute interpolation factor
-    const range = segmentB.time - segmentA.time;
-    const factor = range > 0 ? (t - segmentA.time) / range : 0;
-
-    // Use the interpolation mode of segmentA (the "from" keyframe)
-    const interpolatedValue = interpolatePair(
-      segmentA.value,
-      segmentB.value,
-      factor,
-      segmentA.interpolation,
-    );
+    // Easing belongs to segmentA's outgoing interval at the selected clock.
+    const interpolatedValue = interpolateSegment(segmentA, segmentB, t);
 
     results.push({ name: definition.name, value: interpolatedValue });
   }
@@ -1054,7 +1090,7 @@ function interpolateAutomationCurve(
   keyframes: ClipKeyframe[],
   time: number,
 ): number | string | boolean | undefined {
-  requireSupportedKeyframeInterpolation(keyframes);
+  requireSupportedKeyframeInterpolation(keyframes, time);
   if (keyframes.length === 0) return undefined;
 
   // Filter invalid entries and sort by time
@@ -1083,6 +1119,8 @@ function interpolateAutomationCurve(
   }
 
   const t = Math.max(0, time);
+  requireNamedIntervals(deduped, t);
+
   const first = deduped[0];
   const last = deduped[deduped.length - 1];
 
@@ -1095,14 +1133,7 @@ function interpolateAutomationCurve(
   // Find bracketing keyframes
   for (let i = 0; i < deduped.length - 1; i++) {
     if (t >= deduped[i].time && t < deduped[i + 1].time) {
-      const range = deduped[i + 1].time - deduped[i].time;
-      const factor = range > 0 ? (t - deduped[i].time) / range : 0;
-      return interpolatePair(
-        deduped[i].value,
-        deduped[i + 1].value,
-        factor,
-        deduped[i].interpolation,
-      );
+      return interpolateSegment(deduped[i], deduped[i + 1], t);
     }
   }
 

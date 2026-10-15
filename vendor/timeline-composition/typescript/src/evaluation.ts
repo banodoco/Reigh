@@ -70,3 +70,7 @@ export const queryTrackFrame = (track: PreparedTrack, frame: number): TrackFrame
 
 export {keyframeOrigin, timelineKeyframeTime, spriteKeyframeFrame, declareKeyframeOrigin} from './lib/keyframe-origin';
 export type {KeyframeClock} from './lib/keyframe-origin';
+
+// Pure keyframe consumer shared with App numeric and automation curves.
+export {interpolateKeyframeInterval} from './lib/keyframe-easing';
+export {motionCurveName} from './lib/motion-curves.generated';
