@@ -926,7 +926,7 @@ describe('RuntimeDataProvider', () => {
     const fixture = runtimeFixture();
     const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, baseUrl: 'http://runtime.test', token: 'fixture-token', transport: fixture.transport });
 
-    expect(provider.refreshIntervalMs).toBe(2_000);
+    expect(provider.refreshIntervalMs).toBe(30_000);
     const initial = await provider.loadTimeline(TIMELINE_ID);
     expect(initial.configVersion).toBe(1);
     const edited = { ...initial.config, tracks: initial.config.tracks.map((track, index) => index === 0 ? { ...track, label: 'Edited V1' } : track) };

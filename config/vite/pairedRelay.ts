@@ -11,6 +11,7 @@ import {
   PAIRED_REQUEST_TIMEOUT_MS,
   type PairedRoute,
 } from './pairedRoutePolicy.ts';
+import type { PairedSessionContext } from './pairedSessionContext.ts';
 import { PairingError, PairingRegistry } from './pairedRegistry.ts';
 
 const CONNECTOR_PATH = '/api/pairing/connector';
@@ -129,7 +130,7 @@ export class PairedRelay {
     if (!connector || connector.readyState !== WebSocket.OPEN || connector.generation !== pair.generation) {
       json(response, 503, { error: 'paired_connector_unavailable', detail: 'the local connector is disconnected; reconnect it and retry explicitly' }); return;
     }
-    await this.forward(request, response, route, connector);
+    await this.forward(request, response, route, connector, Object.freeze({ pair_id: pair.pairId, connector_id: pair.connectorId, generation: pair.generation, realm_id: pair.realmId, expires_at: pair.expiresAt }));
     void next;
   }
 
@@ -143,7 +144,7 @@ export class PairedRelay {
         if (!body || typeof body.invitation !== 'string' || body.invitation.length < 32 || body.invitation.length > 256) throw new PairingError('invalid_invitation');
         const { pair, sessionToken } = this.registry.redeemInvitation(body.invitation);
         const connector = this.connectors.get(pair.connectorId);
-        if (connector) send(connector, { type: 'paired', pair_id: pair.pairId, realm_id: pair.realmId, generation: pair.generation });
+        if (connector) send(connector, { type: 'paired', pair_id: pair.pairId, realm_id: pair.realmId, generation: pair.generation, expires_at: pair.expiresAt });
         const secure = !this.config.loopbackTest;
         response.setHeader('Set-Cookie', `${this.cookieName}=${encodeURIComponent(sessionToken)}; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800${secure ? '; Secure' : ''}`);
         json(response, 200, { pair_id: pair.pairId, realm_id: pair.realmId, expires_at: pair.expiresAt });
@@ -246,7 +247,7 @@ export class PairedRelay {
     }
   }
 
-  private async forward(request: IncomingMessage, response: ServerResponse, route: PairedRoute, socket: ConnectorSocket): Promise<void> {
+  private async forward(request: IncomingMessage, response: ServerResponse, route: PairedRoute, socket: ConnectorSocket, pairedSession: Readonly<PairedSessionContext>): Promise<void> {
     const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
     const item: RelayRequest = { request, response, route, connector: socket, generation: socket.generation, id, bytes: 0, done: false };
     this.pending.set(id, item);
@@ -257,7 +258,7 @@ export class PairedRelay {
     const requiresKnownLength = route.stream && !['GET', 'HEAD'].includes(method);
     if (requiresKnownLength && declaredLength === undefined) { this.pending.delete(id); json(response, 411, { error: 'length_required', detail: 'paired media mutations require an explicit Content-Length' }); return; }
     if (declaredLength !== undefined && declaredLength > max) { this.pending.delete(id); json(response, 413, { error: 'payload_too_large', detail: 'paired request exceeds its bounded body limit' }); return; }
-    send(socket, { type: 'request_start', id, method: request.method ?? 'GET', path: route.upstreamPath, service: route.service, headers: forwardHeaders(request.headers) });
+    send(socket, { type: 'request_start', id, method: request.method ?? 'GET', path: route.upstreamPath, service: route.service, headers: forwardHeaders(request.headers), paired_session: pairedSession });
     const timer = setTimeout(() => { if (!item.done) { item.done = true; this.pending.delete(id); send(socket, { type: 'request_cancel', id }); json(response, 504, { error: 'paired_request_timeout' }); } }, PAIRED_REQUEST_TIMEOUT_MS);
     const cleanup = () => clearTimeout(timer);
     response.on('close', () => { cleanup(); if (!item.done) { send(socket, { type: 'request_cancel', id }); this.pending.delete(id); } });

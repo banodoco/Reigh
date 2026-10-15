@@ -8,6 +8,7 @@ import { WebSocket } from 'ws';
 import { ACP_ROUTE_ENTRIES } from '../../src/integrations/astrid/acpRouteContract.ts';
 import { PAIRED_CONSUMER_ROUTES } from '../../config/vite/pairedConsumerPolicy.generated.ts';
 import * as policy from '../../config/vite/pairedRoutePolicy.ts';
+import { PAIRED_SESSION_HEADER, validatedPairedSession } from '../../config/vite/pairedSessionContext.ts';
 import { PairedRelay } from '../../config/vite/pairedRelay.ts';
 import { allowedAcpRoute, allowedRoute } from '../reigh-loopback-gateway.ts';
 
@@ -159,20 +160,22 @@ test('connector rechecks service, normalizes and preserves media headers, and us
   const requests = new Map();
   const outgoing: Record<string, string>[] = [];
   const redirects: string[] = [];
-  const dependencies = { ...policy, send: (message: Record<string, unknown>) => messages.push(message), requests, endpoint: new URL('http://127.0.0.1:1'), token: 'synthetic-product', acpBridgeToken: 'synthetic-acp', process: {env: {}}, ASTRID_BRIDGE_PROTOCOL_HEADER: 'X-Astrid-Bridge-Version', ASTRID_BRIDGE_PROTOCOL_VERSION: 'v1', pausedResponses: new Map(), fetch: async (_url: URL, options: {headers: Record<string, string>; redirect: string}) => { outgoing.push(options.headers); redirects.push(options.redirect); return { status: 200, headers: new Headers(), body: null }; } };
+  const context = { pair_id: 'p', connector_id: 'c', realm_id: 'r', generation: 1, expires_at: Date.now() + 60_000 };
+  const dependencies = { ...policy, PAIRED_SESSION_HEADER, validatedPairedSession, state: { connectorId: 'c' }, realm: { realm_id: 'r' }, generation: 1, pairs: new Map([['p', context.expires_at]]), send: (message: Record<string, unknown>) => messages.push(message), requests, endpoint: new URL('http://127.0.0.1:1'), token: 'synthetic-product', acpBridgeToken: 'synthetic-acp', process: {env: {}}, ASTRID_BRIDGE_PROTOCOL_HEADER: 'X-Astrid-Bridge-Version', ASTRID_BRIDGE_PROTOCOL_VERSION: 'v1', pausedResponses: new Map(), fetch: async (_url: URL, options: {headers: Record<string, string>; redirect: string}) => { outgoing.push(options.headers); redirects.push(options.redirect); return { status: 200, headers: new Headers(), body: null }; } };
   const compiled = ts.transpileModule(functions.join('\n'), {compilerOptions: {target: ts.ScriptTarget.ES2022}}).outputText;
   const begin = new Function(...Object.keys(dependencies), `${compiled}; return beginRequest;`)(...Object.values(dependencies));
-  await begin('a', 'runtime', '/v1/projects/p/media-imports', 'POST', { 'Content-Length': '1', 'X-Expected-Digest': 'sha256:disposable', 'X-Media-Width': '2', 'X-Media-Height': '3', 'X-Media-Duration-Seconds': '1' });
+  await begin('a', 'runtime', '/v1/projects/p/media-imports', 'POST', { 'Content-Length': '1', 'X-Expected-Digest': 'sha256:disposable', 'X-Media-Width': '2', 'X-Media-Height': '3', 'X-Media-Duration-Seconds': '1' }, context);
   assert.equal(outgoing.length, 1);
   assert.equal(outgoing[0]['x-media-width'], '2'); assert.equal(outgoing[0]['x-expected-digest'], 'sha256:disposable');
   assert.equal(outgoing[0].Authorization, 'Bearer synthetic-product');
   assert.equal(redirects[0], 'error');
+  assert.deepEqual(JSON.parse(outgoing[0][PAIRED_SESSION_HEADER]), context);
   for (const [service, path, method, headers] of [
     ['runtime', '/v1/health', 'GET', {'x-hostile-canary': 'disposable'}],
     ['astrid', '/acp/connect', 'POST', {}],
     ['runtime', '/v1/projects/p/media-imports', 'POST', {}],
     ['runtime', '/v1/projects/p/timelines/t/composition-revisions', 'POST', {'content-length': String(policy.PAIRED_MAX_JSON_BYTES + 1)}],
-  ] as const) await begin('reject', service, path, method, headers);
+  ] as const) await begin('reject', service, path, method, headers, context);
   assert.equal(outgoing.length, 1); assert.equal(messages.filter(m => m.type === 'response_error').length, 4);
   let redirectedHits = 0;
   const redirected = createServer((_req, res) => { redirectedHits += 1; res.end('should never be fetched'); });
@@ -183,7 +186,7 @@ test('connector rechecks service, normalizes and preserves media headers, and us
   try {
     const fixed = { ...dependencies, endpoint: new URL(`http://127.0.0.1:${(local.address() as {port: number}).port}`), fetch: globalThis.fetch };
     const beginLocal = new Function(...Object.keys(fixed), `${compiled}; return beginRequest;`)(...Object.values(fixed));
-    await beginLocal('redirect', 'runtime', '/v1/objects/disposable', 'GET', {});
+    await beginLocal('redirect', 'runtime', '/v1/objects/disposable', 'GET', {}, context);
     assert.equal(redirectedHits, 0);
     assert(messages.some(message => message.id === 'redirect' && message.type === 'response_error'));
   } finally {

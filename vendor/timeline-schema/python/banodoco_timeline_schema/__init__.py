@@ -14,6 +14,7 @@ from .generated import (
     Theme,
     ThemeOverrides,
     TimelineClip,
+    TimelineClipModifier,
     TimelineConfig,
     TimelineOutput,
 )
@@ -27,6 +28,7 @@ __all__ = [
     "Theme",
     "ThemeOverrides",
     "TimelineClip",
+    "TimelineClipModifier",
     "TimelineConfig",
     "TimelineOutput",
     "deep_merge_theme",

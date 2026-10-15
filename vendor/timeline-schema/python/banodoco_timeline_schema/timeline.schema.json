@@ -361,6 +361,12 @@
             }
           ]
         },
+        "modifiers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TimelineClipModifier"
+          }
+        },
         "params": {
           "type": "object",
           "additionalProperties": {}
@@ -396,6 +402,27 @@
         "id",
         "at",
         "track"
+      ],
+      "additionalProperties": false
+    },
+    "TimelineClipModifier": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "element": {
+          "type": "string"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "id",
+        "element",
+        "params"
       ],
       "additionalProperties": false
     },

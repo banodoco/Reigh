@@ -1,5 +1,11 @@
 node_modules/
-typescript/dist/
+typescript/dist/*
+!typescript/dist/src/
+typescript/dist/src/*
+!typescript/dist/src/generated.js
+!typescript/dist/src/generated.js.map
+!typescript/dist/src/generated.d.ts
+!typescript/dist/src/generated.d.ts.map
 *.egg-info/
 __pycache__/
 .pytest_cache/
