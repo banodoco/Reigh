@@ -76,6 +76,28 @@ export const runtimeManagedObjectSchema = z.strictObject({
   relation: z.string().min(1).optional(),
 });
 
+/** UI-safe projection defined by C-ACTION-CATALOG-contract-001. */
+export const runtimeActionDeclarationSchema = z.strictObject({
+  kind: z.enum(['action', 'generator']),
+  name: z.string().min(1).optional(),
+  short_description: z.string().optional(),
+  description: z.string().optional(),
+  keywords: z.array(z.string()).optional(),
+  inputs: z.array(z.strictObject({
+    name: z.string().min(1),
+    type: z.string().min(1),
+    required: z.boolean(),
+    default: z.unknown().optional(),
+    description: z.string().optional(),
+  })).optional(),
+  outputs: z.array(z.strictObject({
+    name: z.string().min(1),
+    type: z.string().min(1),
+    artifact_type: z.string().min(1).optional(),
+    description: z.string().optional(),
+  })).optional(),
+});
+
 export const runtimeCapabilitySchema = z.strictObject({
   capability_id: z.string().min(1),
   definition_digest: runtimeSha256IdSchema,
@@ -87,6 +109,7 @@ export const runtimeCapabilitySchema = z.strictObject({
   estimated_scratch_bytes: z.number().int().nonnegative(),
   estimated_output_bytes: z.number().int().nonnegative(),
   unavailable_reason: z.string().nullable().optional(),
+  action_declaration: runtimeActionDeclarationSchema.optional(),
 });
 
 export function runtimePageSchema<Schema extends z.ZodType>(item: Schema) {
@@ -686,6 +709,7 @@ export type BridgeTimelinePayload = z.infer<typeof bridgeTimelinePayloadSchema>;
 export type BridgeAssetRegistryPayload = z.infer<typeof bridgeAssetRegistrySchema>;
 export type RuntimeManagedObject = z.infer<typeof runtimeManagedObjectSchema>;
 export type RuntimeCapability = z.infer<typeof runtimeCapabilitySchema>;
+export type RuntimeActionDeclaration = z.infer<typeof runtimeActionDeclarationSchema>;
 export type RuntimeMutationReceipt = z.infer<typeof runtimeMutationReceiptSchema>;
 export type RuntimeTaskResource = z.infer<typeof runtimeTaskResourceSchema>;
 export type RuntimeEvent = z.infer<typeof runtimeEventSchema>;

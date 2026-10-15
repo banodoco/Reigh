@@ -48,6 +48,10 @@ import {
 import { SchemaForm } from '@/tools/video-editor/components/SchemaForm/SchemaForm';
 import type { StandardSchema, StandardSchemaProperty } from '@/tools/video-editor/components/SchemaForm/SchemaForm';
 import { GenerationSessionPanel } from '@/tools/video-editor/components/GenerationSessionPanel/GenerationSessionPanel';
+import {
+  DeclaredActionForm,
+  type DeclaredActionFormProps,
+} from '@/tools/video-editor/components/AgentToolsPanel/DeclaredActionForm';
 import type {
   ToolResult,
   ToolResultDiagnostic,
@@ -84,6 +88,8 @@ export interface AgentToolsPanelProps {
    * and displays results without routing through ProposalRuntime.
    */
   agentToolInvocationService?: AgentToolInvocationService;
+  /** Optional capability row for an inspectable source-projected action declaration. */
+  declaredAction?: DeclaredActionFormProps;
   /** Called when the panel requests to be closed. */
   onClose?: () => void;
 }
@@ -244,6 +250,7 @@ function agentToolInputSchemaToStandardSchema(
 export function AgentToolsPanel({
   agentToolRegistry,
   agentToolInvocationService,
+  declaredAction,
   onClose,
 }: AgentToolsPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -468,6 +475,12 @@ export function AgentToolsPanel({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {declaredAction && (
+        <div className="border-b border-white/5 px-3 py-2" data-video-editor-agent-tools-action-form="true">
+          <DeclaredActionForm {...declaredAction} />
         </div>
       )}
 

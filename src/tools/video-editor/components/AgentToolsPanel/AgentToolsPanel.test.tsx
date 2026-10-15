@@ -21,6 +21,7 @@ import userEvent from '@testing-library/user-event';
 import { AgentToolsPanel } from '@/tools/video-editor/components/AgentToolsPanel/AgentToolsPanel';
 import { createAgentToolRegistry } from '@/tools/video-editor/runtime/agentToolRegistry';
 import type { AgentToolRegistry } from '@/tools/video-editor/runtime/agentToolRegistry';
+import type { RuntimeCapability } from '@/tools/video-editor/data/bridgeContract';
 import type {
   AgentToolContribution,
   AgentToolHandler,
@@ -511,6 +512,38 @@ describe('AgentToolsPanel component', () => {
     const region = screen.getByRole('region', { name: 'Agent tools panel' });
     expect(region).toBeTruthy();
     expect(region.getAttribute('data-video-editor-agent-tools-panel')).toBe('true');
+  });
+
+  it('hosts a declaration-driven Runtime action form in the existing editor tools surface', () => {
+    const actionCapability: RuntimeCapability = {
+      capability_id: 'chiptune.compose',
+      definition_digest: `sha256:${'a'.repeat(64)}`,
+      status: 'ready',
+      required_resource_keys: [],
+      estimated_scratch_bytes: 0,
+      estimated_output_bytes: 0,
+      action_declaration: {
+        kind: 'action',
+        name: 'Chiptune Compose',
+        inputs: [{ name: 'duration_s', type: 'number', required: true, description: 'Cue length.' }],
+        outputs: [{ name: 'music', type: 'file', description: 'Generated audio.' }],
+      },
+    };
+
+    render(
+      <AgentToolsPanel
+        agentToolRegistry={registry}
+        declaredAction={{
+          actionId: 'chiptune.compose',
+          capability: actionCapability,
+        }}
+      />,
+    );
+
+    expect(document.querySelector('[data-video-editor-agent-tools-action-form="true"]')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Declared action chiptune.compose' })).toBeTruthy();
+    expect(screen.getByLabelText(/duration_s/)).toBeTruthy();
+    expect(screen.getByText('Generated audio.')).toBeTruthy();
   });
 
   it('has aria-live region for tool list updates', () => {
