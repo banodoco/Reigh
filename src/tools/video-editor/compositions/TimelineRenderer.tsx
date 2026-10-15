@@ -56,6 +56,7 @@ import { tryCompileSequenceComponentAsync } from '@/tools/video-editor/sequences
 import { boundCanonicalConfigClips } from '@/tools/video-editor/lib/canonicalRenderBounds.ts';
 import { resolveEndSpanningLayerPreviewParams } from '@/tools/video-editor/sequences/components/EndSpanningLayerSequence.tsx';
 import { projectOutputTimelineConfig } from '@/tools/video-editor/data/timelineOutputProjection.ts';
+import { preparePlayerCut, queryPlayerCutFrame } from './player-cut-evaluation.ts';
 
 const AstridElementHostContext = createContext<AstridElementHost | null>(null);
 const useAstridElementHost = () => requireAstridElementHost(useContext(AstridElementHostContext));
@@ -1278,12 +1279,13 @@ const ExtensionClipSequence: FC<ExtensionClipSequenceProps> = ({
   const from = Math.max(0, secondsToFrames(clip.at, fps));
   const { width, height } = parseResolution(resolution);
   const frame = useCurrentFrame();
+  const drawPlan = useMemo(() => preparePlayerCut(from, durationInFrames), [from, durationInFrames]);
 
   // Clamp the evaluation frame to the clip's own range. Inside the range this
   // is the identity; outside it Remotion renders nothing, and the constant
   // value keeps the memo below from recomputing on every frame of the
   // timeline for clips that are not on screen.
-  const clampedFrame = Math.min(Math.max(frame, from), from + Math.max(0, durationInFrames - 1));
+  const clampedFrame = queryPlayerCutFrame(drawPlan, frame);
   const timeSeconds = clampedFrame / fps;
 
   // Compute host-interpolated params from keyframe data, then apply
@@ -1346,7 +1348,7 @@ const ExtensionClipSequence: FC<ExtensionClipSequenceProps> = ({
   );
 
   return (
-    <Sequence key={clip.id} from={from} durationInFrames={durationInFrames}>
+    <Sequence key={clip.id} from={drawPlan.drawStart} durationInFrames={drawPlan.drawDuration}>
       <ExtensionRendererErrorBoundary fallback={placeholder}>
         <Renderer {...rendererProps} />
       </ExtensionRendererErrorBoundary>
