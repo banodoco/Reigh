@@ -128,7 +128,7 @@ export interface TimelineClip {
     pool_id?: string;
     clip_order?: number;
     keyframes?: {
-        [k: string]: unknown;
+        [k: string]: ClipKeyframe[];
     };
     derived_output?: {
         [k: string]: unknown;
@@ -144,6 +144,20 @@ export interface TimelineClipModifier {
     params: {
         [k: string]: unknown;
     };
+}
+/**
+ * This interface was referenced by `TimelineConfig`'s JSON-Schema
+ * via the `definition` "ClipKeyframe".
+ */
+export interface ClipKeyframe {
+    time: number;
+    value: number | string | boolean;
+    interpolation: "linear" | "hold";
+    /**
+     * Optional named easing; absence preserves the prior interpolation behavior.
+     */
+    easing?: string;
+    [k: string]: unknown;
 }
 /**
  * This interface was referenced by `TimelineConfig`'s JSON-Schema

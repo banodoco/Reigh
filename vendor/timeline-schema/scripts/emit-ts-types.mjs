@@ -15,7 +15,14 @@ const schema = JSON.parse(readFileSync(schemaPath, 'utf8'));
 // Guard: refuse to emit a degenerate artifact (the incident's 265-byte
 // truncation must fail here, before anything downstream sees it).
 // TimelineConfig is the root object; the definitions are the shared types.
-const requiredDefinitions = ['TimelineClip', 'Theme', 'ThemeOverrides', 'TimelineOutput', 'AssetEntry'];
+const requiredDefinitions = [
+  'TimelineClip',
+  'ClipKeyframe',
+  'Theme',
+  'ThemeOverrides',
+  'TimelineOutput',
+  'AssetEntry',
+];
 const definitions = schema.definitions ?? {};
 if (!schema.type || !schema.properties || Object.keys(schema.properties).length === 0) {
   throw new Error('degenerate artifact: root TimelineConfig missing type/properties');
