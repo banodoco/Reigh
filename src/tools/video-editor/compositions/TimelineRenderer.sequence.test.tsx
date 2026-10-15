@@ -386,6 +386,19 @@ beforeEach(() => {
 });
 
 describe('TimelineRenderer registered sequences', () => {
+  it('surfaces an unregistered contributed transition refusal without drawing a legacy fallback', async () => {
+    const config = buildConfig();
+    config.clips = [
+      {id: 'outgoing', track: 'V1', at: 0, hold: 2, clipType: 'media'},
+      {id: 'incoming', track: 'V1', at: 2, hold: 2, clipType: 'media',
+        transition: {type: 'missing-pack:soft', revision: `sha256:${'0'.repeat(64)}`, duration: 1}},
+    ];
+    render(<TimelineRenderer config={config} />);
+    await waitFor(() => expect(screen.getByTestId('player-transition-admission')).toHaveAttribute('data-status', 'refused'));
+    expect(screen.getByRole('alert')).toHaveTextContent("Transition 'missing-pack:soft' is not registered");
+    expect(visualClipMock).not.toHaveBeenCalled();
+  });
+
   it('keeps a canonical visual image absent at the half-open end after transition expansion', async () => {
     const { VisualClipSequence } = await vi.importActual<typeof import('@/tools/video-editor/compositions/VisualClip.tsx')>(
       '@/tools/video-editor/compositions/VisualClip.tsx',

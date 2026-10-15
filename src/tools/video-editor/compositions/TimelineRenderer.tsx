@@ -60,7 +60,8 @@ import { projectOutputTimelineConfig } from '@/tools/video-editor/data/timelineO
 import { admitAppModifierTarget, AppModifierHostProvider, useAppModifierHost } from '@/tools/video-editor/runtime/clip-modifiers.ts';
 
 import { querySceneFrame } from '@banodoco/timeline-composition/evaluation';
-import { preparePlayerTrack } from './playerEvaluation.ts';
+import { usePlayerTrackEvaluation } from './usePlayerTrackEvaluation.ts';
+import { useTransitionRegistrySnapshot } from '../transitions/registry/TransitionRegistryContext.tsx';
 import { PlayerClipSequence, PlayerClipEvaluationContext } from './PlayerClipSequence.tsx';
 
 const AstridElementHostContext = createContext<AstridElementHost | null>(null);
@@ -1404,10 +1405,17 @@ const VisualTrack: FC<VisualTrackProps> = ({
   const { entries: dynamicEntries } = useSequenceComponentRegistrySnapshot();
   const clipTypeRegistry = useClipTypeRegistrySnapshot();
   const {width, height} = parseResolution(resolution);
-  const evaluation = useMemo(() => preparePlayerTrack(track, clips, fps, width, height),
-    [track, clips, fps, width, height]);
-  const sortedClips = evaluation.clips;
+  const transitionSnapshot = useTransitionRegistrySnapshot();
+  const evaluationState = usePlayerTrackEvaluation(track, clips, fps, width, height, transitionSnapshot);
   const frame = useCurrentFrame();
+  if (evaluationState.status !== 'ready') {
+    return <AbsoluteFill role="alert" data-testid="player-transition-admission" data-status={evaluationState.status}
+      style={{background: '#301b1b', color: 'white', padding: 16}}>
+      {evaluationState.status === 'refused' ? evaluationState.error.message : 'Loading pinned transition…'}
+    </AbsoluteFill>;
+  }
+  const evaluation = evaluationState.evaluation;
+  const sortedClips = evaluation.clips;
   const evaluated = querySceneFrame(evaluation.scene, Math.max(0, frame));
   if (sortedClips.length === 0) {
     return null;

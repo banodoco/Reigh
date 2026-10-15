@@ -39,10 +39,15 @@ describe('Player shared scene boundary', () => {
     expect(b.transition).toEqual({type, duration: 1});
   });
 
-  it.each(['wipe', 'extension-missing'])('preserves %s host semantics without a dissolve substitution', type => {
+  it.each(['wipe'])('preserves %s host semantics without a dissolve substitution', type => {
     const {scene, legacyTiming} = prepare([clip('a', 0), clip('b', 2, {transition: {type, duration: 1}})]);
     expect([...legacyTiming]).toEqual([1,0]);
     expect(scene.tracks[0].prepared.plans.every(plan => !plan.fadeIn && !plan.fadeOut)).toBe(true);
+  });
+
+  it('refuses unknown transitions instead of selecting a legacy renderer', () => {
+    expect(() => prepare([clip('a', 0), clip('b', 2,
+      {transition: {type: 'extension-missing', duration: 1}})])).toThrow(/not registered/);
   });
 
   it.each([4, 1])('preserves legacy gap/overlap transition timing at %ss', at => {
