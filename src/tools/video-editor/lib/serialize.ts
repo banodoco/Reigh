@@ -30,6 +30,15 @@ export const validateSerializedConfig = (config: TimelineConfig): void => {
   assertValidTimelineConfigSnapshot(config);
 };
 
+/**
+ * S-PRES preservation contract: every covered App save path preserves opaque
+ * and unknown fields in top-level config, each `config.app` namespace, clip and
+ * track `app`, unknown clip fields, registry metadata, and the bundle. Clearing
+ * a known field requires the explicit `{"op":"clear"}` operation within its
+ * declared coverage. Absent or removed values never reappear after save or an
+ * exact Runtime reload. The fixture-backed harness records current red paths;
+ * this comment states the contract and does not claim the base satisfies it.
+ */
 export const serializeForDisk = (
   resolved: ResolvedTimelineConfig,
   pinnedShotGroups?: TimelineConfig['pinnedShotGroups'],
