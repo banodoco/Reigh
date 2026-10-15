@@ -14,6 +14,13 @@
       "require": "./typescript/src/index.ts",
       "default": "./typescript/src/index.ts"
     },
+    "./evaluation": {
+      "types": "./typescript/src/evaluation.ts",
+      "remotion": "./typescript/src/evaluation.ts",
+      "import": "./typescript/src/evaluation.ts",
+      "require": "./typescript/src/evaluation.ts",
+      "default": "./typescript/src/evaluation.ts"
+    },
     "./theme-api": {
       "types": "./typescript/src/theme-api.ts",
       "remotion": "./typescript/src/theme-api.ts",
