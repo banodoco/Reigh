@@ -1,5 +1,6 @@
-import { rightResizeGestureCommands, tiedEndResizeGesture } from '../commands/semanticGestures.ts';
-import { useCallback, useRef } from 'react';
+import { rightResizeGestureCommands, tiedEndResizeGesture, legacyTiedEndResizeGesture } from '../commands/semanticGestures.ts';
+import { useCallback, useContext, useRef } from 'react';
+import { VideoEditorRuntimeContext } from '../contexts/VideoEditorRuntimeContext.tsx';
 import { buildRowTrackPatches } from '@/tools/video-editor/lib/coordinate-utils.ts';
 import type {
   ClipEdgeResizeContext,
@@ -51,6 +52,8 @@ export interface UseClipResizeArgs {
   dataRef: React.MutableRefObject<TimelineData | null>;
   applyEdit: TimelineApplyEdit;
   editability?: TimelineEditability;
+  /** Explicit host/test capability; otherwise use the mounted provider. */
+  semanticCommandSaving?: boolean;
 }
 
 export interface UseClipResizeResult {
@@ -203,12 +206,17 @@ export function useClipResize({
   dataRef,
   applyEdit,
   editability = allowTimelineEdits,
+  semanticCommandSaving,
 }: UseClipResizeArgs): UseClipResizeResult {
+  const runtime = useContext(VideoEditorRuntimeContext);
+  const semanticEndChoices = semanticCommandSaving ?? runtime?.provider.semanticCommandSaving === true;
   const resizeStartRef = useRef<Record<string, ResizeStartState>>({});
+  const resizeBaseRef = useRef<Record<string, { config: string; head: string; fps: number }>>({});
   const resizeTransactionIdRef = useRef<Record<string, string>>({});
 
   const clearResizeTracking = useCallback((clipId: string) => {
     delete resizeStartRef.current[clipId];
+    delete resizeBaseRef.current[clipId];
     delete resizeTransactionIdRef.current[clipId];
   }, []);
 
@@ -217,6 +225,8 @@ export function useClipResize({
     const current = dataRef.current;
     if (current && !editability.check({ clipId: action.id, sourceTrackId: row.id, targetTrackId: row.id }).allowed) return;
     const clipMeta = current?.meta[action.id];
+    if (current) resizeBaseRef.current[action.id] = { config: JSON.stringify(current.config),
+      head: JSON.stringify(current.head), fps: current.output.fps };
     if (!current || !clipMeta || typeof clipMeta.hold === 'number') {
       resizeTransactionIdRef.current[action.id] = crypto.randomUUID();
       if (current && clipMeta) {
@@ -357,14 +367,29 @@ export function useClipResize({
       session.edge,
     );
 
+    const captured = resizeBaseRef.current[session.clipId];
+    if (semanticEndChoices && primary.clipMeta.app?.astrid && (primary.clipMeta.app.astrid as Record<string, unknown>).until
+      && (!captured || captured.config !== JSON.stringify(current.config)
+        || captured.head !== JSON.stringify(current.head) || captured.fps !== current.output.fps)) {
+      clearResizeTracking(session.clipId);
+      return;
+    }
     const tiedEnd = session.edge === 'right' && effectiveStart === primary.origin.start
-      ? tiedEndResizeGesture(current, session.clipId, effectiveEnd - effectiveStart) : undefined;
+      ? (semanticEndChoices ? tiedEndResizeGesture : legacyTiedEndResizeGesture)(current, session.clipId, effectiveEnd - effectiveStart) : undefined;
     if (tiedEnd === null) {
       clearResizeTracking(session.clipId);
       return;
     }
-    if (tiedEnd) primaryPatch.app = { ...primary.clipMeta.app, astrid: tiedEnd.astrid };
+    if (tiedEnd && semanticEndChoices) {
+      // A relation can resolve beyond pointer geometry. Submit the chosen intent
+      // atomically, retaining authored data until canonical poll/reload. Definite
+      // refusal and uncertain transport cannot leave an optimistic partial trim.
+      applyEdit({ type: 'commands' }, { transactionId, semantic: true, editCommands: tiedEnd.commands });
+      clearResizeTracking(session.clipId);
+      return;
+    }
 
+    if (tiedEnd && 'astrid' in tiedEnd) primaryPatch.app = { ...primary.clipMeta.app, astrid: tiedEnd.astrid };
     applyEdit({
       type: 'rows',
       rows: resolvedRows,
@@ -384,7 +409,7 @@ export function useClipResize({
     });
 
     clearResizeTracking(session.clipId);
-  }, [applyEdit, clearResizeTracking, dataRef, editability]);
+  }, [applyEdit, clearResizeTracking, dataRef, editability, semanticEndChoices]);
 
   return {
     onActionResizeStart,

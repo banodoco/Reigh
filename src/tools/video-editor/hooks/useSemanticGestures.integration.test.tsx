@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React, { useEffect } from 'react';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -23,6 +23,7 @@ import { useAssetManagement } from './useAssetManagement.ts';
 import { VideoEditorRuntimeProvider, type VideoEditorRuntimeContextValue } from '../contexts/VideoEditorRuntimeContext.tsx';
 import { useTimelinePersistence } from './useTimelinePersistence.ts';
 import { useClipResize } from './useClipResize.ts';
+import { usePollSync } from './usePollSync.ts';
 import { useClipEditing } from './useClipEditing.ts';
 import { useTimelineTrackManagement } from './useTimelineTrackManagement.ts';
 import { buildKeyboardTimeNudgeEdit } from '../lib/keyboard-nudge.ts';
@@ -116,11 +117,11 @@ async function setup(reply?: FixtureReply, media = false, providedInitial?: Time
     useEffect(() => eventBus.on('scheduleSave', persistence.scheduleSave), [persistence.scheduleSave]);
     const editing = useClipEditing({ ...commit, selectedClipId: 'clip-1', selectedTrack: initial.tracks[0], currentTime, selectClip, resolvedConfig: commit.data?.resolvedConfig ?? null });
     const tracks = useTimelineTrackManagement({ ...commit, resolvedConfig: commit.data?.resolvedConfig ?? null, eventBus, editability });
-    const resize = useClipResize(commit);
+    const resize = useClipResize({ ...commit, semanticCommandSaving: fixture.provider.semanticCommandSaving });
     const ops = useTimelineOps({ ...commit, createManualCheckpoint: vi.fn(), jumpToCheckpoint: vi.fn(), checkpoints: [], editability });
     return { ...commit, editing, tracks, resize, persistence, ops };
   }, { wrapper });
-  return { ...hook, ...fixture, initial, savedSeqRef, interactionStateRef, eventBus, selectClip };
+  return { ...hook, ...fixture, initial, savedSeqRef, interactionStateRef, eventBus, selectClip, configVersionRef, headRevisionRef, lastSavedSignatureRef };
 }
 beforeEach(() => { vi.stubGlobal('indexedDB', createFakeIndexedDB()); __resetSelectionStoreForTests(); });
 afterEach(() => { resetFakeIndexedDB(); vi.restoreAllMocks(); });
@@ -453,8 +454,8 @@ describe('main-editor semantic gesture wire adaptation', () => {
 const authoredRelations = [
   ['word', { on: '"hello" +2f', until: 'after "hello"' }],
   ['music', { on: 'beat 2', until: 'beat 4' }],
-  ['neighbour', { on: 'c2', until: 'end of c2' }],
-  ['sequence step', { on: 'c2 +2f', until: 'end of c2', sequence: { id: 'steps', index: 1 } }],
+  ['cut', { on: 'c2', until: 'end of c2' }],
+  ['exact neighbour', { on: 'c2', until: 'clip-end "parent/clip:clip-2"' }],
 ] as const;
 async function relationData(astrid: Record<string, unknown>) {
   const base = await initialData();
@@ -471,62 +472,62 @@ function resizeFirst(h: Awaited<ReturnType<typeof setup>>, end = 6) {
     updates: [{ clipId: 'clip-1', start: 1, end }], cancelled: false,
   }));
 }
+const endChoiceWireEvidence: Array<{ label: string; requests: unknown }> = [];
+function recordEndChoiceWire(label: string, requests: unknown) {
+  const evidencePath = process.env.E020_WIRE_EVIDENCE_PATH;
+  if (!evidencePath) return;
+  endChoiceWireEvidence.push({ label, requests });
+  writeFileSync(evidencePath, JSON.stringify(endChoiceWireEvidence, null, 2) + '\n');
+}
+
 describe('authored end relation choices through the main resize handler', () => {
   for (const [relation, astrid] of authoredRelations) {
-    it.each(['keep', null, 'unknown'])(`${relation} overlap choice %s keeps the captured base and sends nothing`, async (choice) => {
+    it.each(['keep', null, 'unknown', 'cancel'])(`${relation} end choice %s sends nothing`, async (choice) => {
       const initial = await relationData(astrid);
       const prompt = vi.spyOn(window, 'prompt').mockReturnValue(choice);
       const h = await setup(undefined, false, initial);
+      const history = vi.fn(); h.eventBus.on('beforeCommit', history);
+      const draft = vi.spyOn(draftStorage, 'saveTimelineDraft');
       resizeFirst(h);
       expect(prompt).toHaveBeenCalledOnce();
       expect(prompt.mock.calls[0][0]).toContain(astrid.until);
       expect(h.result.current.data).toBe(initial);
       expect(h.result.current.editSeqRef.current).toBe(0);
       expect(h.requests).toHaveLength(0);
+      expect(history).not.toHaveBeenCalled();
+      expect(draft).not.toHaveBeenCalled();
       h.unmount();
     });
-    it.each(['detach', 'adjust-offset', 're-anchor'])(`${relation} overlap choice %s sends one captured command`, async (choice) => {
-      const prompt = vi.spyOn(window, 'prompt').mockReturnValueOnce(choice).mockReturnValueOnce('beat 8');
-      const initial = await relationData(astrid);
+    it.each(['detach', 'adjust-offset', 're-anchor'])(`${relation} end choice %s sends one captured typed request`, async (choice) => {
+      const prompt = vi.spyOn(window, 'prompt').mockReturnValueOnce(choice);
+      if (choice === 're-anchor') prompt.mockReturnValueOnce('clip-end "parent/clip:clip-2"');
+      if (choice !== 'detach') prompt.mockReturnValueOnce('-0.125').mockReturnValueOnce('62');
+      const initial = await relationData({ ...astrid, opaque: { value: null }, fixed_start: true });
+      const before = structuredClone(initial.config);
       const h = await setup(undefined, false, initial);
+      const history = vi.fn(); h.eventBus.on('beforeCommit', history);
       resizeFirst(h);
       await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
       expect(h.requests).toHaveLength(1);
-      const op = choice === 'detach' ? 'clip.set-duration' : 'clip.until';
-      const args = choice === 'detach' ? { seconds: 4 }
-        : { moment: choice === 're-anchor' ? 'beat 8' : `${astrid.until} +60f` };
-      expect(h.requests[0].request.change).toEqual({ commands: [{
-        op, select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args,
-        expect: { at: { state: 'present', value: 1 }, hold: { state: 'present', value: 2 },
-          'app.astrid.on': { state: 'present', value: astrid.on },
-          'app.astrid.until': { state: 'present', value: astrid.until }, 'app.astrid.for': { state: 'absent' } },
-      }] });
-      const clip = h.result.current.data!.config.clips.find((clip) => clip.id === 'clip-1')!;
-      expect(clip.hold).toBe(4);
-      expect(clip.app?.clipSentinel).toBe(true);
-      const writtenIntent = clip.app?.astrid as Record<string, unknown> | undefined;
-      expect(writtenIntent?.on).toBe(astrid.on);
-      if (choice === 'detach') {
-        expect(clip.app?.astrid).not.toHaveProperty('until');
-        expect(writtenIntent?.for).toBe(4);
-      } else expect(writtenIntent?.until).toBe(args.moment);
-      expect(prompt).toHaveBeenCalledTimes(choice === 're-anchor' ? 2 : 1);
-      h.unmount();
-    });
-    it(`${relation} plain drag preserves its start tie without showing a choice`, async () => {
-      const { until: _until, ...startRelation } = astrid;
-      const initial = await relationData(startRelation);
-      const prompt = vi.spyOn(window, 'prompt');
-      const h = await setup(undefined, false, initial);
-      act(() => h.result.current.editing.handleSelectedClipChange({ at: 1.3 }));
-      await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
-      expect(h.requests).toHaveLength(1);
-      expect(h.requests[0].request.change).toEqual({ commands: [expect.objectContaining({
-        op: 'clip.nudge', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args: { frames: 9 },
-        expect: { at: { state: 'present', value: 1 }, 'app.astrid.on': { state: 'present', value: astrid.on },
-          'app.astrid.until': { state: 'absent' } },
-      })] });
-      expect(prompt).not.toHaveBeenCalled();
+      const selected = { target: 'parent/clip:clip-1', edge: 'end', choice,
+        ...(choice === 're-anchor' ? { anchor: 'clip-end "parent/clip:clip-2"' } : {}),
+        ...(choice !== 'detach' ? { offset_seconds: -0.125, offset_frames: 62 } : {}) };
+      expect(h.requests[0].request).toMatchObject({ source: { via: 'app' }, base_revision_id: 'parent-r1',
+        change: { commands: [{ op: 'clip.set-duration', select: 'parent/clip:clip-1',
+          resolved: ['parent/clip:clip-1'], args: { seconds: 4, relation_choices: [selected] },
+          expect: { '': { state: 'present', value: before.clips[0] }, at: { state: 'present', value: 1 },
+            hold: { state: 'present', value: 2 }, 'app.astrid.on': { state: 'present', value: astrid.on },
+            'app.astrid.until': { state: 'present', value: astrid.until }, 'app.astrid.for': { state: 'absent' },
+            'app.astrid.fixed_start': { state: 'present', value: true } } }] } });
+      // This fixture records the wire, not Astrid resolution. In particular the
+      // App does not guess the new end from a Moment or apply pointer delta twice.
+      expect(h.result.current.data!.config).toEqual(before);
+      expect(h.result.current.data!.registry).toBe(initial.registry);
+      expect(history).toHaveBeenCalledTimes(1);
+      expect(history.mock.calls[0]).toEqual([initial, expect.objectContaining({ semantic: true, transactionId: expect.any(String) })]);
+      expect(h.result.current.editSeqRef.current).toBe(1);
+      expect(h.compatibilityRequests).toEqual([]);
+      recordEndChoiceWire(`${relation}/${choice}`, h.requests);
       h.unmount();
     });
   }
@@ -540,35 +541,207 @@ describe('authored end relation choices through the main resize handler', () => 
     expect(h.requests).toHaveLength(0);
     h.unmount();
   });
-  it('an end choice captures present-null for separately from absence', async () => {
+  it('captures present-null separately from absent and preserves opaque siblings', async () => {
     vi.spyOn(window, 'prompt').mockReturnValue('detach');
-    const h = await setup(undefined, false, await relationData({ on: 'beat 2', until: 'beat 4', for: null }));
+    const initial = await relationData({ on: null, until: 'beat 4', for: null, opaque: { keep: true } });
+    const h = await setup(undefined, false, initial);
     resizeFirst(h, 3.5);
     await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
-    expect(h.requests).toHaveLength(1);
     expect(h.requests[0].request.change).toEqual({ commands: [expect.objectContaining({
-      op: 'clip.set-duration', args: { seconds: 2.5 },
-      expect: expect.objectContaining({ 'app.astrid.for': { state: 'present', value: null } }),
+      args: { seconds: 2.5, relation_choices: [{ target: 'parent/clip:clip-1', edge: 'end', choice: 'detach' }] },
+      expect: expect.objectContaining({ 'app.astrid.on': { state: 'present', value: null },
+        'app.astrid.for': { state: 'present', value: null }, 'app.astrid.fixed_start': { state: 'absent' } }),
     })] });
+    expect(h.result.current.data!.config).toEqual(initial.config);
     h.unmount();
   });
-  it('cancelling a re-anchor sends nothing', async () => {
-    vi.spyOn(window, 'prompt').mockReturnValueOnce('re-anchor').mockReturnValueOnce(null);
-    const initial = await relationData({ on: 'beat 2', until: 'beat 4' });
+  it.each([
+    ['re-anchor', null], ['re-anchor', ''], ['adjust-offset', null],
+    ['adjust-offset', ''], ['adjust-offset', 'Infinity'], ['adjust-offset', '0', null],
+    ['adjust-offset', '0', '0.5'], ['adjust-offset', '0', 'NaN'],
+  ])('cancel or invalid typed input %j writes nothing', async (...answers) => {
+    const prompt = vi.spyOn(window, 'prompt');
+    for (const answer of answers) prompt.mockReturnValueOnce(answer);
+    const initial = await relationData({ until: 'beat 4 +2f -0.1s' });
     const h = await setup(undefined, false, initial);
+    const draft = vi.spyOn(draftStorage, 'saveTimelineDraft');
+    const history = vi.fn(); h.eventBus.on('beforeCommit', history);
     resizeFirst(h);
     expect(h.result.current.data).toBe(initial);
     expect(h.requests).toHaveLength(0);
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(draft).not.toHaveBeenCalled(); expect(history).not.toHaveBeenCalled();
     h.unmount();
   });
-  it('an offset choice retains existing frame and second offsets as authored TimeRef text', async () => {
-    vi.spyOn(window, 'prompt').mockReturnValue('adjust-offset');
-    const h = await setup(undefined, false, await relationData({ on: 'beat 2', until: 'beat 4 +2f -0.1s' }));
-    resizeFirst(h, 2.5);
+  it('keeps mixed authored units and sends absolute components without rounding or delta addition', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValueOnce('adjust-offset').mockReturnValueOnce('-0.1').mockReturnValueOnce('11');
+    const initial = await relationData({ until: 'beat 4 +2f -0.1s' });
+    const h = await setup(undefined, false, initial);
+    resizeFirst(h, 3.5);
     await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
     expect(h.requests[0].request.change).toEqual({ commands: [expect.objectContaining({
-      op: 'clip.until', args: { moment: 'beat 4 +2f -0.1s -15f' },
+      args: { seconds: 2.5, relation_choices: [{ target: 'parent/clip:clip-1', edge: 'end',
+        choice: 'adjust-offset', offset_seconds: -0.1, offset_frames: 11 }] },
+      expect: expect.objectContaining({ 'app.astrid.until': { state: 'present', value: 'beat 4 +2f -0.1s' } }),
     })] });
+    expect((initial.config.clips[0].app?.astrid as Record<string, unknown>)?.until).toBe('beat 4 +2f -0.1s');
+    h.unmount();
+  });
+  it.each(['rejected', 'refused'] as const)('late %s leaves the whole local authored graph unchanged', async (outcome) => {
+    vi.spyOn(window, 'prompt').mockReturnValue('detach');
+    const initial = await relationData({ on: 'beat 2', until: 'beat 4', opaque: { keep: null } });
+    const before = structuredClone(initial.config);
+    const h = await setup(async () => outcome, false, initial);
+    resizeFirst(h);
+    await waitFor(() => expect(h.result.current.persistence.saveStatus).toBe('error'));
+    expect(h.requests).toHaveLength(1);
+    expect(h.savedSeqRef.current).toBe(0);
+    expect(h.result.current.data!.config).toEqual(before);
+    expect(initial.config).toEqual(before);
+    h.unmount();
+  });
+  it('retries a lost end-choice response with identical key, base, command and offsets', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValueOnce('adjust-offset').mockReturnValueOnce('-0.1').mockReturnValueOnce('11');
+    const h = await setup(async (_request, call) => call === 1 ? 'unavailable' : undefined, false,
+      await relationData({ until: 'beat 4 +2f -0.1s' }));
+    resizeFirst(h, 3.5);
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1), { timeout: 5000 });
+    expect(h.requests).toHaveLength(2);
+    expect(h.requests[1].bytes).toBe(h.requests[0].bytes);
+    expect(h.requests[1].request.request_id).toBe(h.requests[0].request.request_id);
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    h.unmount();
+  });
+  it('rebases a queued end choice from its captured base using only the returned preview commands', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const h = await setup(async (_request, call) => { if (call === 1) await held; }, false,
+      await relationData({ until: 'beat 4', opaque: { keep: null } }));
+    act(() => h.result.current.editing.handleSelectedClipChange({ opacity: 0.4 }));
+    await waitFor(() => expect(h.requests).toHaveLength(1));
+    const captured = structuredClone(h.result.current.data!.config);
+    vi.spyOn(window, 'prompt').mockReturnValue('detach');
+    resizeFirst(h, 3.5);
+    expect(h.requests).toHaveLength(1);
+    release();
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
+    expect(h.requests).toHaveLength(3);
+    const [, preview, accepted] = h.requests.map((entry) => entry.request);
+    expect(preview).toMatchObject({ dry_run: true, base_revision_id: 'parent-r1', source: { via: 'app' } });
+    expect(accepted).toMatchObject({ dry_run: false, base_revision_id: 'parent-r2', source: { via: 'app' } });
+    expect(accepted.request_id).not.toBe(preview.request_id);
+    expect(accepted.change).toEqual(preview.change);
+    expect(preview.change).toEqual({ commands: [expect.objectContaining({ op: 'clip.set-duration',
+      args: { seconds: 2.5, relation_choices: [{ target: 'parent/clip:clip-1', edge: 'end', choice: 'detach' }] },
+      expect: expect.objectContaining({ '': { state: 'present', value: captured.clips[0] } }),
+    })] });
+    expect(h.result.current.data!.config).toEqual(captured);
+    recordEndChoiceWire('queued-end-choice-preview-rebase', h.requests);
+    h.unmount();
+  });
+  it('adopts a canonical choice document through the existing poll seam without a second save', async () => {
+    const initial = await relationData({ until: 'beat 4', opaque: { keep: null } });
+    const h = await setup(undefined, false, initial);
+    vi.spyOn(window, 'prompt').mockReturnValue('detach');
+    resizeFirst(h, 3.5);
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.result.current.data!.config).toEqual(initial.config);
+    // Synthetic canonical document input to the App poll seam, not an executed
+    // Astrid result. A owns proof that Runtime materializes this actual choice.
+    const canonical = await buildTimelineData({ ...initial.config, clips: initial.config.clips.map((clip) => {
+      if (clip.id !== 'clip-1') return clip;
+      const { until: _until, ...astrid } = clip.app!.astrid as Record<string, unknown>;
+      return { ...clip, hold: 2.5, app: { ...clip.app, astrid: { ...astrid, for: 2.5 } } };
+    }) }, initial.registry, undefined, h.configVersionRef.current, undefined, h.headRevisionRef.current);
+    const history = vi.fn(); h.eventBus.on('beforeCommit', history);
+    const poll = renderHook(() => usePollSync({ provider: h.provider,
+      queries: { timelineQuery: { data: canonical, isLoading: false }, assetRegistryQuery: { data: initial.registry } },
+      ...h.result.current, savedSeqRef: h.savedSeqRef, configVersionRef: h.configVersionRef, headRevisionRef: h.headRevisionRef,
+      lastSavedSignatureRef: h.lastSavedSignatureRef, interactionStateRef: h.interactionStateRef,
+      isSavingRef: h.result.current.persistence.isSavingRef, pendingOpsRef: { current: 0 },
+    }));
+    await waitFor(() => expect(h.result.current.data!.config).toEqual(canonical.config));
+    expect(h.requests).toHaveLength(1);
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(history).not.toHaveBeenCalled();
+    expect((h.result.current.data!.config.clips[0].app?.astrid as Record<string, unknown>).opaque).toEqual({ keep: null });
+    poll.unmount(); h.unmount();
+  });
+  it('pointer cancellation emits no choice, draft, history or request', async () => {
+    const initial = await relationData({ until: 'beat 4' });
+    const h = await setup(undefined, false, initial);
+    const row = initial.rows[0]; const action = row.actions[0];
+    const history = vi.fn(); h.eventBus.on('beforeCommit', history);
+    const draft = vi.spyOn(draftStorage, 'saveTimelineDraft');
+    const prompt = vi.spyOn(window, 'prompt');
+    act(() => h.result.current.resize.onActionResizeStart({ action, row, dir: 'right' }));
+    act(() => h.result.current.resize.onClipEdgeResizeEnd({ session: { pointerId: 1, rowId: 'V1', clipId: 'clip-1', edge: 'right', cursorOffsetPx: 0,
+      initialBoundaryTime: 3, context: { kind: 'free', clipId: 'clip-1', initialStart: 1, initialEnd: 3 }, siblingTimes: [] },
+      updates: [{ clipId: 'clip-1', start: 1, end: 4 }], cancelled: true }));
+    expect(h.result.current.data).toBe(initial);
+    expect(prompt).not.toHaveBeenCalled(); expect(draft).not.toHaveBeenCalled(); expect(history).not.toHaveBeenCalled();
+    expect(h.requests).toHaveLength(0); expect(h.result.current.editSeqRef.current).toBe(0);
+    h.unmount();
+  });
+  it.each(['sequence', 'bed', 'missing occurrence pins'] as const)('keeps %s end resize on its characterized fallback', async (kind) => {
+    const base = await relationData({ until: 'beat 4', ...(kind === 'sequence' ? { sequence: { id: 'steps', index: 1 } } : {}) });
+    const initial = await buildTimelineData({ ...base.config,
+      ...(kind === 'bed' ? { app: { astrid: { v: 2, music_beds: { 'parent/clip:clip-1': { source: base.config.clips[0] } } } } } : {}),
+      clips: base.config.clips.map((clip) => kind === 'missing occurrence pins' && clip.id === 'clip-1'
+        ? { ...clip, app: { ...clip.app, canonical: { occurrenceId: 'occ-A' } } } : clip),
+    }, base.registry, undefined, 1, undefined, base.head);
+    const h = await setup(undefined, false, initial);
+    const prompt = vi.spyOn(window, 'prompt');
+    resizeFirst(h, 3.5);
+    expect(prompt).not.toHaveBeenCalled();
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it('overlap alone never opens the authored relation prompt', async () => {
+    const base = await initialData();
+    const initial = await buildTimelineData({ ...base.config, clips: base.config.clips.map((clip) => ({ ...clip, app: {} })) }, base.registry,
+      undefined, 1, undefined, base.head);
+    const h = await setup(undefined, false, initial);
+    const prompt = vi.spyOn(window, 'prompt');
+    resizeFirst(h);
+    expect(prompt).not.toHaveBeenCalled();
+    h.unmount();
+  });
+  it('a changed captured source refuses before prompting or scheduling the end choice', async () => {
+    const initial = await relationData({ until: 'beat 4' });
+    const h = await setup(undefined, false, initial);
+    const row = initial.rows[0]; const action = row.actions[0];
+    act(() => h.result.current.resize.onActionResizeStart({ action, row, dir: 'right' }));
+    h.result.current.dataRef.current = { ...initial, head: { ...initial.head!, headRevisionId: 'parent-r2' } };
+    const prompt = vi.spyOn(window, 'prompt');
+    act(() => h.result.current.resize.onClipEdgeResizeEnd({ session: { pointerId: 1, rowId: 'V1', clipId: 'clip-1', edge: 'right', cursorOffsetPx: 0,
+      initialBoundaryTime: 3, context: { kind: 'free', clipId: 'clip-1', initialStart: 1, initialEnd: 3 }, siblingTimes: [] },
+      updates: [{ clipId: 'clip-1', start: 1, end: 4 }], cancelled: false }));
+    expect(prompt).not.toHaveBeenCalled(); expect(h.requests).toHaveLength(0);
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    h.unmount();
+  });
+  it('uses real occurrence source identity and captured closure pins, never the display id', async () => {
+    const base = await relationData({ on: 'beat 2', until: 'beat 4' });
+    const raw = structuredClone(base.config.clips[0]);
+    const initial = await buildTimelineData({ ...base.config, clips: [{ ...raw, app: { ...raw.app, canonical: {
+      projectId: 'gesture-project', parentDocumentId: 'gesture-timeline', headRevisionId: 'parent-r1', occurrenceId: 'occ-A',
+      shotId: 'shot-A', revisionId: 'shot-r1', internalTimelineRevisionId: 'internal-r1', outputIdentity: 'out-A',
+      sourceClipId: 'source-hold', sourceClip: { ...raw, id: 'source-hold' },
+    } } }, base.config.clips[1]] }, base.registry, undefined, 1, undefined, base.head);
+    const h = await setup(undefined, false, initial);
+    vi.spyOn(window, 'prompt').mockReturnValue('detach');
+    resizeFirst(h, 3.5);
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.requests[0].request).toMatchObject({ base_revision_id: 'parent-r1', source: { via: 'app' },
+      scope: { target: 'occurrence:occ-A', content: 'this-occurrence', shot_id: 'shot-A', shot_revision_id: 'shot-r1',
+        internal_revision_id: 'internal-r1', complete: ['clips', 'tracks'], projection_version: 1 },
+      change: { commands: [{ select: 'occurrence:occ-A/clip:source-hold', resolved: ['occurrence:occ-A/clip:source-hold'],
+        args: { seconds: 2.5, relation_choices: [{ target: 'occurrence:occ-A/clip:source-hold', edge: 'end', choice: 'detach' }] } }] } });
+    expect(h.result.current.data!.config).toEqual(initial.config);
+    recordEndChoiceWire('occurrence-source-pins', h.requests);
     h.unmount();
   });
 });

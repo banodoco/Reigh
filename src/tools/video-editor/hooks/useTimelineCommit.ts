@@ -1,5 +1,5 @@
 import type { EditCommand } from '@/integrations/runtime/generated.ts';
-import { attachGestureCommands } from '../commands/semanticGestures.ts';
+import { attachGestureCommands, gestureCommandsFor } from '../commands/semanticGestures.ts';
 import {
   useCallback,
   useEffect,
@@ -124,6 +124,8 @@ export type TimelineEditMutation =
     }
   /** Explicit authored track edits preserve opaque rows and unedited clip state. */
   | { type: 'tracks'; tracks: TimelineData['tracks'] }
+  /** Submit authored semantic intent; materialization comes from canonical reload. */
+  | { type: 'commands' }
   /** Pinned shot groups only; clips and rows are left exactly as they are. */
   | {
       type: 'pinnedShotGroups';
@@ -427,6 +429,16 @@ export function useTimelineCommit({
       // user's edit vanished with no signal. Surface it so the write-ack
       // watchdog can make the loss visible.
       eventBus.emit('lostEdit');
+      return;
+    }
+
+    if (mutation.type === 'commands') {
+      if (!options?.editCommands?.length) return;
+      const nextData = { ...current };
+      attachGestureCommands(nextData, options.editCommands, current);
+      // Never turn a rejected semantic attachment into a compatibility save.
+      if (!gestureCommandsFor(nextData)) return;
+      commitData(nextData, options);
       return;
     }
 

@@ -39,7 +39,12 @@ export function attachGestureCommands(data: TimelineData, commands: readonly Edi
       continue;
     }
     if (command.select.startsWith('occurrence:')) {
-      if (!occurrenceOps.has(command.op) || command.resolved?.length !== 1
+      const endChoice = command.op === 'clip.set-duration' && Array.isArray(command.args.relation_choices)
+        && command.args.relation_choices.length === 1
+        && command.args.relation_choices[0]?.target === command.select
+        && command.args.relation_choices[0]?.edge === 'end'
+        && ['detach', 'adjust-offset', 're-anchor'].includes(command.args.relation_choices[0]?.choice);
+      if ((!occurrenceOps.has(command.op) && !endChoice) || command.resolved?.length !== 1
         || command.resolved[0] !== command.select) return;
       const matches = source.config.clips.flatMap((clip) => {
         const identity = occurrenceIdentityFor(source, clip.id);
@@ -157,11 +162,12 @@ export function detachAudioGestureCommands(data: TimelineData, id: string, child
   return [...additions, { ...command(id, 'clip.detach-audio', { track }, { '': state(clip, true) }), created: [created] }];
 }
 
+// Characterized compatibility provider behavior stays on its original save path.
 /** Only a hold's authored end relation has the admitted duration/until choices.
  * Moment parsing and resolving remain with Astrid. Its TimeRef grammar accepts
  * successive offsets, so appending frames preserves the exact original anchor.
  */
-export function tiedEndResizeGesture(data: TimelineData, id: string, duration: number): {
+export function legacyTiedEndResizeGesture(data: TimelineData, id: string, duration: number): {
   commands: EditCommand[]; astrid: Record<string, unknown>;
 } | null | undefined {
   const clip = originalClip(data, id);
@@ -194,6 +200,64 @@ export function tiedEndResizeGesture(data: TimelineData, id: string, duration: n
   } else return null;
   const { for: _for, ...astrid } = intent;
   return { commands: [command(id, 'clip.until', { moment }, expect)], astrid: { ...astrid, until: moment } };
+}
+
+/** Existing hold-end choice UI. Astrid alone parses/resolves Moments and discovers
+ * dependencies. The App asks for absolute offset components, never parses an
+ * authored Moment or guesses an offset from pointer geometry.
+ */
+export function tiedEndResizeGesture(data: TimelineData, id: string, duration: number): {
+  commands: EditCommand[];
+} | null | undefined {
+  const target = gestureTarget(data, id);
+  if (!target) return undefined;
+  const select = scopedGestureClipId(target);
+  if (!/^(?:parent|occurrence:[^/\s]+)\/clip:[^/\s]+$/.test(select)) return undefined;
+  const clip = gestureSource(data, id);
+  const intent = clip.app?.astrid as Record<string, unknown> | undefined;
+  const occurrence = occurrenceIdentityFor(data, id);
+  const beds = (data.config.app?.astrid as Record<string, unknown> | undefined)?.music_beds;
+  if (typeof clip.hold !== 'number' || typeof intent?.until !== 'string' || !intent.until.trim()
+    || (clip.speed !== undefined && clip.speed !== 1)
+    || ['sequence', 'sequence_fit', 'segment', 'formulas', 'loop', 'orphan'].some((key) => hasOwn(intent, key) || hasOwn(clip.app ?? {}, key))
+    || data.config.pinnedShotGroups?.some((group) => group.clipIds.includes(id))
+    || (beds != null && (typeof beds !== 'object' || Array.isArray(beds) || hasOwn(beds, select)))
+    || (occurrence && (occurrence.headRevisionId !== data.head?.headRevisionId
+      || occurrence.projectId !== data.head?.projectId || occurrence.parentDocumentId !== data.head?.timelineId))) return undefined;
+  const actions = data.rows.flatMap((row) => row.actions).filter((candidate) => candidate.id === id);
+  if (actions.length !== 1 || !Number.isFinite(duration) || duration <= 0
+    || Math.abs(clip.hold - (actions[0].end - actions[0].start)) > 1e-7) return undefined;
+  if (Math.abs(duration - clip.hold) < 1e-7) return null;
+  const choice = window.prompt(`The end of ${id} is tied to ${intent.until}. Choose keep to leave it unchanged, detach for a fixed duration, adjust-offset to keep the anchor, or re-anchor to choose another end anchor. Cancel leaves the clip unchanged.`, 'keep');
+  // Keep means abandoning this resize in the existing UI, not asking Astrid to
+  // promise contradictory geometry. Cancel never reaches applyEdit or a draft.
+  if (!choice || choice === 'keep' || !['detach', 'adjust-offset', 're-anchor'].includes(choice)) return null;
+  const relation: Record<string, unknown> = { target: select, edge: 'end', choice };
+  if (choice === 're-anchor') {
+    const anchor = window.prompt('New end anchor without an offset (for example beat 8 or clip-end "parent/clip:clip-2")');
+    if (!anchor?.trim()) return null;
+    relation.anchor = anchor.trim();
+  }
+  if (choice !== 'detach') {
+    const seconds = window.prompt('New absolute anchor offset in seconds (kept separately from frames)', '0');
+    if (seconds === null || !seconds.trim() || !Number.isFinite(Number(seconds))) return null;
+    const frames = window.prompt('New absolute anchor offset in whole frames (added to seconds)', '0');
+    if (frames === null || !frames.trim() || !Number.isSafeInteger(Number(frames))) return null;
+    relation.offset_seconds = Number(seconds);
+    relation.offset_frames = Number(frames);
+  }
+  const expect = {
+    '': state(clip, true),
+    at: state(clip.at, hasOwn(clip, 'at')),
+    hold: state(clip.hold, true),
+    'app.astrid.on': state(intent.on, hasOwn(intent, 'on')),
+    'app.astrid.until': state(intent.until, true),
+    'app.astrid.for': state(intent.for, hasOwn(intent, 'for')),
+    'app.astrid.fixed_start': state(intent.fixed_start, hasOwn(intent, 'fixed_start')),
+  };
+  return { commands: [command(target, 'clip.set-duration', {
+    seconds: duration, relation_choices: [relation],
+  }, expect)] };
 }
 export function moveGestureCommands(data: TimelineData, id: string, start: number, track?: string): EditCommand[] | undefined {
   const target = gestureTarget(data, id);

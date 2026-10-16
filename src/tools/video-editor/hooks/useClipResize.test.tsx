@@ -615,3 +615,32 @@ describe('useClipResize — unified clip-edge commit path', () => {
     expectRowBounds(mutation.rows, 'V1', 'c', { start: 2, end: 3 });
   });
 });
+
+describe('useClipResize compatibility end-choice routing', () => {
+  it('retains the original local detach mutation when semantic command saving is off', () => {
+    const data = makeData({ groupClipIds: [], freeClips: [{ id: 'tied', at: 1, hold: 2, trackId: 'V1' }] });
+    const app = { astrid: { on: 'beat 2', until: 'beat 4', opaque: { keep: null } } };
+    data.config.clips[0].app = app;
+    data.meta.tied.app = app;
+    const applyEdit = vi.fn<TimelineApplyEdit>();
+    const hook = renderHook(() => useClipResize({ dataRef: { current: data }, applyEdit, semanticCommandSaving: false }));
+    const row = data.rows.find((candidate) => candidate.id === 'V1')!;
+    const action = row.actions.find((candidate) => candidate.id === 'tied')!;
+    const prompt = vi.spyOn(window, 'prompt').mockReturnValue('detach');
+    act(() => hook.result.current.onActionResizeStart({ action, row, dir: 'right' }));
+    act(() => hook.result.current.onClipEdgeResizeEnd({
+      session: { pointerId: 1, rowId: 'V1', clipId: 'tied', edge: 'right', cursorOffsetPx: 0,
+        initialBoundaryTime: 3, context: { kind: 'free', clipId: 'tied', initialStart: 1, initialEnd: 3 }, siblingTimes: [] },
+      updates: [{ clipId: 'tied', start: 1, end: 3.5 }], cancelled: false,
+    }));
+    expect(applyEdit).toHaveBeenCalledOnce();
+    expect(applyEdit.mock.calls[0][0]).toMatchObject({ type: 'rows', metaUpdates: {
+      tied: { hold: 2.5, app: { astrid: { on: 'beat 2', for: 2.5, opaque: { keep: null } } } },
+    } });
+    expect(applyEdit.mock.calls[0][1]?.editCommands).toEqual([expect.objectContaining({
+      op: 'clip.set-duration', args: { seconds: 2.5 },
+    })]);
+    prompt.mockRestore();
+    hook.unmount();
+  });
+});
