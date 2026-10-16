@@ -8,7 +8,7 @@ import test from 'node:test';
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const INSTALL_ROOT = process.env.REMOTION_509_CHECK_ROOT || ROOT;
 const PACKAGE_ROOT = path.join(INSTALL_ROOT, 'node_modules/remotion');
-const HAS_INSTALL = fs.existsSync(path.join(PACKAGE_ROOT, 'package.json'));
+const HAS_REMOTION_SOURCE = fs.existsSync(path.join(PACKAGE_ROOT, 'package.json'));
 const TARGETS = [
   {
     form: 'CJS',
@@ -174,7 +174,7 @@ async function rejectionInvariant(source, form) {
 
 test(
   'Remotion 4.0.509 CJS and ESM keep the native-resume fence semantics',
-  { skip: !HAS_INSTALL },
+  { skip: !HAS_REMOTION_SOURCE },
   async (t) => {
     const packageJson = JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8'));
     assert.equal(packageJson.name, 'remotion');
