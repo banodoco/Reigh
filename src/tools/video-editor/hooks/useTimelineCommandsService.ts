@@ -1,5 +1,5 @@
 import type { TimelineEditability } from '@/tools/video-editor/lib/timeline-editability.ts';
-import { duplicateGestureCommands, deleteGestureCommands, moveGestureCommands, propertyGestureCommands, rightResizeGestureCommands } from '../commands/semanticGestures.ts';
+import { duplicateGestureCommands, deleteGestureCommands, literalStructuralSource, moveGestureCommands, propertyGestureCommands, rightResizeGestureCommands } from '../commands/semanticGestures.ts';
 import { getAssetImmediateSource } from '../lib/asset-registry.ts';
 import { canonicalJsonStringify } from '../data/typed/timelineBundle.ts';
 import { useMemo } from 'react';
@@ -294,6 +294,61 @@ const isPinnedGroupClip = (current: TimelineData, clipId: string): boolean => {
   return findEnclosingPinnedGroup(current.config, clipId) !== null;
 };
 
+/** Consume the duplicate planner's ordered ripple, refusing the entire mapping
+ * if even one affected action cannot be represented by an exact parent nudge.
+ * The no-ripple route below keeps its existing admission rules.
+ */
+const duplicateRippleCommands = (current: TimelineData, sourceId: string, edit: NonNullable<ReturnType<typeof buildDuplicateClipEdit>>) => {
+  const row = current.rows.find((candidate) => candidate.actions.some((action) => action.id === sourceId));
+  const index = row?.actions.findIndex((action) => action.id === sourceId) ?? -1;
+  if (!row || index < 0 || index === row.actions.length - 1
+    || current.rows.filter((candidate) => candidate.id === row.id).length !== 1
+    || current.config.tracks?.filter((track) => track.id === row.id).length !== 1) return undefined;
+  const source = row.actions[index];
+  const duration = source.end - source.start;
+  const fps = current.output.fps;
+  const frameExact = (seconds: number) => Number.isFinite(seconds)
+    && Math.abs(seconds * fps - Math.round(seconds * fps)) <= 1e-6;
+  if (!Number.isFinite(fps) || fps <= 0 || duration < 0.05 || !frameExact(duration)
+    || current.config.clips.some((clip) => clip.id === edit.clipId)) return undefined;
+  const affected = row.actions.slice(index);
+  if (affected.some((action) => !literalStructuralSource(current, action.id)
+    || isPinnedGroupClip(current, action.id)
+    || current.rows.flatMap((candidate) => candidate.actions).filter((candidate) => candidate.id === action.id).length !== 1
+    || !frameExact(action.start) || !frameExact(action.end)
+    || !current.config.clips.some((clip) => clip.id === action.id && clip.track === row.id
+      && clip.at === action.start))) return undefined;
+  const commands = duplicateGestureCommands(current, sourceId, source.end, edit.clipId);
+  if (!commands) return undefined;
+  const planned = edit.rows.find((candidate) => candidate.id === row.id);
+  for (const action of affected.slice(1)) {
+    const next = planned?.actions.find((candidate) => candidate.id === action.id);
+    if (!next || !frameExact(next.start) || !frameExact(next.end)
+      || roundTimelineValue(next.start - action.start) !== roundTimelineValue(duration)
+      || roundTimelineValue(next.end - action.end) !== roundTimelineValue(duration)) return undefined;
+    const nudge = toolMoveCommands(current, action.id, next.start);
+    if (nudge?.length !== 1 || nudge[0].op !== 'clip.nudge'
+      || nudge[0].args.frames !== Math.round(duration * fps)) return undefined;
+    commands.push(...nudge);
+  }
+  // The row serializer supports a bounded set of clip fields. Do not admit a
+  // semantic copy if that existing local path would drop opaque authored data
+  // or change anything beyond the planner's copy and captured placements.
+  const preview = previewTimelineMutation(current, { type: 'rows', rows: edit.rows,
+    metaUpdates: edit.metaUpdates, clipOrderOverride: edit.clipOrderOverride });
+  if (!preview.ok) return undefined;
+  const positions = new Map(affected.slice(1).map((action) => [action.id, action.start + duration]));
+  const sourceClip = current.config.clips.find((clip) => clip.id === sourceId)!;
+  const expected = [...current.config.clips.map((clip) => positions.has(clip.id)
+    ? { ...clip, at: roundTimelineValue(positions.get(clip.id)!) } : clip),
+  { ...sourceClip, id: edit.clipId, at: source.end }];
+  const actual = preview.nextData.config;
+  if (actual.clips.length !== expected.length || expected.some((clip) => canonicalJsonStringify(clip)
+    !== canonicalJsonStringify(actual.clips.find((candidate) => candidate.id === clip.id)))
+    || canonicalJsonStringify({ ...current.config, clips: actual.clips }) !== canonicalJsonStringify(actual)) return undefined;
+  return commands;
+};
+
 const getClipTrackKind = (current: TimelineData, clip: TimelineData['resolvedConfig']['clips'][number]): TrackKind => {
   if (clip.clipType === 'text' || clip.clipType === 'hold' || clip.clipType === 'effect-layer') {
     return 'visual';
@@ -541,11 +596,14 @@ export function createTimelineCommands(
         const source = current.config.clips.find((clip) => clip.id === input.afterClipId);
         const sourceRow = current.rows.find((row) => row.actions.some((action) => action.id === input.afterClipId));
         const lastAction = sourceRow?.actions.at(-1);
-        const editCommands = source?.asset === input.assetId && source.track === sourceRow?.id
+        let editCommands = source?.asset === input.assetId && source.track === sourceRow?.id
           && lastAction?.id === input.afterClipId && lastAction.end - lastAction.start >= 0.05
           ? duplicateGestureCommands(current, input.afterClipId, lastAction.end, nextEdit.clipId) : undefined;
         if (source?.asset === input.assetId && lastAction?.id === input.afterClipId && !editCommands) {
           return failure('invalid_argument', 'Existing-source duplication requires an exact literal independent clip at a frame boundary.');
+        }
+        if (source?.asset === input.assetId && lastAction?.id !== input.afterClipId) {
+          editCommands = duplicateRippleCommands(current, input.afterClipId, nextEdit);
         }
         return applyValidatedMutation(
           store,

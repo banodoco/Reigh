@@ -26,6 +26,7 @@ import { useTimelineTrackManagement } from './useTimelineTrackManagement.ts';
 import { buildKeyboardTimeNudgeEdit } from '../lib/keyboard-nudge.ts';
 import { expandTinyClip } from '../lib/expand-tiny-clip.ts';
 import { gestureCommandsFor } from '../commands/semanticGestures.ts';
+import { buildDuplicateClipEdit } from '../lib/duplicate-clip.ts';
 import { createTimelineCommands } from './useTimelineCommandsService.ts';
 import type { TimelineStoreApi } from './timelineStore.ts';
 import { useTimelineOps } from './useTimelineOps.ts';
@@ -38,7 +39,7 @@ import { readAudioLanePresentation } from '../data/audioLanePresentation.ts';
 // This transport is a wire recorder, not an Astrid operation executor. Successful
 // fixture acknowledgements establish App adaptation only, never Runtime acceptance.
 const json = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
-function wireFixture(initial: TimelineData, reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable'>) {
+function wireFixture(initial: TimelineData, reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable' | 'rejected'>) {
   const requests: Array<{ request: CommitRequest; bytes: string; headers: Record<string, string> }> = [];
   const compatibilityRequests: string[] = [];
   let currentHead = initial.head!.headRevisionId!;
@@ -56,19 +57,21 @@ function wireFixture(initial: TimelineData, reply?: (request: CommitRequest, cal
       const bytes = new TextDecoder().decode(body as Uint8Array);
       const request = JSON.parse(bytes) as CommitRequest;
       requests.push({ request, bytes, headers: { ...headers } });
-      const unavailable = await reply?.(request, requests.length) === 'unavailable';
-      if (!unavailable && !request.dry_run && !acceptedHeads.has(request.request_id)) {
+      const outcome = await reply?.(request, requests.length);
+      const unavailable = outcome === 'unavailable';
+      const rejected = outcome === 'rejected';
+      if (!unavailable && !rejected && !request.dry_run && !acceptedHeads.has(request.request_id)) {
         currentHead = `parent-r${++acceptanceSequence}`;
         acceptedHeads.set(request.request_id, currentHead);
       }
       const response: CommitResult = {
-        status: unavailable ? 'error' : request.dry_run ? 'preview' : 'accepted', request_id: request.request_id, request_hash: 'fixture',
-        base_revision_id: request.base_revision_id, accepted_revision_id: unavailable || request.dry_run ? null : acceptedHeads.get(request.request_id)!,
+        status: unavailable || rejected ? 'error' : request.dry_run ? 'preview' : 'accepted', request_id: request.request_id, request_hash: 'fixture',
+        base_revision_id: request.base_revision_id, accepted_revision_id: unavailable || rejected || request.dry_run ? null : acceptedHeads.get(request.request_id)!,
         accepted_publication_id: null, previous_revision_id: request.base_revision_id, rebased_onto: request.dry_run ? currentHead : null,
         canonical_document: null, projection_version: 1, document_digest: null, id_map: {},
         change: { changes: [], commands: request.dry_run && 'commands' in request.change
           ? structuredClone(request.change.commands) : [], direct_writes: [], consequences: [], affected: [] },
-        conflicts: [], choices: [], provenance: null, evidence: null, schema_report: null, runtime_receipt: null, error: unavailable ? { code: 'runtime_unavailable', message: 'fixture unavailable', hint: 'retry', next_action: 'retry' } : null,
+        conflicts: [], choices: [], provenance: null, evidence: null, schema_report: null, runtime_receipt: null, error: unavailable ? { code: 'runtime_unavailable', message: 'fixture unavailable', hint: 'retry', next_action: 'retry' } : rejected ? { code: 'invalid_command', message: 'fixture rejected acceptance', hint: 'fix the command', next_action: 'fix' } : null,
       };
       return { status: unavailable ? 503 : 200, headers: {}, body: json(response) };
     }
@@ -88,7 +91,7 @@ async function initialData(media = false, crops: { cropTop?: number; cropBottom?
   data.head = { projectId: 'gesture-project', timelineId: 'gesture-timeline', headRevisionId: 'parent-r1' };
   return data;
 }
-async function setup(reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable'>, media = false, providedInitial?: TimelineData, currentTime = 1, editability?: TimelineEditability) {
+async function setup(reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable' | 'rejected'>, media = false, providedInitial?: TimelineData, currentTime = 1, editability?: TimelineEditability) {
   const initial = providedInitial ?? await initialData(media);
   const fixture = wireFixture(initial, reply);
   const eventBus = new TimelineEventBus();
@@ -875,6 +878,19 @@ describe('D source-backed structural gesture consumers', () => {
       ? { ...clip, asset: 'source', opaque_clip: { nullable: null }, app: { opaque: { nullable: null } } } : clip) },
     { assets: { source: { type: 'video', file: 'fixture.mp4', duration: 8 } } }, undefined, 1, undefined, base.head);
   }
+  const duplicateCommands = (h: Awaited<ReturnType<typeof setup>>) => createTimelineCommands({ getState: () => ({
+    data: { data: h.result.current.data, dataRef: h.result.current.dataRef },
+    ops: { applyEdit: h.result.current.applyEdit }, availability: { mounted: true },
+  }) } as unknown as TimelineStoreApi);
+  async function rippleData() {
+    const base = await literalData();
+    return buildTimelineData({ ...base.config, clips: [
+      { id: 'before', at: 0, hold: 0.5, clipType: 'hold', track: 'V1' },
+      ...base.config.clips.map((clip) => { const { opaque_clip: _opaque, ...supported } = clip; return supported; }),
+      { id: 'clip-3', at: 8, hold: 1, clipType: 'hold', track: 'V1', app: { opaque: null } },
+      { id: 'other', at: 6, hold: 1, clipType: 'hold', track: 'V2' },
+    ] }, base.registry, undefined, 1, undefined, base.head);
+  }
   it.each(['selected', 'at-time', 'bulk'] as const)('%s literal split sends the captured whole source and stable created identity', async (mode) => {
     const h = await setup(undefined, false, await literalData(), 2);
     act(() => {
@@ -977,14 +993,125 @@ describe('D source-backed structural gesture consumers', () => {
     expect(h.requests).toHaveLength(0);
     h.unmount();
   });
-  it('existing-source duplicate with following row actions keeps the whole ripple on its explicit fallback', async () => {
-    const h = await setup(undefined, false, await literalData());
-    const commands = createTimelineCommands({ getState: () => ({ data: { data: h.result.current.data, dataRef: h.result.current.dataRef },
-      ops: { applyEdit: h.result.current.applyEdit }, availability: { mounted: true } }) } as unknown as TimelineStoreApi);
-    act(() => expect(commands.addClip({ assetId: 'source', afterClipId: 'clip-1' }).ok).toBe(true));
+  it('existing-source duplicate emits the exact ordered planner ripple in one commit and undo boundary', async () => {
+    const initial = await rippleData();
+    const before = structuredClone(initial.config);
+    const plan = buildDuplicateClipEdit(initial, 'clip-1', 'source')!;
+    const h = await setup(undefined, false, initial);
+    const history = vi.fn();
+    h.eventBus.on('beforeCommit', history);
+    act(() => expect(duplicateCommands(h).addClip({ assetId: 'source', afterClipId: 'clip-1' })).toEqual({ ok: true, data: { clipId: plan.clipId, trackId: 'V1' } }));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.result.current.data!.rows).toEqual(plan.rows);
+    expect(h.result.current.data!.clipOrder).toEqual(plan.clipOrderOverride);
+    expect(h.result.current.data!.config.clips.find((clip) => clip.id === 'clip-1')).toEqual(before.clips.find((clip) => clip.id === 'clip-1'));
+    expect(h.result.current.data!.config.clips.find((clip) => clip.id === plan.clipId)).toEqual({ ...before.clips.find((clip) => clip.id === 'clip-1'), id: plan.clipId, at: 3 });
+    for (const clip of before.clips.filter((clip) => clip.id !== 'clip-1')) {
+      expect(h.result.current.data!.config.clips.find((next) => next.id === clip.id)).toEqual({ ...clip,
+        at: ['clip-2', 'clip-3'].includes(clip.id) ? Number(clip.at) + 2 : clip.at });
+    }
+    expect(initial.config).toEqual(before);
+    expect(h.result.current.data!.registry).toEqual(initial.registry);
+    expect(h.requests).toHaveLength(1);
+    expect(h.requests[0].request.base_revision_id).toBe('parent-r1');
+    expect(h.requests[0].request.source).toEqual({ via: 'app' });
+    expect(h.requests[0].request.change).toEqual({ commands: [
+      { op: 'timeline.add', select: null, args: { from: 'parent/clip:clip-1', at: 3 }, created: [`parent/clip:${plan.clipId}`],
+        expect: { 'parent/clip:clip-1::': { state: 'present', value: before.clips.find((clip) => clip.id === 'clip-1') } } },
+      ...['clip-2', 'clip-3'].map((id) => ({ op: 'clip.nudge', select: `parent/clip:${id}`, resolved: [`parent/clip:${id}`], args: { frames: 60 },
+        expect: { at: { state: 'present', value: before.clips.find((clip) => clip.id === id)!.at },
+          'app.astrid.on': { state: 'absent' }, 'app.astrid.until': { state: 'absent' } } })),
+    ] });
+    expect(history).toHaveBeenCalledTimes(1);
+    expect(history.mock.calls[0]).toEqual([initial, expect.objectContaining({ semantic: true })]);
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(h.compatibilityRequests).toEqual([]);
+    h.unmount();
+  });
+  it('existing-source ripple retries the whole batch with stable bytes and one reserved child', async () => {
+    const initial = await rippleData();
+    const child = buildDuplicateClipEdit(initial, 'clip-1', 'source')!.clipId;
+    const h = await setup(async (_request, call) => call === 1 ? 'unavailable' : undefined, false, initial);
+    const history = vi.fn();
+    h.eventBus.on('beforeCommit', history);
+    act(() => expect(duplicateCommands(h).addClip({ assetId: 'source', afterClipId: 'clip-1' }).ok).toBe(true));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1), { timeout: 2500 });
+    expect(h.requests).toHaveLength(2);
+    expect(h.requests[0].bytes).toBe(h.requests[1].bytes);
+    expect(h.requests[0].headers).toEqual(h.requests[1].headers);
+    expect((h.requests[1].request.change as { commands: unknown[] }).commands).toHaveLength(3);
+    expect(h.result.current.data!.config.clips.filter((clip) => clip.id === child)).toHaveLength(1);
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(history).toHaveBeenCalledTimes(1);
+    expect(h.compatibilityRequests).toEqual([]);
+    h.unmount();
+  });
+  it.each((['source', 'follower'] as const).flatMap((target) =>
+    ['on', 'until', 'cut', 'sequence', 'legacy tie', 'animated', 'modifiers', 'grouped', 'ambiguous', 'opaque field'].map((kind) => ({ target, kind }))))(
+    'existing-source ripple retains whole fallback or refusal for $target $kind', async ({ target, kind }) => {
+    const base = await rippleData();
+    const id = target === 'source' ? 'clip-1' : 'clip-3';
+    const patch = kind === 'legacy tie' ? { app: { on: 'beat 2' } }
+      : kind === 'animated' ? { keyframes: {} }
+      : kind === 'modifiers' ? { modifiers: [] }
+      : kind === 'opaque field' ? { opaque_clip: { nullable: null } }
+      : ['grouped', 'ambiguous'].includes(kind) ? {} : { app: { astrid: { [kind]: 'beat 2' } } };
+    const initial = await buildTimelineData({ ...base.config, clips: base.config.clips.map((clip) => clip.id === id ? { ...clip, ...patch } : clip),
+      ...(kind === 'grouped' ? { pinnedShotGroups: [{ shotId: 'shot-1', trackId: 'V1', clipIds: [id], mode: 'images' as const }] } : {}),
+    }, base.registry, undefined, 1, undefined, base.head);
+    if (kind === 'ambiguous') initial.config.clips.push(structuredClone(initial.config.clips.find((clip) => clip.id === id)!));
+    const h = await setup(undefined, false, initial);
+    const plan = buildDuplicateClipEdit(initial, 'clip-1', 'source')!;
+    const refused = target === 'source' && kind === 'grouped';
+    act(() => expect(duplicateCommands(h).addClip({ assetId: 'source', afterClipId: 'clip-1' }).ok).toBe(!refused));
+    expect(h.result.current.editSeqRef.current).toBe(refused ? 0 : 1);
+    expect(h.result.current.data!.rows).toEqual(refused ? initial.rows : plan.rows);
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it.each(['subframe source', 'non-frame delta', 'subframe follower', 'owner mismatch', 'duplicate action', 'missing authored follower'])(
+    'existing-source ripple keeps %s wholly on fallback', async (kind) => {
+    const base = await rippleData();
+    const initial = await buildTimelineData({ ...base.config, clips: base.config.clips.map((clip) =>
+      kind === 'subframe source' && clip.id === 'clip-1' ? { ...clip, at: 1.001 }
+        : kind === 'non-frame delta' && clip.id === 'clip-1' ? { ...clip, to: 6.002 }
+        : kind === 'subframe follower' && clip.id === 'clip-3' ? { ...clip, at: 8.001 } : clip),
+    }, base.registry, undefined, 1, undefined, base.head);
+    if (kind === 'owner mismatch') initial.config.clips.find((clip) => clip.id === 'clip-3')!.track = 'V2';
+    if (kind === 'duplicate action') initial.rows.find((row) => row.id === 'V2')!.actions.push({ ...initial.rows.find((row) => row.id === 'V1')!.actions.at(-1)! });
+    if (kind === 'missing authored follower') initial.config.clips = initial.config.clips.filter((clip) => clip.id !== 'clip-3');
+    const h = await setup(undefined, false, initial);
+    act(() => expect(duplicateCommands(h).addClip({ assetId: 'source', afterClipId: 'clip-1' }).ok).toBe(true));
     expect(h.result.current.editSeqRef.current).toBe(1);
     expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
     expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it('existing-source ripple missing source is a no-op with no commit or history entry', async () => {
+    const h = await setup(undefined, false, await rippleData());
+    const history = vi.fn();
+    h.eventBus.on('beforeCommit', history);
+    act(() => expect(duplicateCommands(h).addClip({ assetId: 'source', afterClipId: 'missing' })).toMatchObject({ ok: false, error: { code: 'clip_not_found' } }));
+    expect(h.result.current.data).toBe(h.initial);
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(history).not.toHaveBeenCalled();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it('existing-source ripple failed acceptance does not acknowledge or split the local transaction', async () => {
+    const h = await setup(async () => 'rejected', false, await rippleData());
+    const history = vi.fn();
+    h.eventBus.on('beforeCommit', history);
+    act(() => expect(duplicateCommands(h).addClip({ assetId: 'source', afterClipId: 'clip-1' }).ok).toBe(true));
+    await waitFor(() => expect(h.result.current.persistence.saveStatus).toBe('error'));
+    expect(h.savedSeqRef.current).toBe(0);
+    expect(h.result.current.data!.head?.headRevisionId).toBe('parent-r1');
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(history).toHaveBeenCalledTimes(1);
+    expect(h.requests).toHaveLength(1);
+    expect((h.requests[0].request.change as { commands: unknown[] }).commands).toHaveLength(3);
+    expect(h.compatibilityRequests).toEqual([]);
     h.unmount();
   });
   it('mixed available and missing split selection refuses the whole batch', async () => {
