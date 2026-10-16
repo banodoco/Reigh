@@ -1,10 +1,12 @@
-import { emptyTrackGestureCommands, moveGestureCommands } from '../commands/semanticGestures.ts';
+import { emptyTrackGestureCommands, literalStructuralSource, moveGestureCommands } from '../commands/semanticGestures.ts';
 import { addTrackGestureCommands, authoredTracks, reorderTrackGestureCommands, trackPropertyGesture } from '../commands/trackGestures.ts';
 import { trackRole } from '@/tools/video-editor/data/timelineOutputProjection.ts';
 import { useCallback, useMemo } from 'react';
 import { arrayMove } from '@dnd-kit/sortable';
 import { addTrack, getTrackIndex } from '@/tools/video-editor/lib/editor-utils.ts';
 import { DEFAULT_VIDEO_TRACKS } from '@/tools/video-editor/lib/defaults.ts';
+import { getClipSourceDuration } from '@/tools/video-editor/lib/config-utils.ts';
+import { validateSerializedConfig } from '@/tools/video-editor/lib/serialize.ts';
 import type { PinnedShotGroup, TrackDefinition, TrackKind } from '@/tools/video-editor/types/index.ts';
 import { findNearestFreeTrack, moveClipBetweenTracks, trySnapToEdge } from '@/tools/video-editor/lib/coordinate-utils.ts';
 import type { ClipMeta, TimelineData } from '@/tools/video-editor/lib/timeline-data.ts';
@@ -236,6 +238,48 @@ function appendTrackForResolvedMove(current: TimelineData, sourceTrack: TrackDef
   };
 }
 
+/** One captured base for the structural add and its dependent literal clip move. */
+function newTrackClipMove(current: TimelineData, clipId: string, start: number, track: TrackDefinition) {
+  if (!literalStructuralSource(current, clipId) || findEnclosingPinnedGroup(current.config, clipId)) return;
+  const tracks = authoredTracks(current);
+  const clip = current.config.clips.find((candidate) => candidate.id === clipId)!;
+  const source = tracks?.find((candidate) => candidate.id === clip.track);
+  const actions = current.rows.flatMap((row) => row.actions
+    .filter((action) => action.id === clipId).map((action) => ({ row, action })));
+  const fps = current.output.fps;
+  const duration = getClipSourceDuration(clip) / (clip.speed ?? 1);
+  // Nudge quantizes to frames. Never attach it to a subframe/local-only move,
+  // an inferred owner, or a source whose live position differs from its base.
+  if (!tracks || !source || source.kind !== track.kind || trackRole(source) !== trackRole(track)
+    || actions.length !== 1 || actions[0].row.id !== clip.track || actions[0].action.start !== clip.at
+    || !Number.isFinite(duration) || duration <= 0
+    || Math.abs(actions[0].action.end - actions[0].action.start - duration) > 1e-7
+    || !Number.isFinite(fps) || fps <= 0 || !Number.isFinite(start) || start < 0
+    || [clip.at, start].some((at) => Math.abs(at * fps - Math.round(at * fps)) > 1e-6)
+    || tracks.length !== current.tracks.length
+    || tracks.some((row, index) => row.id !== current.tracks[index]?.id)
+    || current.rows.some((row) => row.id === track.id)) return;
+  const add = addTrackGestureCommands(current, track);
+  const move = moveGestureCommands(current, clipId, start, track.id);
+  if (!add || !move?.length || move.at(-1)?.op !== 'clip.set-track') return;
+  // Do not let the config mutation's serializer silently drop an invalid
+  // authored key while the command leaves that same base row untouched.
+  validateSerializedConfig({ ...current.config, tracks: [...tracks, track] });
+  return {
+    editCommands: [...add, ...move],
+    // Use authored rows, including opaque app data and persisted track names.
+    // applyEdit validates/materializes the entire edit before replacing dataRef.
+    resolvedConfig: {
+      ...current.resolvedConfig,
+      ...current.config,
+      output: current.output,
+      tracks: [...tracks, track],
+      clips: current.config.clips.map((row) => row.id === clipId ? { ...row, at: start, track: track.id } : row),
+      registry: current.resolvedConfig.registry,
+    },
+  };
+}
+
 /** Preflight only the timing-preserving subset of the existing per-clip move path. */
 function planSimpleTrackMoves(
   current: TimelineData,
@@ -352,6 +396,7 @@ export function useTimelineTrackManagement({
     const destinationId = targetTrackId ?? targetRowId;
     const targetTrack = current.tracks.find((track) => track.id === destinationId);
     if (!sourceRow || !action || !sourceTrack || (!needsNewTrack && !targetTrack) || (targetTrack && targetTrack.kind !== sourceTrack.kind)) return;
+    if (!needsNewTrack && targetTrackId === sourceRow.id && start === action.start) return;
     if (editability.checkMove && !editability.checkMove({
       clipId,
       sourceTrackId: sourceRow.id,
@@ -363,6 +408,14 @@ export function useTimelineTrackManagement({
     let finalTrackId = targetTrackId;
     if (needsNewTrack || !finalTrackId) {
       const appended = appendTrackForResolvedMove(current, sourceTrack);
+      const track = appended.nextState.tracks.at(-1)!;
+      const semantic = newTrackClipMove(current, clipId, start, track);
+      if (semantic) {
+        applyEdit({ type: 'config', resolvedConfig: semantic.resolvedConfig }, {
+          transactionId, editCommands: semantic.editCommands,
+        });
+        return;
+      }
       current = appended.nextState;
       finalTrackId = appended.trackId;
       dataRef.current = current;
@@ -616,6 +669,23 @@ export function useTimelineTrackManagement({
     // A new lane created by moving existing material keeps its eligibility.
     // Explicit Add track still uses the ordinary legacy/output default.
     newTrack.role = trackRole(sourceTrack);
+
+    // The fallback's top insertion needs an order command as well. Keep that
+    // path unchanged; only the exact append + single literal move is admitted.
+    if (!enclosingGroup && !insertAtTop) {
+      const start = typeof newStartTime === 'number' ? Math.max(0, newStartTime) : sourceClip!.at;
+      const semantic = newTrackClipMove(current, clipId, start, newTrack);
+      if (semantic) {
+        const action = current.rows.flatMap((row) => row.actions).find((candidate) => candidate.id === clipId)!;
+        if (editability.checkMove && !editability.checkMove({
+          clipId, sourceTrackId: sourceTrackId ?? null, targetTrackId: newTrack.id, start, duration: action.end - action.start,
+        }).allowed) return;
+        applyEdit({ type: 'config', resolvedConfig: semantic.resolvedConfig }, {
+          selectedClipId: clipId, selectedTrackId: newTrack.id, editCommands: semantic.editCommands,
+        });
+        return;
+      }
+    }
 
     if (enclosingGroup) {
       if (!sourceTrackId) {

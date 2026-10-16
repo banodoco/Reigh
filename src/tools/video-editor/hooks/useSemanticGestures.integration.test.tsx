@@ -34,11 +34,14 @@ import { createTimelineReader } from '../lib/timeline-reader.ts';
 import { AstridElementOperationAdapter, createElementTimelineRoutes } from '../runtime/element-adapter.ts';
 import { buildReighAgentElementContext } from '../runtime/element-contract.ts';
 import { readAudioLanePresentation } from '../data/audioLanePresentation.ts';
+import { planClipDrag } from '../lib/clip-drag-planner.ts';
+import { createTimelineEditability } from '../lib/timeline-editability.ts';
 
 // This transport is a wire recorder, not an Astrid operation executor. Successful
 // fixture acknowledgements establish App adaptation only, never Runtime acceptance.
 const json = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
-function wireFixture(initial: TimelineData, reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable'>) {
+type FixtureReply = (request: CommitRequest, call: number) => Promise<void | 'unavailable' | 'refused'>;
+function wireFixture(initial: TimelineData, reply?: FixtureReply) {
   const requests: Array<{ request: CommitRequest; bytes: string; headers: Record<string, string> }> = [];
   const compatibilityRequests: string[] = [];
   let currentHead = initial.head!.headRevisionId!;
@@ -56,14 +59,16 @@ function wireFixture(initial: TimelineData, reply?: (request: CommitRequest, cal
       const bytes = new TextDecoder().decode(body as Uint8Array);
       const request = JSON.parse(bytes) as CommitRequest;
       requests.push({ request, bytes, headers: { ...headers } });
-      const unavailable = await reply?.(request, requests.length) === 'unavailable';
-      if (!unavailable && !request.dry_run && !acceptedHeads.has(request.request_id)) {
+      const outcome = await reply?.(request, requests.length);
+      const unavailable = outcome === 'unavailable';
+      const refused = outcome === 'refused';
+      if (!unavailable && !refused && !request.dry_run && !acceptedHeads.has(request.request_id)) {
         currentHead = `parent-r${++acceptanceSequence}`;
         acceptedHeads.set(request.request_id, currentHead);
       }
       const response: CommitResult = {
-        status: unavailable ? 'error' : request.dry_run ? 'preview' : 'accepted', request_id: request.request_id, request_hash: 'fixture',
-        base_revision_id: request.base_revision_id, accepted_revision_id: unavailable || request.dry_run ? null : acceptedHeads.get(request.request_id)!,
+        status: unavailable ? 'error' : refused ? 'refused' : request.dry_run ? 'preview' : 'accepted', request_id: request.request_id, request_hash: 'fixture',
+        base_revision_id: request.base_revision_id, accepted_revision_id: unavailable || refused || request.dry_run ? null : acceptedHeads.get(request.request_id)!,
         accepted_publication_id: null, previous_revision_id: request.base_revision_id, rebased_onto: request.dry_run ? currentHead : null,
         canonical_document: null, projection_version: 1, document_digest: null, id_map: {},
         change: { changes: [], commands: request.dry_run && 'commands' in request.change
@@ -88,7 +93,7 @@ async function initialData(media = false, crops: { cropTop?: number; cropBottom?
   data.head = { projectId: 'gesture-project', timelineId: 'gesture-timeline', headRevisionId: 'parent-r1' };
   return data;
 }
-async function setup(reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable'>, media = false, providedInitial?: TimelineData, currentTime = 1, editability?: TimelineEditability) {
+async function setup(reply?: FixtureReply, media = false, providedInitial?: TimelineData, currentTime = 1, editability?: TimelineEditability) {
   const initial = providedInitial ?? await initialData(media);
   const fixture = wireFixture(initial, reply);
   const eventBus = new TimelineEventBus();
@@ -104,7 +109,7 @@ async function setup(reply?: (request: CommitRequest, call: number) => Promise<v
     const persistence = useTimelinePersistence({ provider: fixture.provider, assetResolver: fixture.provider, timelineId: 'gesture-timeline', eventBus, ...commit, savedSeqRef, configVersionRef, headRevisionRef, lastSavedSignatureRef, interactionStateRef });
     useEffect(() => eventBus.on('scheduleSave', persistence.scheduleSave), [persistence.scheduleSave]);
     const editing = useClipEditing({ ...commit, selectedClipId: 'clip-1', selectedTrack: initial.tracks[0], currentTime, selectClip: vi.fn(), resolvedConfig: commit.data?.resolvedConfig ?? null });
-    const tracks = useTimelineTrackManagement({ ...commit, resolvedConfig: commit.data?.resolvedConfig ?? null, eventBus });
+    const tracks = useTimelineTrackManagement({ ...commit, resolvedConfig: commit.data?.resolvedConfig ?? null, eventBus, editability });
     const resize = useClipResize(commit);
     const ops = useTimelineOps({ ...commit, createManualCheckpoint: vi.fn(), jumpToCheckpoint: vi.fn(), checkpoints: [], editability });
     return { ...commit, editing, tracks, resize, persistence, ops };
@@ -1249,4 +1254,233 @@ describe('D008 source-backed track consumers', () => {
     h.unmount();
   });
 
+});
+
+describe('bounded new-track clip move wire adaptation', () => {
+  async function laneData(kind: 'visual' | 'audio' = 'visual', role: 'source' | 'output' = 'output', media = false) {
+    const base = await initialData(media);
+    const data = await buildTimelineData({ ...base.config,
+      tracks: [
+        { ...base.config.tracks![0], role, app: { opaque: null, object: { op: 'clear' } } },
+        base.config.tracks![1],
+        { id: 'A4', kind: 'audio', label: 'Audio', role, app: { audioOpaque: null } },
+      ],
+      clips: base.config.clips.map((clip) => clip.id === 'clip-1'
+        ? { ...clip, track: kind === 'audio' ? 'A4' : 'V1', app: { clipSentinel: true, astrid: { opaque: null } } } : clip),
+    }, base.registry, undefined, 1, undefined, base.head);
+    Reflect.set(data.config.tracks![0], 'name', 'opaque-persisted-name');
+    return data;
+  }
+  function drag(h: Awaited<ReturnType<typeof setup>>, start: number, planOverrides: Partial<Parameters<typeof planClipDrag>[0]> = {}) {
+    const data = h.result.current.data!;
+    const row = data.rows.find((candidate) => candidate.actions.some((action) => action.id === 'clip-1'))!;
+    const action = row.actions.find((candidate) => candidate.id === 'clip-1')!;
+    const sourceKind = data.tracks.find((track) => track.id === row.id)!.kind;
+    const plan = planClipDrag({
+      pointerTime: start, clipDuration: action.end - action.start, clipId: 'clip-1', sourceKind,
+      rows: data.rows, tracks: data.tracks, pointerRowIndex: data.rows.length,
+      pixelSnapThreshold: 8, pixelsPerSecond: 100, requestedNewTrackPlacement: 'bottom',
+      ...planOverrides,
+    });
+    expect(plan).toMatchObject({ valid: true, needsNewTrack: true, targetTrackId: null, resolvedStart: start });
+    const session = {
+      clipId: 'clip-1', draggedClipIds: ['clip-1'], groupDragEntry: null,
+      sourceRowId: row.id, sourceKind, transactionId: 'new-lane-drag',
+      clipOffsets: [{ clipId: 'clip-1', rowId: row.id, deltaTime: 0, initialStart: action.start, initialEnd: action.end }],
+    } as InternalDragSession;
+    act(() => commitDraggingSession({ session, nextStart: 99, lastPlan: plan,
+      dropPosition: { isNewTrack: true, isNewTrackTop: false }, crossTrackActive: true, liveData: data,
+      callbacks: { ...h.result.current.tracks, applyEdit: h.result.current.applyEdit, selectClip: vi.fn(), selectClips: vi.fn() },
+    }));
+  }
+  const variants = (['visual', 'audio'] as const).flatMap((kind) => (['source', 'output'] as const)
+    .flatMap((role) => [0, 9].map((frames) => ({ kind, role, frames }))));
+  it.each(variants)('$kind/$role/$frames frames uses the exact plan and ordered add/nudge/set-track in one transaction', async ({ kind, role, frames }) => {
+    const h = await setup(undefined, false, await laneData(kind, role));
+    const before = structuredClone(h.initial.config);
+    const commits = vi.fn(); h.eventBus.on('beforeCommit', commits);
+    const start = 1 + frames / 30;
+    const id = kind === 'visual' ? 'V3' : 'A5';
+    const source = kind === 'visual' ? 'V1' : 'A4';
+    const track = { id, kind, label: id, role };
+    drag(h, start);
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.requests[0].request).toMatchObject({ base_revision_id: 'parent-r1', dry_run: false });
+    expect(h.requests[0].request.change).toEqual({ commands: [
+      { op: 'timeline.add', select: `parent/track:${id}`, args: { track }, created: [`parent/track:${id}`],
+        expect: { [`parent/track:${id}::`]: { state: 'absent' } } },
+      ...(frames ? [{ op: 'clip.nudge', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args: { frames },
+        expect: { at: { state: 'present', value: 1 }, 'app.astrid.on': { state: 'absent' }, 'app.astrid.until': { state: 'absent' } } }] : []),
+      { op: 'clip.set-track', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args: { track: id },
+        expect: { track: { state: 'present', value: source } } },
+    ] });
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(commits.mock.calls[0][0]).toBe(h.initial);
+    expect(commits.mock.calls[0][1]).toMatchObject({ transactionId: 'new-lane-drag' });
+    const data = h.result.current.data!;
+    expect(data.config.tracks!.slice(0, -1)).toEqual(before.tracks);
+    expect(data.config.tracks!.at(-1)).toMatchObject(track);
+    expect(data.config.clips).toEqual(before.clips.map((clip) => clip.id === 'clip-1' ? { ...clip, at: start, track: id } : clip));
+    expect(data.tracks.map((row) => row.id)).toEqual([...before.tracks!.map((row) => row.id), id]);
+    expect(data.rows.at(-1)).toMatchObject({ id, actions: [{ id: 'clip-1', start, end: start + 2 }] });
+    expect(data.clipOrder[id]).toEqual(['clip-1']);
+    expect(data.clipOrder[source]).not.toContain('clip-1');
+    expect(h.result.current.selectedClipId).toBe('clip-1');
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(h.compatibilityRequests).toEqual([]);
+    h.unmount();
+  });
+  it('consumes the planner timeline-start snap without re-running the legacy snapper', async () => {
+    const h = await setup(undefined, false, await laneData());
+    drag(h, 0, { pointerTime: 0.05 });
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.requests[0].request.change).toMatchObject({ commands: [
+      { op: 'timeline.add' }, { op: 'clip.nudge', args: { frames: -30 } }, { op: 'clip.set-track', args: { track: 'V3' } },
+    ] });
+    expect(h.result.current.data!.rows.at(-1)?.actions[0]).toMatchObject({ start: 0, end: 2 });
+    h.unmount();
+  });
+  it('an occupied target plan allocates the next free lane identity without moving or trimming siblings', async () => {
+    const base = await laneData();
+    const initial = await buildTimelineData({ ...base.config,
+      tracks: [...base.config.tracks!, { id: 'V3', kind: 'visual', label: 'Existing V3', app: { keep: null } }],
+      clips: [...base.config.clips,
+        { id: 'block-v2', at: 4, hold: 4, clipType: 'hold', track: 'V2' },
+        { id: 'block-v3', at: 4, hold: 4, clipType: 'hold', track: 'V3' },
+      ],
+    }, base.registry, undefined, 1, undefined, base.head);
+    const h = await setup(undefined, false, initial);
+    const before = structuredClone(initial.config);
+    drag(h, 5, { pointerRowIndex: 0, requestedNewTrackPlacement: null });
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.requests[0].request.change).toMatchObject({ commands: [
+      { op: 'timeline.add', select: 'parent/track:V4', created: ['parent/track:V4'], expect: { 'parent/track:V4::': { state: 'absent' } } },
+      { op: 'clip.nudge', args: { frames: 120 } }, { op: 'clip.set-track', args: { track: 'V4' } },
+    ] });
+    expect(h.result.current.data!.config.clips).toEqual(before.clips.map((clip) => clip.id === 'clip-1' ? { ...clip, at: 5, track: 'V4' } : clip));
+    expect(h.result.current.data!.config.tracks!.slice(0, -1)).toEqual(before.tracks);
+    h.unmount();
+  });
+  it('the no-plan append control preserves its full default track row and selection', async () => {
+    const h = await setup(undefined, false, await laneData('visual', 'source', true));
+    const before = structuredClone(h.initial.config);
+    const commits = vi.fn(); h.eventBus.on('beforeCommit', commits);
+    act(() => h.result.current.tracks.createTrackAndMoveClip('clip-1', 'visual', 1.3));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    const change = h.requests[0].request.change;
+    expect(change).toMatchObject({ commands: [
+      { op: 'timeline.add', args: { track: { id: 'V3', kind: 'visual', label: 'V3', role: 'source',
+        scale: 1, fit: 'manual', opacity: 1, blendMode: 'normal' } }, created: ['parent/track:V3'] },
+      { op: 'clip.nudge', args: { frames: 9 } },
+      { op: 'clip.set-track', args: { track: 'V3' }, expect: { track: { state: 'present', value: 'V1' } } },
+    ] });
+    expect(h.result.current.data!.config.clips).toEqual(before.clips.map((clip) => clip.id === 'clip-1' ? { ...clip, at: 1.3, track: 'V3' } : clip));
+    expect(h.result.current.selectedClipId).toBe('clip-1');
+    expect(h.result.current.selectedTrackId).toBe('V3');
+    expect(commits).toHaveBeenCalledTimes(1);
+    h.unmount();
+  });
+  it('unavailable acknowledgement keeps the complete draft and retries identical reservation, bytes and headers', async () => {
+    let release!: () => void;
+    const paused = new Promise<void>((resolve) => { release = resolve; });
+    const h = await setup(async (_request, call) => { if (call === 1) return 'unavailable'; await paused; }, false, await laneData());
+    const commits = vi.fn(); h.eventBus.on('beforeCommit', commits);
+    drag(h, 1.3);
+    await waitFor(() => expect(h.requests).toHaveLength(2), { timeout: 2500 });
+    expect(h.savedSeqRef.current).toBe(0);
+    expect(h.result.current.data!.head).toEqual(h.initial.head);
+    expect(h.result.current.data!.config.tracks!.at(-1)?.id).toBe('V3');
+    expect(h.result.current.data!.config.clips[0]).toMatchObject({ at: 1.3, track: 'V3' });
+    expect(h.requests[0].bytes).toBe(h.requests[1].bytes);
+    expect(h.requests[0].headers).toEqual(h.requests[1].headers);
+    expect(h.requests[0].request.request_id).toBe(h.requests[1].request.request_id);
+    release();
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(2);
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(h.result.current.data!.config.tracks!.filter((row) => row.id === 'V3')).toHaveLength(1);
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    h.unmount();
+  });
+  it('a rejected batch keeps both lane and clip in the unsaved draft and does not acknowledge a partial edit', async () => {
+    const h = await setup(async () => 'refused', false, await laneData());
+    const commits = vi.fn(); h.eventBus.on('beforeCommit', commits);
+    drag(h, 1.3);
+    await waitFor(() => expect(h.result.current.persistence.saveStatus).toBe('error'));
+    expect(h.requests).toHaveLength(1);
+    expect(h.savedSeqRef.current).toBe(0);
+    expect(h.result.current.data!.head).toEqual(h.initial.head);
+    expect(h.result.current.data!.config.tracks!.at(-1)?.id).toBe('V3');
+    expect(h.result.current.data!.config.clips[0]).toMatchObject({ at: 1.3, track: 'V3' });
+    expect(gestureCommandsFor(h.result.current.data!)?.map((command) => command.op)).toEqual(['timeline.add', 'clip.nudge', 'clip.set-track']);
+    expect(commits).toHaveBeenCalledTimes(1);
+    h.unmount();
+  });
+  it.each(['track', 'clip'] as const)('an invalid authored %s key refuses before serialization can drop it', async (kind) => {
+    const initial = await laneData();
+    Reflect.set(kind === 'track' ? initial.config.tracks![0] : initial.config.clips[0], 'unknownField', { keep: null });
+    const h = await setup(undefined, false, initial);
+    const commits = vi.fn(); h.eventBus.on('beforeCommit', commits);
+    expect(() => h.result.current.tracks.applyResolvedClipMove('clip-1', 'new', null, 1.3, true)).toThrow(/unexpected key/);
+    expect(h.result.current.dataRef.current).toBe(initial);
+    expect(h.result.current.data).toBe(initial);
+    expect(commits).not.toHaveBeenCalled();
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it.each(['missing', 'same-position', 'locked', 'read-only', 'boundary', 'late-boundary'] as const)('%s makes no request or partial lane', async (mode) => {
+    const editability = mode === 'locked' ? createTimelineEditability({ lockedClipIds: ['clip-1'] })
+      : mode === 'read-only' ? createTimelineEditability({ readOnly: true })
+      : mode === 'boundary' ? createTimelineEditability({ hardDurationSeconds: 3 })
+      : mode === 'late-boundary' ? { check: () => ({ allowed: true }), checkTimeline: () => ({ allowed: false }) }
+      : undefined;
+    const h = await setup(undefined, false, await laneData(), 1, editability);
+    const before = h.result.current.data;
+    const commits = vi.fn(); h.eventBus.on('beforeCommit', commits);
+    act(() => h.result.current.tracks.applyResolvedClipMove(mode === 'missing' ? 'missing' : 'clip-1', 'V1',
+      mode === 'same-position' ? 'V1' : null, mode === 'same-position' ? 1 : 1.3, mode !== 'same-position', 'no-op'));
+    expect(h.result.current.data).toBe(before);
+    expect(h.result.current.dataRef.current).toBe(before);
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(commits).not.toHaveBeenCalled();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it.each(['on', 'until', 'cut', 'group', 'subframe', 'live-position', 'top'] as const)('%s stays on its existing fallback without invented commands', async (mode) => {
+    const base = await laneData();
+    const initial = await buildTimelineData({ ...base.config,
+      clips: base.config.clips.map((clip) => clip.id === 'clip-1' && ['on', 'until', 'cut'].includes(mode)
+        ? { ...clip, app: { ...clip.app, astrid: { [mode]: mode === 'cut' ? 'cut-1' : 'beat 2' } } } : clip),
+      ...(mode === 'group' ? { pinnedShotGroups: [{ shotId: 'group', trackId: 'V1', clipIds: ['clip-1', 'clip-2'], mode: 'images' as const }] } : {}),
+    }, base.registry, undefined, 1, undefined, base.head);
+    if (mode === 'live-position') initial.rows[0].actions[0].start = 1.1;
+    const h = await setup(undefined, false, initial);
+    act(() => mode === 'top' ? h.result.current.tracks.createTrackAndMoveClip('clip-1', 'visual', 1.3, true)
+      : h.result.current.tracks.applyResolvedClipMove('clip-1', 'new', null, mode === 'subframe' ? 1.31 : 1.3, true));
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+  it('multi-clip new-lane drag remains a single fallback edit without converting only one member', async () => {
+    const h = await setup(undefined, false, await laneData());
+    const data = h.result.current.data!;
+    const session = { clipId: 'clip-1', draggedClipIds: ['clip-1', 'clip-2'], groupDragEntry: null,
+      sourceRowId: 'V1', sourceKind: 'visual', transactionId: 'multi-new-lane',
+      clipOffsets: data.rows[0].actions.map((action) => ({ clipId: action.id, rowId: 'V1', deltaTime: action.start - 1, initialStart: action.start, initialEnd: action.end })),
+    } as InternalDragSession;
+    act(() => commitDraggingSession({ session, nextStart: 1.3, dropPosition: { isNewTrack: true, isNewTrackTop: false },
+      crossTrackActive: true, liveData: data,
+      callbacks: { ...h.result.current.tracks, applyEdit: h.result.current.applyEdit, selectClip: vi.fn(), selectClips: vi.fn() },
+    }));
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
 });

@@ -61,10 +61,20 @@ Remaining original fallback criteria:
 - W12–W15, W20, W26–W32, W40, W42–W44: catalog composites, snapshots/mixed patches,
   App keyframes/effects/shader/transition/text/transform, general tied/group/left/media
   resize, overlap and repair composites still lack matching lossless command payloads.
-- W35, remaining W48/W49/W52–W54: new-track detach/move, cross-kind drag, unsupported
+- W35, remaining W48/W49/W52–W54: 012 converts the bounded single literal parent
+  clip move into a new appended lane through `applyResolvedClipMove` and the no-plan
+  `createTrackAndMoveClip` append control. One captured command list adds the complete
+  authored track with qualified absent guard and stable `created`, nudges only an
+  exact nonzero frame delta, then sets the track against its original expectation.
+  Source/Output role, planner start, selection and one existing transaction boundary
+  are retained. The complete local edit is materialized together; unavailable/refused
+  saves retain both lane and clip as one unsaved draft, and retries reuse exact bytes.
+  Tied/group/multi-clip, animated/carrier, subframe or mismatched live-source moves,
+  top insertion in the no-plan control, new-track detach, cross-kind drag, unsupported
   property patches, occupied-track removal and pinned-group structure remain fallback.
-  009 supplies only the explicit bounded track slices listed above; no whole-row
-  completion or revised aggregate fallback count is inferred.
+  Focused hook/generated-client wire fixtures establish App adaptation, not installed
+  Runtime execution or canonical inverse proof. 009 and 012 supply only these bounded
+  slices; no whole-row completion or revised aggregate fallback count is inferred.
 - W62 and remaining W69: embedded/non-Runtime providers and unsupported tool edits
   retain their existing contracts and compatibility paths. W59 remains local recovery.
 

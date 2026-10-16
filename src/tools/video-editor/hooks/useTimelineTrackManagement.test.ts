@@ -539,10 +539,25 @@ describe('source track editing', async () => {
 
   it('inherits Source in the resolved drag path and preserves its undo transaction', async () => {
     const { dataRef, applyEdit, result } = await setup();
+    const before = dataRef.current;
     act(() => result.current.applyResolvedClipMove('clip-V1', 'new', null, 4, true, 'drag-role'));
-    expect(dataRef.current.tracks.at(-1)?.role).toBe('source');
+    expect(dataRef.current).toBe(before);
     expect(applyEdit).toHaveBeenCalledTimes(1);
-    expect(applyEdit.mock.calls[0][1]).toEqual({ transactionId: 'drag-role' });
+    expect(applyEdit.mock.calls[0][0].resolvedConfig.tracks.at(-1)).toEqual({ id: 'V3', kind: 'visual', label: 'V3', role: 'source' });
+    expect(applyEdit.mock.calls[0][1]).toMatchObject({ transactionId: 'drag-role', editCommands: [
+      { op: 'timeline.add' }, { op: 'clip.nudge', args: { frames: 120 } }, { op: 'clip.set-track', args: { track: 'V3' } },
+    ] });
+  });
+
+  it('leaves no preallocated lane when the shared apply boundary refuses or throws', async () => {
+    const { dataRef, applyEdit, result } = await setup();
+    const before = dataRef.current;
+    act(() => result.current.applyResolvedClipMove('clip-V1', 'new', null, 4, true, 'refused-drag'));
+    expect(dataRef.current).toBe(before);
+    applyEdit.mockImplementation(() => { throw new Error('validation refused'); });
+    expect(() => result.current.applyResolvedClipMove('clip-V1', 'new', null, 4, true)).toThrow('validation refused');
+    expect(dataRef.current).toBe(before);
+    expect(dataRef.current.tracks.map((track) => track.id)).toEqual(['V1', 'V2']);
   });
 
   it('keeps explicit Add track on the legacy Output default', async () => {
