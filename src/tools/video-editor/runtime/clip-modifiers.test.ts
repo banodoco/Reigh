@@ -82,8 +82,33 @@ test('App adapter explicitly refuses missing admission, unsupported targets and 
     (error: unknown) => error instanceof ModifierAdmissionError && error.code === 'unsupported-app-target');
   const findings: unknown[] = [];
   assert.throws(() => composeAppClipModifiers({ clip: { ...clip, modifiers: instances }, content, frame: 10, fps: 20,
-    bounds: { status: 'unknown', reason: 'no intrinsic size' }, host: { ...host, onFinding: f => findings.push(f) } }), /no intrinsic size/);
-  assert.deepEqual(findings, [{ code: 'unknown-modifier-bounds', clipId: clip.id, reason: 'no intrinsic size' }]);
+    bounds: { status: 'unknown', reason: 'no intrinsic size' }, host: { ...host, onFinding: f => findings.push(f) } }),
+  (error: unknown) => error instanceof ModifierAdmissionError && error.code === 'unknown-target-bounds'
+    && /no intrinsic size/.test(error.message));
+  assert.deepEqual(findings, [{ code: 'unknown-target-bounds', clipId: clip.id, reason: 'no intrinsic size' }]);
+});
+
+test('App adapter renders a modifier with unknown output bounds on known target geometry and reports the finding', () => {
+  calls.length = 0;
+  const unknownBoundsDeclaration = declareModifier({ kind: 'modifier', element, hosts: ['app'], bounds: 'unknown',
+    alpha: 'preserve', support: 'preserve', component: Trace,
+    resolveParams(params, context) {
+      calls.push(context);
+      if (typeof params.strength !== 'number') throw new Error('Fixture strength must be numeric');
+      return { strength: params.strength };
+    } });
+  const findings: unknown[] = [];
+  const output = composeAppClipModifiers({ clip: { ...clip, modifiers: [instances[0]] }, content,
+    frame: 10, fps: 20, bounds,
+    host: { ...host, registry: { [element]: unknownBoundsDeclaration }, onFinding: finding => findings.push(finding) } });
+
+  assert.ok(isValidElement<ModifierProps<{ strength: number }>>(output));
+  assert.equal(output.key, 'A');
+  assert.strictEqual(output.props.children, content);
+  assert.strictEqual(output.props.context.bounds, bounds);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(findings, [{ code: 'unknown-modifier-bounds', clipId: clip.id, instanceId: 'A', element,
+    reason: 'Modifier declares unknown output bounds' }]);
 });
 
 test('actual App row projection and sanitizer preserve modifier ids, order and params through JSON roundtrip', () => {
@@ -115,19 +140,31 @@ test('actual native effect wrapper refuses explicit easing and preserves ordinar
   assert.deepEqual(effect.props.params, { distance: 60 });
 });
 
-test('actual App keyframe validation and evaluators refuse untyped named easing without altering legacy linear or hold', () => {
+test('actual App keyframe validation and evaluators support named easing while retaining legacy linear and hold', () => {
   const schema: ParameterSchema = [{ name: 'x', label: 'x', description: 'x', type: 'number', default: 0 }];
   const ordinary = [{ time: 0, value: 0, interpolation: 'linear' }, { time: 1, value: 10, interpolation: 'hold' }];
-  const keys = JSON.parse(JSON.stringify(ordinary));
-  assert.deepEqual(resolveAnimatedParams({ x: keys }, schema, .5), [{ name: 'x', value: 5 }]);
-  keys[0].easing = 'in';
-  assert.ok(validateKeyframes(keys, schema[0]).some(d => d.code === 'keyframes/unsupported-easing'));
-  assert.throws(() => resolveAnimatedParams({ x: keys }, schema, .5), /named easing is not supported/);
+  assert.deepEqual(resolveAnimatedParams({ x: ordinary }, schema, .5), [{ name: 'x', value: 5 }]);
+
+  const eased = JSON.parse(JSON.stringify(ordinary));
+  eased[0].easing = 'in';
+  assert.deepEqual(validateKeyframes(eased, schema[0]), []);
+  assert.deepEqual(resolveAnimatedParams({ x: eased }, schema, .5), [{ name: 'x', value: 2.5 }]);
+  assert.deepEqual(applyAutomationOverrides([{ clipType: 'automation', params: { enabled: true,
+    target: { contributionId: 'target', parameterPath: 'x' }, keyframes: eased } }], 'target', { x: 0 }, .5), { x: 2.5 });
+
+  const invalid = JSON.parse(JSON.stringify(ordinary));
+  invalid[0].easing = 'bogus';
+  assert.deepEqual(validateKeyframes(invalid, schema[0]), [{ severity: 'error', code: 'keyframes/invalid-easing',
+    message: 'parameter "x"[0]: unknown motion easing bogus',
+    detail: { parameterName: 'x', index: 0, easing: 'bogus' } }]);
+  assert.throws(() => resolveAnimatedParams({ x: invalid }, schema, .5), /unknown motion easing bogus/);
   assert.throws(() => applyAutomationOverrides([{ clipType: 'automation', params: { enabled: true,
-    target: { contributionId: 'target', parameterPath: 'x' }, keyframes: keys } }], 'target', { x: 0 }, .5), /named easing is not supported/);
-  delete keys[0].easing;
-  keys[0].interpolation = 'hold';
-  assert.deepEqual(resolveAnimatedParams({ x: keys }, schema, .5), [{ name: 'x', value: 0 }]);
+    target: { contributionId: 'target', parameterPath: 'x' }, keyframes: invalid } }], 'target', { x: 0 }, .5),
+  /unknown motion easing bogus/);
+
+  const held = JSON.parse(JSON.stringify(ordinary));
+  held[0].interpolation = 'hold';
+  assert.deepEqual(resolveAnimatedParams({ x: held }, schema, .5), [{ name: 'x', value: 0 }]);
 });
 
 test('native media source structure keeps crop inside modifiers and alpha, effects and transitions outside', () => {
