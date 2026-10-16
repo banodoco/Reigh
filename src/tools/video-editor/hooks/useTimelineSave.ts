@@ -1,3 +1,4 @@
+import { timelineDraftRecoveryKey } from '@/tools/video-editor/data/timelineDraftIndexedDb.ts';
 import type { RegistrationSaveOwner } from './timeline-state-types.ts';
 import {
   useCallback,
@@ -129,7 +130,7 @@ export function useTimelineSave(
   } | null>(null);
   const [recoveredAsDirty, setRecoveredAsDirty] = useState(false);
   const recoveryCheckedScopeRef = useRef<string | null>(null);
-  const recoveryKey = provider.getTimelineDraftRecoveryMetadata?.().recoveryKey ?? timelineId;
+  const recoveryKey = timelineDraftRecoveryKey(provider.getTimelineDraftRecoveryMetadata?.(timelineId), timelineId);
   const recoveryScope = `${timelineId}\u0000${recoveryKey}`;
   const fallbackCanonicalReloadInProgressRef = useRef(false);
   const canonicalReloadInProgressRef = persistence.canonicalReloadInProgressRef

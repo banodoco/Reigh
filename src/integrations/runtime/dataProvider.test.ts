@@ -1,3 +1,5 @@
+import { clearTimelineDraft, loadTimelineDraft, saveTimelineDraft, timelineDraftRecoveryKey } from '@/tools/video-editor/data/timelineDraftIndexedDb.ts';
+import { RuntimeCommitSession, browserCommitSessionStorage } from './commitSession.ts';
 import { splitClipAtPlayhead } from '@/tools/video-editor/lib/editor-utils.ts';
 import { serializeForDisk } from '@/tools/video-editor/lib/serialize.ts';
 import gesturePreservation from './fixtures/gesture-preservation.json';
@@ -18,6 +20,12 @@ import { sanitizeTimelineClipSnapshot } from '@/tools/video-editor/lib/timeline-
 import { createDefaultTimelineConfig } from '@/tools/video-editor/lib/defaults.ts';
 import type { ProjectObjectMetadata } from '@reigh/editor-sdk';
 import type { TimelineConfig } from '@/tools/video-editor/types/index.ts';
+
+// The repository-local fixture intentionally ships JavaScript only.
+const { createFakeIndexedDB, resetFakeIndexedDB } = await vi.importActual<{
+  createFakeIndexedDB: () => IDBFactory;
+  resetFakeIndexedDB: () => void;
+}>('fake-indexeddb');
 
 const PROJECT_ID = 'project-r1';
 const TIMELINE_ID = 'timeline-r1';
@@ -117,7 +125,9 @@ function compactParentComposition() {
 
 
 function runtimeFixture(options: {
+  projectId?: string;
   runtimeInstanceId?: string;
+  realmId?: string;
   mediaEtag?: string;
   objectReadOverrides?: Map<string, Uint8Array>;
   initialClips?: TimelineConfig['clips'];
@@ -130,6 +140,7 @@ function runtimeFixture(options: {
   advanceHeadAfterAudioInspect?: boolean;
   inspectNextCursor?: string | null;
 } = {}) {
+  const fixtureProjectId = options.projectId ?? PROJECT_ID;
   let documentVersion = 1;
   const receipts = new Map<string, { request: string; body: Uint8Array }>();
   let headRevisionId = 'parent-r1';
@@ -172,16 +183,16 @@ function runtimeFixture(options: {
       return { status: 200, headers: {}, body: json({ status: 'ok', protocol: 'workspace.v1', schema_digest: RUNTIME_SCHEMA_DIGEST, runtime_epoch: 1, runtime_instance_id: options.runtimeInstanceId ?? 'runtime-instance-r1' }) };
     }
     if (path === '/v1/handshake') {
-      return { status: 200, headers: {}, body: json({ protocol: 'workspace.v1', schema_digest: RUNTIME_SCHEMA_DIGEST, session_id: 'session-r1', actor_id: 'reigh-product-connector', realm_id: 'realm-r1', scopes: RUNTIME_CLIENT_SCOPES, capabilities: [RUNTIME_TARGETED_EXECUTION_CAPABILITY] }) };
+      return { status: 200, headers: {}, body: json({ protocol: 'workspace.v1', schema_digest: RUNTIME_SCHEMA_DIGEST, session_id: 'session-r1', actor_id: 'reigh-product-connector', realm_id: options.realmId ?? 'realm-r1', scopes: RUNTIME_CLIENT_SCOPES, capabilities: [RUNTIME_TARGETED_EXECUTION_CAPABILITY] }) };
     }
     if (path === '/v1/realm') {
-      return { status: 200, headers: {}, body: json({ realm_id: 'realm-r1', display_name: 'R1 fixture', version: 1, created_at: '2026-09-11T00:00:00Z' }) };
+      return { status: 200, headers: {}, body: json({ realm_id: options.realmId ?? 'realm-r1', display_name: 'R1 fixture', version: 1, created_at: '2026-09-11T00:00:00Z' }) };
     }
-    if (method === 'POST' && path === `/v1/projects/${PROJECT_ID}/media-imports`) {
+    if (method === 'POST' && path === `/v1/projects/${fixtureProjectId}/media-imports`) {
       const operationId = headers['Idempotency-Key'] ?? '';
       const bytes = await requestBodyBytes(body);
       objects.set(MANAGED_OBJECT_ID, {
-        projectId: PROJECT_ID,
+        projectId: fixtureProjectId,
         bytes,
         digest: MANAGED_OBJECT_DIGEST,
         mediaType: headers['Content-Type'] ?? 'video/mp4',
@@ -192,7 +203,7 @@ function runtimeFixture(options: {
         headers: { ETag: `"${MANAGED_OBJECT_DIGEST}"` },
         body: json({
           data: {
-            provider: 'runtime', project: PROJECT_ID, import_operation_id: operationId, status: 'completed',
+            provider: 'runtime', project: fixtureProjectId, import_operation_id: operationId, status: 'completed',
             task_id: 'task-import-r3', generation_id: 'generation-import-r3', variant_id: 'variant-import-r3',
             asset_id: MANAGED_OBJECT_ID,
             entry: { object_id: MANAGED_OBJECT_ID, media_type: headers['Content-Type'] ?? 'video/mp4', size: bytes.byteLength, filename: headers['X-Original-Name'] ?? 'managed-creative.mp4' },
@@ -295,7 +306,7 @@ function runtimeFixture(options: {
         body: method === 'HEAD' ? new Uint8Array() : ranged.bytes,
       };
     }
-    if (method === 'POST' && path === `/v1/projects/${PROJECT_ID}/timelines/${TIMELINE_ID}/inspect`) {
+    if (method === 'POST' && path === `/v1/projects/${fixtureProjectId}/timelines/${TIMELINE_ID}/inspect`) {
       const requestsAudioLane = (parsedBody?.presentation as Record<string, unknown> | undefined)?.audio_lane === true;
       if (requestsAudioLane && (options.audioLaneUnavailable || options.audioLaneInvalid)) {
         const unavailable = options.audioLaneUnavailable === true;
@@ -315,7 +326,7 @@ function runtimeFixture(options: {
         render_requested: false,
         representation: 'canonical_head',
         authority: 'runtime_parent_composition',
-        project_id: PROJECT_ID,
+        project_id: fixtureProjectId,
         timeline_id: TIMELINE_ID,
         revision_id: inspectedHead,
         head_revision_id: inspectedHead,
@@ -347,7 +358,7 @@ function runtimeFixture(options: {
         body: json(responseBody),
       };
     }
-    const revisionPath = `/v1/projects/${PROJECT_ID}/timelines/${TIMELINE_ID}/composition-revisions/`;
+    const revisionPath = `/v1/projects/${fixtureProjectId}/timelines/${TIMELINE_ID}/composition-revisions/`;
     const requestedRevision = path.startsWith(revisionPath) ? decodeURIComponent(path.slice(revisionPath.length)) : '';
     if (method === 'GET' && (revisions.has(requestedRevision) || requestedRevision === headRevisionId)) {
       return {
@@ -355,7 +366,7 @@ function runtimeFixture(options: {
         headers: {},
         body: json({
           revision_id: requestedRevision,
-          project_id: PROJECT_ID,
+          project_id: fixtureProjectId,
           timeline_id: TIMELINE_ID,
           content_digest: `sha256:${'1'.repeat(64)}`,
           payload: revisions.get(requestedRevision) ?? { config, registry, clips: [], occurrences: [] },
@@ -363,21 +374,21 @@ function runtimeFixture(options: {
         }),
       };
     }
-    if (method === 'GET' && path.startsWith(`/v1/projects/${PROJECT_ID}/timelines/${TIMELINE_ID}/composition-revisions?`)) {
+    if (method === 'GET' && path.startsWith(`/v1/projects/${fixtureProjectId}/timelines/${TIMELINE_ID}/composition-revisions?`)) {
       return {
         status: 200,
         headers: {},
         body: json({
           items: [{
             revision_id: 'parent-r1',
-            project_id: PROJECT_ID,
+            project_id: fixtureProjectId,
             timeline_id: TIMELINE_ID,
             content_digest: `sha256:${'1'.repeat(64)}`,
             created_at: '2026-09-11T00:00:00Z',
             is_current_head: true,
           }, {
             revision_id: 'parent-old',
-            project_id: PROJECT_ID,
+            project_id: fixtureProjectId,
             timeline_id: TIMELINE_ID,
             content_digest: `sha256:${'2'.repeat(64)}`,
             created_at: '2026-09-10T00:00:00Z',
@@ -387,7 +398,7 @@ function runtimeFixture(options: {
         }),
       };
     }
-    if (method === 'POST' && path === `/v1/projects/${PROJECT_ID}/timelines/${TIMELINE_ID}/composition-revisions/parent-old/restore`) {
+    if (method === 'POST' && path === `/v1/projects/${fixtureProjectId}/timelines/${TIMELINE_ID}/composition-revisions/parent-old/restore`) {
       const request = parsedBody as { expected_head: string | null };
       if (request.expected_head !== headRevisionId) {
         return { status: 409, headers: {}, body: json({ code: 'conflict', message: 'head conflict' }) };
@@ -398,7 +409,7 @@ function runtimeFixture(options: {
         headers: {},
         body: json({
           data: {
-            project_id: PROJECT_ID,
+            project_id: fixtureProjectId,
             timeline_id: TIMELINE_ID,
             revision_id: headRevisionId,
             parent_revision_id: headRevisionId,
@@ -410,7 +421,7 @@ function runtimeFixture(options: {
             command_kind: 'parent_composition.restore',
             idempotency_key: headers['Idempotency-Key'],
             request_hash: 'history-restore-hash',
-            project_id: PROJECT_ID,
+            project_id: fixtureProjectId,
             project_seq: [2, 2],
             event_ids: [],
             result: {},
@@ -419,7 +430,7 @@ function runtimeFixture(options: {
         }),
       };
     }
-    if (method === 'POST' && path === `/v1/projects/${PROJECT_ID}/timelines/${TIMELINE_ID}/composition-revisions`) {
+    if (method === 'POST' && path === `/v1/projects/${fixtureProjectId}/timelines/${TIMELINE_ID}/composition-revisions`) {
       const request = parsedBody as {
         expected_head: string | null;
         parent_revision_id: string;
@@ -445,7 +456,7 @@ function runtimeFixture(options: {
         headers: {},
         body: json({
           data: {
-            project_id: PROJECT_ID,
+            project_id: fixtureProjectId,
             timeline_id: TIMELINE_ID,
             revision_id: headRevisionId,
             parent_revision_id: headRevisionId,
@@ -458,7 +469,7 @@ function runtimeFixture(options: {
             command_kind: 'parent_composition.publish',
             idempotency_key: headers['Idempotency-Key'],
             request_hash: 'hash',
-            project_id: PROJECT_ID,
+            project_id: fixtureProjectId,
             project_seq: [documentVersion, documentVersion],
             event_ids: [`event-${documentVersion}`],
             result: {},
@@ -469,7 +480,7 @@ function runtimeFixture(options: {
       receipts.set(headers['Idempotency-Key'], { request: requestJson, body: response.body });
       return response;
     }
-    if (path === `/v1/projects/${PROJECT_ID}/timelines/${TIMELINE_ID}`) {
+    if (path === `/v1/projects/${fixtureProjectId}/timelines/${TIMELINE_ID}`) {
       throw new Error('retired mutable timeline GET must not be used');
     }
     if (path.includes('/documents/timeline%3A')) {
@@ -1916,6 +1927,218 @@ describe('RuntimeDataProvider commit save routing', () => {
     };
     return { ...fixture, transport, commits, setHead };
   }
+
+  function tabStorage() {
+    const values = new Map<string, string>();
+    return { values, getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => { values.set(key, value); } };
+  }
+  function nativeProvider(fixture: ReturnType<typeof commitFixture>, storage = tabStorage()) {
+    return new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport,
+      commitSessionStorage: storage, commitRouting: { enabled: true } });
+  }
+
+  it('native recovery identity matches the verified realm and every emitted commit dimension without credentials', async () => {
+    const fixture = commitFixture(async (body) => result(body));
+    const storage = tabStorage();
+    const setItem = vi.spyOn(storage, 'setItem');
+    const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, token: 'disposable-credential-do-not-store',
+      baseUrl: 'http://disposable-user:disposable-password@runtime.test/?token=disposable-query#disposable-fragment',
+      transport: fixture.transport, commitSessionStorage: storage, commitRouting: { enabled: true } });
+    expect(provider.getTimelineDraftRecoveryMetadata(TIMELINE_ID).recoveryKey).toBeNull();
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+    const metadata = provider.getTimelineDraftRecoveryMetadata(TIMELINE_ID);
+    await provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!, undefined, undefined, []);
+    const request = JSON.parse(fixture.commits[0].bytes) as CommitRequest;
+    expect(JSON.parse(metadata.recoveryKey!)).toEqual([
+      'runtime-timeline-draft-v1', 'realm-r1', PROJECT_ID, TIMELINE_ID, request.scope, request.session_id,
+    ]);
+    expect(request.scope).toEqual({ target: 'parent', complete: ['clips', 'tracks'], projection_version: 1 });
+    expect(metadata.recoveryKey).not.toContain('disposable-credential');
+    expect(metadata.recoveryKey).not.toContain('session-r1'); // handshake session is not the commit session
+    for (const [key, value] of setItem.mock.calls) {
+      for (const secret of ['disposable-user', 'disposable-password', 'disposable-query', 'disposable-fragment', 'disposable-credential']) {
+        expect(key + value).not.toContain(secret);
+      }
+    }
+    expect(provider.getTimelineDraftRecoveryMetadata().recoveryKey).toBeNull();
+  });
+
+  it('native recovery survives same-tab recreation and reserves increasing sequences before transport', async () => {
+    resetFakeIndexedDB();
+    vi.stubGlobal('indexedDB', createFakeIndexedDB());
+    const storage = tabStorage();
+    const fixture = commitFixture(async (body) => result(body));
+    const first = nativeProvider(fixture, storage);
+    const loaded = await first.loadTimeline(TIMELINE_ID);
+    const metadata = first.getTimelineDraftRecoveryMetadata(TIMELINE_ID);
+    await saveTimelineDraft(TIMELINE_ID, { config: loaded.config, editCommands: [] }, 1,
+      { ...metadata, ownerId: 'suffix-owner', draftIdentity: 'suffix-draft', baseHeadRevisionId: 'parent-r1',
+        baseHeadProjectId: PROJECT_ID, baseHeadTimelineId: TIMELINE_ID });
+    await first.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!, undefined, undefined, []);
+    const second = nativeProvider(fixture, storage);
+    const reloaded = await second.loadTimeline(TIMELINE_ID);
+    expect(second.getTimelineDraftRecoveryMetadata(TIMELINE_ID)).toEqual(metadata);
+    const key = metadata.recoveryKey!;
+    expect(await loadTimelineDraft(key)).toMatchObject({ ownerId: 'suffix-owner', draftIdentity: 'suffix-draft',
+      baseHeadProjectId: PROJECT_ID, baseHeadTimelineId: TIMELINE_ID, baseHeadRevisionId: 'parent-r1' });
+    await second.saveTimelineAtHead(TIMELINE_ID, reloaded.config, reloaded.head!, undefined, undefined, []);
+    const requests = fixture.commits.map(({ bytes }) => JSON.parse(bytes) as CommitRequest);
+    expect(requests.map((r) => r.session_id)).toEqual([requests[0].session_id, requests[0].session_id]);
+    expect(requests.map((r) => r.session_sequence)).toEqual([1, 2]);
+    await clearTimelineDraft(key, 'other-owner');
+    expect(await loadTimelineDraft(key)).not.toBeNull();
+    await clearTimelineDraft(key, 'suffix-owner');
+    expect(await loadTimelineDraft(key)).toBeNull();
+  });
+
+  it('native recovery isolates independent tab contexts, timelines, projects and verified realms', async () => {
+    resetFakeIndexedDB(); vi.stubGlobal('indexedDB', createFakeIndexedDB());
+    const fixture = commitFixture(async (body) => result(body));
+    const a = nativeProvider(fixture); const b = nativeProvider(fixture);
+    await a.loadTimeline(TIMELINE_ID); await b.loadTimeline(TIMELINE_ID);
+    const keyA = a.getTimelineDraftRecoveryMetadata(TIMELINE_ID).recoveryKey!;
+    const keyB = b.getTimelineDraftRecoveryMetadata(TIMELINE_ID).recoveryKey!;
+    expect(JSON.parse(keyA)[5]).not.toBe(JSON.parse(keyB)[5]);
+    await saveTimelineDraft(TIMELINE_ID, { suffix: 'tab A' }, 1, { recoveryKey: keyA });
+    expect(await loadTimelineDraft(keyB)).toBeNull();
+    const otherTimeline = a.getTimelineDraftRecoveryMetadata('other-timeline').recoveryKey!;
+    const alternate = runtimeFixture({ realmId: 'realm-other' });
+    const otherRealm = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: alternate.transport, commitSessionStorage: tabStorage() });
+    await otherRealm.loadTimeline(TIMELINE_ID);
+    const otherProject = new RuntimeDataProvider({ projectId: 'other-project', commitSessionStorage: tabStorage(),
+      transport: runtimeFixture({ projectId: 'other-project' }).transport });
+    await otherProject.loadTimeline(TIMELINE_ID);
+    const projectKey = otherProject.getTimelineDraftRecoveryMetadata(TIMELINE_ID).recoveryKey!;
+    const realmKey = otherRealm.getTimelineDraftRecoveryMetadata(TIMELINE_ID).recoveryKey!;
+    expect(JSON.parse(otherTimeline)[3]).toBe('other-timeline');
+    expect(JSON.parse(projectKey)[2]).toBe('other-project');
+    expect(JSON.parse(realmKey)[1]).toBe('realm-other');
+    for (const key of [otherTimeline, projectKey, realmKey]) {
+      expect(key).not.toBe(keyA); expect(await loadTimelineDraft(key)).toBeNull();
+    }
+    await clearTimelineDraft(keyB);
+    expect((await loadTimelineDraft(keyA))?.draft).toEqual({ suffix: 'tab A' });
+  });
+
+  it('native recovery retains a failed suffix expect under its exact reload key', async () => {
+    resetFakeIndexedDB(); vi.stubGlobal('indexedDB', createFakeIndexedDB());
+    const fixture = commitFixture(async (body) => ({ ...result(body), status: 'conflict', accepted_revision_id: null,
+      conflicts: [{ reason: 'expect failed' }] } as unknown as CommitResult));
+    const storage = tabStorage(); const provider = nativeProvider(fixture, storage);
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+    const editCommands: EditCommand[] = [{ op: 'clip.clear', select: 'parent/clip:missing', args: { keys: ['opacity'] },
+      expect: { opacity: { state: 'present', value: 0.5 } } }];
+    const metadata = provider.getTimelineDraftRecoveryMetadata(TIMELINE_ID);
+    fixture.setHead('parent-after-A');
+    await provider.loadTimeline(TIMELINE_ID);
+    await saveTimelineDraft(TIMELINE_ID, { config: loaded.config, editCommands }, 1, { ...metadata,
+      ownerId: 'failed-suffix', draftIdentity: 'failed-expect', baseHeadRevisionId: loaded.head!.headRevisionId });
+    await expect(provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!, undefined, undefined, editCommands)).rejects.toThrow();
+    expect(JSON.parse(fixture.commits[0].bytes)).toMatchObject({ dry_run: true, change: { commands: editCommands } });
+    const recreated = nativeProvider(fixture, storage); await recreated.loadTimeline(TIMELINE_ID);
+    expect(recreated.getTimelineDraftRecoveryMetadata(TIMELINE_ID)).toEqual(metadata);
+    expect((await loadTimelineDraft(metadata.recoveryKey!))?.draft.editCommands).toEqual(editCommands);
+  });
+
+  it('native recovery fails closed for unavailable storage, realm mismatch, or a producer-owned scope/session', async () => {
+    const fixture = commitFixture(async (body) => result(body));
+    const unavailable = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport,
+      commitSessionStorage: null, commitRouting: { enabled: true } });
+    const loaded = await unavailable.loadTimeline(TIMELINE_ID);
+    expect(unavailable.getTimelineDraftRecoveryMetadata(TIMELINE_ID)).toEqual({ recoveryKey: null });
+    await unavailable.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!, undefined, undefined, []);
+    const supplied = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport,
+      commitSessionStorage: tabStorage(), commitRouting: { enabled: true, requestForSave: () => request() } });
+    await supplied.loadTimeline(TIMELINE_ID);
+    expect(supplied.getTimelineDraftRecoveryMetadata(TIMELINE_ID).recoveryKey).toBeNull();
+    const mismatched = new RuntimeDataProvider({ projectId: PROJECT_ID, commitSessionStorage: tabStorage(),
+      transport: (method, path, headers, body) => path === '/v1/realm'
+        ? Promise.resolve({ status: 200, headers: {}, body: json({ realm_id: 'other', display_name: 'fixture', version: 1, created_at: '' }) })
+        : fixture.transport(method, path, headers, body) });
+    await mismatched.loadTimeline(TIMELINE_ID);
+    expect(mismatched.getTimelineDraftRecoveryMetadata(TIMELINE_ID).recoveryKey).toBeNull();
+    expect(timelineDraftRecoveryKey(undefined, TIMELINE_ID)).toBe(TIMELINE_ID);
+  });
+
+  it('native recovery reserves preview and actual sequences across recreation, including uncertain transport', async () => {
+    const fixture = commitFixture(async (body) => body.dry_run
+      ? { ...result(body), status: 'preview', accepted_revision_id: null, rebased_onto: 'parent-new' }
+      : result(body));
+    const storage = tabStorage(); const provider = nativeProvider(fixture, storage);
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+    fixture.setHead('parent-new'); await provider.loadTimeline(TIMELINE_ID);
+    await provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!, undefined, undefined, []);
+    const recreated = nativeProvider(fixture, storage); const again = await recreated.loadTimeline(TIMELINE_ID);
+    await recreated.saveTimelineAtHead(TIMELINE_ID, again.config, again.head!, undefined, undefined, []);
+    const requests = fixture.commits.map(({ bytes }) => JSON.parse(bytes) as CommitRequest);
+    expect(requests.map((r) => r.session_sequence)).toEqual([1, 2, 3]);
+    expect(new Set(requests.map((r) => r.session_id)).size).toBe(1);
+    const session = new RuntimeCommitSession(storage, 'uncertain');
+    expect(session.next().sequence).toBe(1); // reserved even without an ACK
+    expect(new RuntimeCommitSession(storage, 'uncertain').next().sequence).toBe(2);
+  });
+
+  it('native recovery uses browser tab storage on the default path and disables unsupported navigation identity', async () => {
+    const storage = tabStorage();
+    const getter = vi.spyOn(window, 'sessionStorage', 'get').mockReturnValue(storage as Storage);
+    const navigation = vi.spyOn(performance, 'getEntriesByType').mockReturnValue([{ type: 'reload' } as PerformanceNavigationTiming]);
+    try {
+      const fixture = commitFixture(async (body) => result(body));
+      const options = { projectId: PROJECT_ID, transport: fixture.transport, commitRouting: { enabled: true } };
+      const first = new RuntimeDataProvider(options); await first.loadTimeline(TIMELINE_ID);
+      const second = new RuntimeDataProvider(options); await second.loadTimeline(TIMELINE_ID);
+      expect(second.getTimelineDraftRecoveryMetadata(TIMELINE_ID)).toEqual(first.getTimelineDraftRecoveryMetadata(TIMELINE_ID));
+      expect(first.getTimelineDraftRecoveryMetadata(TIMELINE_ID).recoveryKey).toBeTypeOf('string');
+      getter.mockReturnValue(tabStorage() as Storage);
+      const other = new RuntimeDataProvider(options); await other.loadTimeline(TIMELINE_ID);
+      expect(other.getTimelineDraftRecoveryMetadata(TIMELINE_ID)).not.toEqual(first.getTimelineDraftRecoveryMetadata(TIMELINE_ID));
+      navigation.mockReturnValue([]);
+      expect(browserCommitSessionStorage('unsupported-navigation').storage).toBeNull();
+    } finally { getter.mockRestore(); navigation.mockRestore(); }
+  });
+
+  it('native recovery preserves uncertain request bytes and advances the durable sequence after recreation', async () => {
+    const fixture = commitFixture(async (body, call) => {
+      if (call === 1) throw new Error('disposable lost response');
+      return result(body);
+    });
+    const storage = tabStorage(); const first = nativeProvider(fixture, storage);
+    const loaded = await first.loadTimeline(TIMELINE_ID);
+    const config = loaded.config;
+    await expect(first.saveTimelineAtHead(TIMELINE_ID, config, loaded.head!, undefined, undefined, [])).rejects.toThrow('disposable lost response');
+    await first.saveTimelineAtHead(TIMELINE_ID, config, loaded.head!, undefined, undefined, []);
+    expect(fixture.commits[1]).toEqual(fixture.commits[0]);
+    const recreated = nativeProvider(fixture, storage); const again = await recreated.loadTimeline(TIMELINE_ID);
+    await recreated.saveTimelineAtHead(TIMELINE_ID, again.config, again.head!, undefined, undefined, []);
+    const requests = fixture.commits.map(({ bytes }) => JSON.parse(bytes) as CommitRequest);
+    expect(requests.map((r) => r.session_sequence)).toEqual([1, 1, 2]);
+    expect(new Set(requests.map((r) => r.session_id)).size).toBe(1);
+  });
+
+  it('native recovery allocates a fresh session for opener-copied navigation and fails closed on storage loss', () => {
+    const storage = tabStorage(); const first = new RuntimeCommitSession(storage, 'context');
+    first.next();
+    const copied = tabStorage();
+    for (const [key, value] of storage.values) copied.setItem(key, value);
+    const duplicate = new RuntimeCommitSession(copied, 'context', true);
+    expect(duplicate.id).not.toBe(first.id);
+    expect(first.next()).toEqual({ id: first.id, sequence: 2 });
+    let writes = 0;
+    const unstable = { getItem: storage.getItem, setItem: (key: string, value: string) => {
+      if (++writes > 1) throw new Error('quota'); storage.setItem(key, value);
+    } };
+    const session = new RuntimeCommitSession(unstable, 'unstable'); const durableId = session.id;
+    expect(session.recoverable).toBe(true);
+    expect(session.next().id).not.toBe(durableId);
+    expect(session.recoverable).toBe(false);
+    const blocked = new RuntimeCommitSession({ getItem: () => { throw new Error('blocked'); }, setItem: () => {} }, 'blocked');
+    expect(blocked.recoverable).toBe(false);
+    const navigation = vi.spyOn(performance, 'getEntriesByType').mockReturnValue([{ type: 'navigate' } as PerformanceNavigationTiming]);
+    expect(browserCommitSessionStorage('fresh-namespace').fresh).toBe(true);
+    expect(browserCommitSessionStorage('fresh-namespace').fresh).toBe(false);
+    navigation.mockRestore();
+  });
 
   it('keeps flag-off publication bytes and headers equal to the unchanged default route', async () => {
     async function capture(explicitOff: boolean) {

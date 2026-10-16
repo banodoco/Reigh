@@ -37,7 +37,8 @@ export interface TimelineDraftRecord {
 }
 
 export interface TimelineDraftRecoveryMetadata {
-  recoveryKey?: string;
+  /** null explicitly disables recovery; undefined preserves the legacy timeline slot. */
+  recoveryKey?: string | null;
   /** Compare-and-delete owner for editor save acknowledgements. */
   ownerId?: string;
   baseHeadRevisionId?: string | null;
@@ -48,6 +49,10 @@ export interface TimelineDraftRecoveryMetadata {
   acknowledgementIdentity?: string;
 }
 
+export function timelineDraftRecoveryKey(metadata: TimelineDraftRecoveryMetadata | undefined, timelineId: string): string | null {
+  return metadata?.recoveryKey === null ? null : metadata?.recoveryKey ?? timelineId;
+}
+
 /**
  * Move a queued descendant draft onto the immutable head acknowledged by its
  * predecessor. The compare is deliberately scoped by owner and full head
@@ -55,12 +60,12 @@ export interface TimelineDraftRecoveryMetadata {
  * another project/timeline.
  */
 export async function advanceTimelineDraftBaseAfterHeadAcknowledgement(
-  recoveryKey: string,
+  recoveryKey: string | null,
   ownerId: string,
   expectedHead: TimelineHeadRevision,
   acknowledgedHead: TimelineHeadRevision,
 ): Promise<boolean> {
-  if (typeof indexedDB === 'undefined') return false;
+  if (recoveryKey === null || typeof indexedDB === 'undefined') return false;
   const database = await openDatabase();
   const advanced = await new Promise<boolean>((resolve, reject) => {
     const transaction = database.transaction(DRAFT_STORE_NAME, 'readwrite');
@@ -165,7 +170,7 @@ export async function saveTimelineDraftIfOwner(
   expectedDraftIdentity: string | null,
   mergeOnOwnershipConflict?: TimelineDraftOwnershipConflictMerge,
 ): Promise<boolean> {
-  if (typeof indexedDB === 'undefined') {
+  if (recoveryMetadata.recoveryKey === null || typeof indexedDB === 'undefined') {
     return false;
   }
   const database = await openDatabase();
@@ -201,7 +206,7 @@ export async function saveTimelineDraft(
   baseVersion: number,
   recoveryMetadata: TimelineDraftRecoveryMetadata = {},
 ): Promise<void> {
-  if (typeof indexedDB === 'undefined') {
+  if (recoveryMetadata.recoveryKey === null || typeof indexedDB === 'undefined') {
     return;
   }
   const database = await openDatabase();
@@ -216,9 +221,9 @@ export async function saveTimelineDraft(
 }
 
 export async function loadTimelineDraft(
-  timelineId: string,
+  timelineId: string | null,
 ): Promise<TimelineDraftRecord | null> {
-  if (typeof indexedDB === 'undefined') {
+  if (timelineId === null || typeof indexedDB === 'undefined') {
     return null;
   }
   const database = await openDatabase();
@@ -232,8 +237,8 @@ export async function loadTimelineDraft(
   return record ?? null;
 }
 
-export async function clearTimelineDraft(timelineId: string, expectedOwnerId?: string): Promise<void> {
-  if (typeof indexedDB === 'undefined') {
+export async function clearTimelineDraft(timelineId: string | null, expectedOwnerId?: string): Promise<void> {
+  if (timelineId === null || typeof indexedDB === 'undefined') {
     return;
   }
   const database = await openDatabase();
@@ -259,10 +264,10 @@ export async function clearTimelineDraft(timelineId: string, expectedOwnerId?: s
 
 /** Delete only the exact draft identity acknowledged by a completed save. */
 export async function clearTimelineDraftIfMatches(
-  recoveryKey: string,
+  recoveryKey: string | null,
   acknowledgementIdentity: string,
 ): Promise<boolean> {
-  if (typeof indexedDB === 'undefined') return false;
+  if (recoveryKey === null || typeof indexedDB === 'undefined') return false;
   const database = await openDatabase();
   const cleared = await new Promise<boolean>((resolve, reject) => {
     const transaction = database.transaction(DRAFT_STORE_NAME, 'readwrite');
@@ -290,13 +295,13 @@ export async function clearTimelineDraftIfMatches(
  * the acknowledged request's expected head is eligible for this rebase.
  */
 export async function advanceTimelineDraftBaseAfterAcknowledgement(
-  recoveryKey: string,
+  recoveryKey: string | null,
   expectedHeadRevisionId: string,
   acknowledgedHeadRevisionId: string,
   acknowledgedGraph: Record<string, unknown>,
   acknowledgementIdentity: string,
 ): Promise<boolean> {
-  if (typeof indexedDB === 'undefined') return false;
+  if (recoveryKey === null || typeof indexedDB === 'undefined') return false;
   const database = await openDatabase();
   const advanced = await new Promise<boolean>((resolve, reject) => {
     const transaction = database.transaction(DRAFT_STORE_NAME, 'readwrite');
@@ -358,11 +363,11 @@ export async function advanceTimelineDraftBaseAfterAcknowledgement(
  * or a genuinely stale draft cannot be rewritten by an older popup load.
  */
 export async function reconcileTimelineDraftHeadMarker(
-  recoveryKey: string,
+  recoveryKey: string | null,
   draftIdentity: string,
   baseHeadRevisionId: string,
 ): Promise<boolean> {
-  if (typeof indexedDB === 'undefined') return false;
+  if (recoveryKey === null || typeof indexedDB === 'undefined') return false;
   const database = await openDatabase();
   const reconciled = await new Promise<boolean>((resolve, reject) => {
     const transaction = database.transaction(DRAFT_STORE_NAME, 'readwrite');
@@ -413,10 +418,10 @@ export async function reconcileTimelineDraftHeadMarker(
 
 /** Clear only the recovery snapshot observed by an explicit reload/discard. */
 export async function clearTimelineDraftIfSnapshotMatches(
-  recoveryKey: string,
+  recoveryKey: string | null,
   snapshot: Pick<TimelineDraftRecord, 'updatedAt' | 'draftIdentity'>,
 ): Promise<boolean> {
-  if (typeof indexedDB === 'undefined') return false;
+  if (recoveryKey === null || typeof indexedDB === 'undefined') return false;
   const database = await openDatabase();
   const cleared = await new Promise<boolean>((resolve, reject) => {
     const transaction = database.transaction(DRAFT_STORE_NAME, 'readwrite');

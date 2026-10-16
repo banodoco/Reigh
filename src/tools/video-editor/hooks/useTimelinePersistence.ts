@@ -1,3 +1,4 @@
+import { timelineDraftRecoveryKey } from '@/tools/video-editor/data/timelineDraftIndexedDb.ts';
 import type { EditCommand } from '@/integrations/runtime/generated.ts';
 import { gestureCommandsFor } from '../commands/semanticGestures.ts';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
@@ -141,7 +142,7 @@ interface ScheduledSave {
   data: TimelineData;
   seq: number;
   draftOwnerId: string;
-  draftRecoveryKey: string;
+  draftRecoveryKey: string | null;
   draftWrite: Promise<void>;
   traceId: string;
   /** The editor base captured when this mutation was scheduled. */
@@ -956,11 +957,11 @@ export function useTimelinePersistence({
 
   const createScheduledSave = useCallback((nextData: TimelineData, seq: number): ScheduledSave => {
     const draftOwnerId = generateUUID();
-    const recoveryMetadata = provider.getTimelineDraftRecoveryMetadata?.() ?? {};
+    const recoveryMetadata = provider.getTimelineDraftRecoveryMetadata?.(timelineId) ?? {};
     // Provider caches may contain a polled head. Only the editor's adopted
     // base (or its own acknowledged successor) belongs to this draft.
     const head = headRevisionRef.current;
-    const draftRecoveryKey = recoveryMetadata.recoveryKey ?? timelineId;
+    const draftRecoveryKey = timelineDraftRecoveryKey(recoveryMetadata, timelineId);
     const draftBaseVersion = configVersionRef.current;
     const traceId = createShotTimelineTraceId(timelineId);
     const wireBundle = loadedBundleRef.current === null
@@ -1390,7 +1391,7 @@ export function useTimelinePersistence({
           if (reloadCancelledRef.current) {
             throw new Error('Canonical reload was superseded by a new timeline edit.');
           }
-          const recoveryKey = provider.getTimelineDraftRecoveryMetadata?.().recoveryKey ?? timelineId;
+          const recoveryKey = timelineDraftRecoveryKey(provider.getTimelineDraftRecoveryMetadata?.(timelineId), timelineId);
           const recoverySnapshot = await loadTimelineDraft(recoveryKey);
           if (reloadCancelledRef.current) {
             throw new Error('Canonical reload was superseded by a new timeline edit.');

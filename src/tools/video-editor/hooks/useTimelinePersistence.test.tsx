@@ -2207,6 +2207,19 @@ describe('semantic suffix queue and recovery', () => {
     await act(async () => { for (let i = 0; i < 30; i++) await Promise.resolve(); });
   }
 
+  it('passes the exact timeline to metadata and never falls back when Runtime recovery is unavailable', async () => {
+    await saveTimelineDraft('timeline-1', { prior: true }, 1);
+    const harness = setup({ recoveryMetadata: { recoveryKey: null } });
+    const metadata = vi.spyOn(harness.provider, 'getTimelineDraftRecoveryMetadata');
+    harness.scheduleSave(makeTimelineData('unavailable-recovery'));
+    await settle();
+    expect(metadata).toHaveBeenCalledWith('timeline-1');
+    expect((await loadTimelineDraft('timeline-1'))?.draft).toEqual({ prior: true });
+    await act(async () => { await harness.reloadFromServer(); });
+    expect((await loadTimelineDraft('timeline-1'))?.draft).toEqual({ prior: true });
+    harness.unmount();
+  });
+
   it('keeps queued commands and their draft on the authored base after A is acknowledged', async () => {
     let acceptA!: () => void;
     let acceptB!: () => void;

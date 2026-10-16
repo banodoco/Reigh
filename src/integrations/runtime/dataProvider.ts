@@ -1,3 +1,5 @@
+import { RuntimeCommitSession, browserCommitSessionStorage, type CommitSessionStorage } from './commitSession.ts';
+import type { TimelineDraftRecoveryMetadata } from '@/tools/video-editor/data/timelineDraftIndexedDb.ts';
 import { ApiError, type ByteResponse, type MediaImportOperation as MediaImport, type RequestBody, type CommitRequest, type CommitResult, type EditCommand } from './generated.ts';
 import {
   ReighRuntimeClient,
@@ -115,6 +117,8 @@ interface PendingTimelineCommit {
 
 export interface RuntimeDataProviderOptions {
   projectId: string;
+  /** Defaults to the browser tab session context; null disables durable recovery. */
+  commitSessionStorage?: CommitSessionStorage | null;
   /** Explicit opt-in. With no GESTURES producer, enabling this must fail closed. */
   commitRouting?: TimelineCommitRouting;
   baseUrl?: string;
@@ -339,8 +343,11 @@ export class RuntimeDataProvider implements DataProvider {
 
   private readonly commitRouting?: TimelineCommitRouting;
   readonly semanticCommandSaving: boolean;
-  private readonly commitSessionId = generateUUID();
-  private commitSessionSequence = 0;
+  private readonly commitSession: RuntimeCommitSession;
+  private recoveryRealmId: string | null = null;
+  private readonly commitScope: ImmutableCommitRequest['scope'] = Object.freeze({
+    target: 'parent', complete: Object.freeze(['clips', 'tracks'] as const), projection_version: 1,
+  });
   private readonly pendingCommits = new Map<string, PendingTimelineCommit>();
   private readonly projectId: string;
   private readonly client: ReighRuntimeClient;
@@ -385,6 +392,17 @@ export class RuntimeDataProvider implements DataProvider {
     this.client = new ReighRuntimeClient({ baseUrl: options.baseUrl, token: options.token, transport: options.transport });
     this.onRuntimeError = options.onRuntimeError;
     this.apiBaseUrl = this.client.baseUrl;
+    // Endpoint partitioning is local context only, never realm authority. URL
+    // credentials/query/hash must not enter even the browser storage key.
+    let endpoint: string[] = [];
+    try {
+      const url = new URL(this.apiBaseUrl, 'http://relative-runtime.invalid');
+      if (url.protocol === 'http:' || url.protocol === 'https:') endpoint = [url.origin, url.pathname];
+    } catch { /* Invalid custom transports still retain ordinary commit behavior. */ }
+    const namespace = JSON.stringify([...endpoint, this.projectId]);
+    const context = options.commitSessionStorage === undefined
+      ? browserCommitSessionStorage(namespace) : { storage: options.commitSessionStorage, fresh: false };
+    this.commitSession = new RuntimeCommitSession(context.storage, namespace, context.fresh);
   }
 
   private async loadRuntimeShotComposition(projectId: string, timelineId: string): Promise<unknown> {
@@ -553,6 +571,11 @@ export class RuntimeDataProvider implements DataProvider {
 
   async loadTimeline(timelineId: string): Promise<LoadedTimeline> {
     const record = await this.readTimeline(timelineId, true);
+    // Reuse the authenticated client handshake. A missing/mismatched identity
+    // disables recovery only; ordinary Runtime reads keep their existing errors.
+    const { handshake, realm } = await this.client.ensureSession();
+    this.recoveryRealmId = typeof realm.realm_id === 'string' && realm.realm_id.length > 0
+      && realm.realm_id === handshake.realm_id ? realm.realm_id : null;
     const configRecord = asRecord(record.config);
     if (!configRecord) {
       throw new TimelineSchemaIncompatibleError('Workspace Runtime timeline has no config object');
@@ -648,16 +671,30 @@ export class RuntimeDataProvider implements DataProvider {
       this.saveTimelineInOrder(timelineId, config, base, registry, bundle));
   }
 
+  getTimelineDraftRecoveryMetadata(timelineId?: string): TimelineDraftRecoveryMetadata {
+    // Injected request producers own their scope/session. Never guess those
+    // dimensions from the native gesture path or fall back to a timeline key.
+    if (!this.recoveryRealmId || !this.projectId || !timelineId
+      || !this.commitSession.recoverable || this.commitRouting?.requestForSave) {
+      return { recoveryKey: null };
+    }
+    return { recoveryKey: JSON.stringify([
+      'runtime-timeline-draft-v1', this.recoveryRealmId, this.projectId,
+      timelineId, this.commitScope, this.commitSession.id,
+    ]) };
+  }
+
   private requestForGestureSave(save: TimelineCommitSaveContext): ImmutableCommitRequest {
     if (!save.expectedHead.headRevisionId) {
       throw new TimelineSchemaIncompatibleError('Semantic gestures require an existing exact revision.');
     }
+    const session = this.commitSession.next();
     return {
       api_version: 1, project_id: this.projectId, timeline_id: save.timelineId,
-      request_id: generateUUID(), session_id: this.commitSessionId,
-      session_sequence: ++this.commitSessionSequence,
+      request_id: generateUUID(), session_id: session.id,
+      session_sequence: session.sequence,
       base_revision_id: save.expectedHead.headRevisionId, base_publication_id: null,
-      scope: { target: 'parent', complete: ['clips', 'tracks'], projection_version: 1 },
+      scope: this.commitScope,
       change: { commands: save.editCommands ?? [] },
       source: { via: 'app' }, dry_run: false,
     };
@@ -722,10 +759,13 @@ export class RuntimeDataProvider implements DataProvider {
           // This is a new real transaction, not a retry of the dry-run key.
           // Capture it before sending: uncertain transport always retries these
           // exact commands, target and identity, even if the head later moves.
-          this.commitSessionSequence = Math.max(this.commitSessionSequence, attempt.request.session_sequence) + 1;
+          const session = this.commitSession.next(attempt.request.session_sequence);
           attempt.request = freezeCommitValue(JSON.parse(JSON.stringify({
             ...attempt.request, request_id: generateUUID(),
-            session_sequence: this.commitSessionSequence,
+            // An injected producer retains its own session identity. Native
+            // gestures use the same persisted allocator for preview and commit.
+            session_id: this.commitRouting?.requestForSave ? attempt.request.session_id : session.id,
+            session_sequence: session.sequence,
             base_revision_id: targetHead, base_publication_id: null,
             change: { commands: preview.change.commands }, dry_run: false,
           })) as CommitRequest);

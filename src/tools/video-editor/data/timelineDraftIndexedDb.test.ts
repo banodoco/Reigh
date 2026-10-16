@@ -14,11 +14,26 @@ import {
   reconcileTimelineDraftHeadMarker,
   saveTimelineDraft,
   saveTimelineDraftIfOwner,
+  timelineDraftRecoveryKey,
 } from '@/tools/video-editor/data/timelineDraftIndexedDb.ts';
 
 describe('timelineDraftIndexedDb — one-slot recovery draft (plan-v5 B9)', () => {
   beforeEach(() => {
     resetFakeIndexedDB();
+  });
+
+  it('explicitly unavailable recovery never reads, writes or clears a legacy timeline slot', async () => {
+    await saveTimelineDraft('tl-1', { original: true }, 1);
+    const metadata = { recoveryKey: null };
+    const key = timelineDraftRecoveryKey(metadata, 'tl-1');
+    expect(key).toBeNull();
+    await saveTimelineDraft('tl-1', { replacement: true }, 2, metadata);
+    expect(await saveTimelineDraftIfOwner('tl-1', { replacement: true }, 2, metadata, null)).toBe(false);
+    expect(await loadTimelineDraft(key)).toBeNull();
+    await clearTimelineDraft(key);
+    expect((await loadTimelineDraft('tl-1'))?.draft).toEqual({ original: true });
+    expect(timelineDraftRecoveryKey(undefined, 'tl-1')).toBe('tl-1');
+    expect(timelineDraftRecoveryKey({}, 'tl-1')).toBe('tl-1');
   });
 
   it('round-trips a draft with its base version', async () => {

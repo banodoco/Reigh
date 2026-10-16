@@ -87,7 +87,7 @@ describe('useTimelineSave stable occurrence recovery', () => {
       loadedBundleRef: { current: null },
     };
     const provider = {
-      getTimelineDraftRecoveryMetadata: () => ({ recoveryKey }),
+      getTimelineDraftRecoveryMetadata: vi.fn(() => ({ recoveryKey })),
       resolveAssetUrl: async (file: string) => file,
     } as unknown as DataProvider;
     await saveTimelineDraft('old-session', { config, registry }, 7, {
@@ -101,6 +101,7 @@ describe('useTimelineSave stable occurrence recovery', () => {
     }, store));
 
     await waitFor(() => expect(hook.result.current.recoveryDraft).toMatchObject({ baseVersion: 7 }));
+    expect(provider.getTimelineDraftRecoveryMetadata).toHaveBeenCalledWith('session-new');
     expect(hook.result.current.saveStatus).toBe('dirty');
     expect(await loadTimelineDraft(recoveryKey)).not.toBeNull();
 
