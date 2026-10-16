@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { buildTimelineData } from '@/tools/video-editor/lib/timeline-data';
+import { buildTimelineData, type TimelineData } from '@/tools/video-editor/lib/timeline-data';
 import { serializeForDisk } from '@/tools/video-editor/lib/serialize';
 import {
   useTimelineTrackManagement,
@@ -161,6 +161,37 @@ describe('moveTrackWithinKind', () => {
 });
 
 describe('useTimelineTrackManagement', () => {
+  it.each([
+    'missing data', 'missing authored tracks', 'incomplete projection', 'stale order',
+    'duplicate identity', 'empty identity', 'foreign identity', 'qualified path delimiter', 'non-string identity',
+  ])('refuses track reorder with %s before applying an edit', async (invalid) => {
+    const data = await buildTimelineData(makeResolvedConfig([
+      makeTrack('V1', 'visual'), makeTrack('A1', 'audio'), makeTrack('V2', 'visual'),
+    ]), { assets: {} });
+    const resolvedConfig = { ...data.resolvedConfig, tracks: data.resolvedConfig.tracks.map((track) => ({ ...track })) };
+    const sourceTracks = data.config.tracks!;
+    const dataRef: { current: TimelineData | null } = { current: data };
+    if (invalid === 'missing data') dataRef.current = null;
+    if (invalid === 'missing authored tracks') delete data.config.tracks;
+    if (invalid === 'incomplete projection') resolvedConfig.tracks.pop();
+    if (invalid === 'stale order') sourceTracks.reverse();
+    const badId = {
+      'duplicate identity': 'V1', 'empty identity': '', 'foreign identity': 'occurrence:shot/track:audio',
+      'qualified path delimiter': 'audio::track_order', 'non-string identity': 42,
+    }[invalid];
+    if (badId !== undefined) {
+      // A malformed sibling must refuse even when both dragged IDs are valid.
+      sourceTracks[1].id = badId as string;
+      resolvedConfig.tracks[1].id = badId as string;
+    }
+    const applyEdit = vi.fn();
+    const { result } = renderHook(() => useTimelineTrackManagement({
+      dataRef, resolvedConfig, selectedClipId: null, setSelectedTrackId: vi.fn(), applyEdit,
+    }));
+    act(() => result.current.handleMoveTrack('V1', 'V2'));
+    expect(applyEdit).not.toHaveBeenCalled();
+  });
+
   it('keeps a canonical-shot track during direct removal and clear-unused operations', () => {
     const tracks = [
       makeTrack('V1', 'visual'),

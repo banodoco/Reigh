@@ -94,6 +94,8 @@ export type ScheduleSaveFn = (
  * ```
  */
 export type TimelineEditMutation =
+  /** Complete authored track permutation; preserve opaque row fields verbatim. */
+  | { type: 'track-order'; order: string[] }
   /**
    * Bulk declarative edit in row shape: hand over the rows you want, plus any
    * per-clip metadata to merge (`metaUpdates`) or drop (`metaDeletes`). This is
@@ -423,6 +425,18 @@ export function useTimelineCommit({
       // user's edit vanished with no signal. Surface it so the write-ack
       // watchdog can make the loss visible.
       eventBus.emit('lostEdit');
+      return;
+    }
+
+    if (mutation.type === 'track-order') {
+      const tracks = current.config.tracks ?? [];
+      const byId = new Map(tracks.map((track) => [track.id, track]));
+      if (byId.size !== tracks.length || mutation.order.length !== tracks.length
+        || new Set(mutation.order).size !== tracks.length
+        || mutation.order.some((id) => !byId.has(id))) return;
+      commitData(buildDataFromCurrentRegistry({
+        ...current.config, tracks: mutation.order.map((id) => byId.get(id)!),
+      }, current), options);
       return;
     }
 

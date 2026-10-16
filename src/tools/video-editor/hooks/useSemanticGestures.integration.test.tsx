@@ -573,17 +573,83 @@ describe('supported detach and explicit unconverted structural seams', () => {
     expect(h.requests).toHaveLength(0);
     h.unmount();
   });
-  it.each(['add', 'reorder', 'property'] as const)('track %s retains its explicit unconverted path', async (operation) => {
+  it.each(['add', 'property'] as const)('track %s retains its explicit unconverted path', async (operation) => {
     const h = await setup();
     act(() => {
       if (operation === 'add') h.result.current.tracks.handleAddTrack('audio');
-      if (operation === 'reorder') h.result.current.tracks.handleMoveTrack('V1', 'V2');
-      if (operation === 'remove') h.result.current.tracks.handleRemoveTrack('V2');
       if (operation === 'property') h.result.current.tracks.handleTrackPopoverChange('V1', { label: 'Changed' });
     });
     expect(h.result.current.editSeqRef.current).toBe(1);
     expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
     expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+});
+
+async function interleavedTrackData() {
+  const base = await initialData();
+  const tracks = [
+    { id: 'V1', kind: 'visual' as const, label: 'Picture one' },
+    { id: 'A1', kind: 'audio' as const, label: 'Sound one' },
+    { id: 'V2', kind: 'visual' as const, label: 'Picture two' },
+    { id: 'A2', kind: 'audio' as const, label: 'Sound two' },
+  ].map((track) => ({ ...track, opaque: { sentinel: track.id, nullable: null },
+    nullable: null, app: { sibling: { track: track.id }, astrid: { extension: null } } }));
+  return buildTimelineData({ ...base.config, tracks }, base.registry, undefined, 1, undefined, base.head);
+}
+
+describe('D008 complete parent track reorder wire adaptation', () => {
+  it.each([
+    ['cross-kind forward', 'V1', 'A2', ['A1', 'V2', 'A2', 'V1']],
+    ['cross-kind backward', 'A2', 'V1', ['A2', 'V1', 'A1', 'V2']],
+    ['same-kind', 'V1', 'V2', ['A1', 'V2', 'V1', 'A2']],
+  ] as const)('%s preserves the exact array move and sends one complete guarded permutation', async (_name, active, over, order) => {
+    const initial = await interleavedTrackData();
+    const before = structuredClone(initial.config);
+    const h = await setup(undefined, false, initial);
+    act(() => h.result.current.tracks.handleMoveTrack(active, over));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.compatibilityRequests).toEqual([]);
+    const expectedOrder = ['V1', 'A1', 'V2', 'A2'].map((id) => `parent/track:${id}`);
+    expect(h.requests[0].request.change).toEqual({ commands: [{
+      op: 'timeline.reorder', select: `parent/track:${active}`, resolved: [`parent/track:${active}`],
+      args: { order: order.map((id) => `parent/track:${id}`), expected_order: expectedOrder },
+      expect: { [`parent/track:${active}::track_order`]: { state: 'present', value: expectedOrder } },
+    }] });
+    expect(h.requests[0].request.base_revision_id).toBe('parent-r1');
+    expect(h.requests[0].request.source).toEqual({ via: 'app' });
+    const expectedTracks = order.map((id) => before.tracks!.find((track) => track.id === id));
+    expect(h.result.current.data!.tracks).toEqual(expectedTracks);
+    expect(h.result.current.data!.resolvedConfig.tracks).toEqual(expectedTracks);
+    expect(h.result.current.data!.config).toEqual({ ...before, tracks: expectedTracks });
+    expect(h.result.current.selectedTrackId).toBe(active);
+    expect(initial.config).toEqual(before);
+    h.unmount();
+  });
+
+  it.each([['V1', 'V1'], ['V1', 'missing'], ['missing', 'A1']])('drop %s onto %s is a no-op with zero commits', async (active, over) => {
+    const h = await setup(undefined, false, await interleavedTrackData());
+    const before = h.result.current.data;
+    const selected = h.result.current.selectedTrackId;
+    act(() => h.result.current.tracks.handleMoveTrack(active, over));
+    expect(h.result.current.data).toBe(before);
+    expect(h.result.current.selectedTrackId).toBe(selected);
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(h.requests).toHaveLength(0);
+    h.unmount();
+  });
+
+  it('cross-kind retry retains the complete captured order, request bytes and identity', async () => {
+    const h = await setup(async (_request, call) => call === 1 ? 'unavailable' : undefined, false, await interleavedTrackData());
+    act(() => h.result.current.tracks.handleMoveTrack('V1', 'A2'));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1), { timeout: 2500 });
+    expect(h.requests).toHaveLength(2);
+    expect(h.requests[1].bytes).toBe(h.requests[0].bytes);
+    expect(h.requests[1].headers).toEqual(h.requests[0].headers);
+    expect(h.requests[1].request.request_id).toBe(h.requests[0].request.request_id);
+    expect(h.requests[1].request.base_revision_id).toBe('parent-r1');
+    expect(h.result.current.data!.config.tracks!.map((track) => track.id)).toEqual(['A1', 'V2', 'A2', 'V1']);
     h.unmount();
   });
 });

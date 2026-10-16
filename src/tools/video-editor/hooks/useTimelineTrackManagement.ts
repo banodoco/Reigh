@@ -981,8 +981,26 @@ export function useTimelineTrackManagement({
       return;
     }
 
-    applyEdit({ type: 'config', resolvedConfig: { ...resolvedConfig, tracks: nextTracks } }, { selectedTrackId: activeId });
-  }, [applyEdit, resolvedConfig]);
+    // D008 reorders the complete authored owner array, including interleaved
+    // kinds. Refuse projected, stale or ambiguous rows before changing locally.
+    const sourceTracks = dataRef.current?.config.tracks;
+    if (!sourceTracks || sourceTracks.length !== resolvedConfig.tracks.length
+      || sourceTracks.some((track, index) => typeof track.id !== 'string' || !track.id
+        || track.id.includes('/') || track.id.includes('::')
+        || track.id !== resolvedConfig.tracks[index].id)
+      || new Set(sourceTracks.map((track) => track.id)).size !== sourceTracks.length) return;
+
+    const select = `parent/track:${activeId}`;
+    const expectedOrder = sourceTracks.map((track) => `parent/track:${track.id}`);
+    applyEdit({ type: 'track-order', order: nextTracks.map((track) => track.id) }, {
+      selectedTrackId: activeId,
+      editCommands: [{
+        op: 'timeline.reorder', select, resolved: [select],
+        args: { order: nextTracks.map((track) => `parent/track:${track.id}`), expected_order: expectedOrder },
+        expect: { [`${select}::track_order`]: { state: 'present', value: expectedOrder } },
+      }],
+    });
+  }, [applyEdit, dataRef, resolvedConfig]);
 
   const handleRemoveTrack = useCallback((trackId: string) => {
     if (!resolvedConfig) {
