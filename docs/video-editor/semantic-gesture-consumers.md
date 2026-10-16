@@ -41,6 +41,18 @@ transaction; validation is unchanged. The existing local scale marker is still
 materialized by the editor; it is not added to OpCalls as a metadata workaround.
 These are source/fixture bounds, not Runtime operation execution or inverse proof.
 
+E-NEW-TRACK-DETACH-011 adds the W35 no-audio-track detach slice using the same
+D008 contract: one ordered batch first adds the exact App-authored audio row with
+`parent/track:<id>` in `created` and a qualified whole-row tagged absence, then
+`clip.detach-audio` targets that track with the reserved child and captured whole
+source expectation. The existing single local config edit mutes the source and
+clones its range, speed, gain, anchors and opaque data, removing only authored
+cut/layer/sequence/sequence_index ownership from the child. Existing-track detach
+remains one command. Wire tests cover collision allocation, byte-identical
+unavailable-response retry, failed-save preservation of the complete optimistic
+edit, read-only refusal and ineligible/invalid identity no-ops. This is App fixture
+adaptation evidence, not installed Runtime acceptance or journal/inverse proof.
+
 Earlier supported property/clear, delete, ordinary move, existing-track move,
 right-resize, hold-end choices, existing-track detach, patch/proposal and mounted-tool
 slices remain. Their exact wire tests are retained. No whole-row conversion is inferred
@@ -61,9 +73,9 @@ Remaining original fallback criteria:
 - W12–W15, W20, W26–W32, W40, W42–W44: catalog composites, snapshots/mixed patches,
   App keyframes/effects/shader/transition/text/transform, general tied/group/left/media
   resize, overlap and repair composites still lack matching lossless command payloads.
-- W35, remaining W48/W49/W52–W54: new-track detach/move, cross-kind drag, unsupported
+- Remaining W48/W49/W52–W54: new-track move, cross-kind drag, unsupported
   property patches, occupied-track removal and pinned-group structure remain fallback.
-  009 supplies only the explicit bounded track slices listed above; no whole-row
+  009 and 011 supply only the explicit bounded slices listed above; no whole-row
   completion or revised aggregate fallback count is inferred.
 - W62 and remaining W69: embedded/non-Runtime providers and unsupported tool edits
   retain their existing contracts and compatibility paths. W59 remains local recovery.

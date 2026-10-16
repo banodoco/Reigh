@@ -1,5 +1,7 @@
 import type { EditCommand } from '@/integrations/runtime/generated.ts';
 import type { ClipMeta, TimelineData } from '../lib/timeline-data.ts';
+import type { TrackDefinition } from '../types/index.ts';
+import { addTrackGestureCommands } from './trackGestures.ts';
 
 /** Intent is attached by the handler, never inferred from the resulting document. */
 const authoredCommands = new WeakMap<TimelineData, readonly EditCommand[]>();
@@ -74,13 +76,19 @@ export function deleteGestureCommands(data: TimelineData, ids: string[]): EditCo
 }
 
 /** The existing runner allocates this exact child via OpCall.created. */
-export function detachAudioGestureCommands(data: TimelineData, id: string, childId: string, track: string): EditCommand[] | undefined {
-  const clip = originalClip(data, id);
-  if (clip.clipType !== 'media' || !childId || childId.includes('/')
-    || !data.config.tracks?.some((candidate) => candidate.id === track && candidate.kind === 'audio')) return undefined;
+export function detachAudioGestureCommands(data: TimelineData, id: string, childId: string, track: string, newTrack?: TrackDefinition): EditCommand[] | undefined {
+  const sources = data.config.clips.filter((clip) => clip.id === id);
+  const clip = sources[0];
+  if (sources.length !== 1 || !id || id.includes('/') || clip.clipType !== 'media'
+    || !childId || childId.includes('/') || data.config.clips.some((clip) => clip.id === childId)
+    || !track || track.includes('/')) return undefined;
+  const additions = newTrack ? addTrackGestureCommands(data, newTrack) : [];
+  if (!additions || (newTrack ? newTrack.id !== track || newTrack.kind !== 'audio'
+    : data.config.tracks?.filter((candidate) => candidate.id === track).length !== 1
+      || !data.config.tracks.some((candidate) => candidate.id === track && candidate.kind === 'audio'))) return undefined;
   const source = scopedGestureClipId(id);
   const created = `${source.slice(0, source.lastIndexOf('/'))}/clip:${childId}`;
-  return [{ ...command(id, 'clip.detach-audio', { track }, { '': state(clip, true) }), created: [created] }];
+  return [...additions, { ...command(id, 'clip.detach-audio', { track }, { '': state(clip, true) }), created: [created] }];
 }
 
 /** Only a hold's authored end relation has the admitted duration/until choices.

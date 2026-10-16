@@ -59,19 +59,19 @@ export function useClipAudioManagement(ctx: ClipEditingContext) {
     const current = dataRef.current;
     const source = current?.config.clips.find((clip) => clip.id === clipId);
     const child = nextConfig.clips.find((clip) => !resolvedConfig.clips.some((before) => before.id === clip.id));
+    const newTrack = nextConfig.tracks.find((track) => !resolvedConfig.tracks.some((before) => before.id === track.id));
     const editCommands = current && child
-      ? detachAudioGestureCommands(current, clipId, child.id, child.track) : undefined;
-    if (source && child && editCommands) {
-      // Match clip.detach-audio: clone the authored source, retaining its anchor,
-      // range, gain, and opaque siblings; only cut/sequence ownership is removed.
-      const astrid = { ...(source.app?.astrid as Record<string, unknown> | undefined) };
-      for (const key of ['cut', 'layer', 'sequence', 'sequence_index']) delete astrid[key];
-      const detached = {
-        ...source, id: child.id, track: child.track,
-        ...(source.app ? { app: { ...source.app, ...(source.app.astrid ? { astrid } : {}) } } : {}),
-      };
-      nextConfig = { ...nextConfig, clips: nextConfig.clips.map((clip) => clip.id === child.id ? detached : clip) };
-    }
+      ? detachAudioGestureCommands(current, clipId, child.id, child.track, newTrack) : undefined;
+    if (!source || !child || !editCommands) return;
+    // Match clip.detach-audio: clone the authored source, retaining its anchor,
+    // range, gain, and opaque siblings; only cut/sequence ownership is removed.
+    const astrid = { ...(source.app?.astrid as Record<string, unknown> | undefined) };
+    for (const key of ['cut', 'layer', 'sequence', 'sequence_index']) delete astrid[key];
+    const detached = {
+      ...source, id: child.id, track: child.track,
+      ...(source.app ? { app: { ...source.app, ...(source.app.astrid ? { astrid } : {}) } } : {}),
+    };
+    nextConfig = { ...nextConfig, clips: nextConfig.clips.map((clip) => clip.id === child.id ? detached : clip) };
     applyConfigEdit(nextConfig, { selectedClipId: clipId, semantic: true, editCommands });
   }, [applyConfigEdit, dataRef, resolvedConfig]);
 

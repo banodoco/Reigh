@@ -38,7 +38,7 @@ import { readAudioLanePresentation } from '../data/audioLanePresentation.ts';
 // This transport is a wire recorder, not an Astrid operation executor. Successful
 // fixture acknowledgements establish App adaptation only, never Runtime acceptance.
 const json = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
-function wireFixture(initial: TimelineData, reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable'>) {
+function wireFixture(initial: TimelineData, reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable' | 'failed'>) {
   const requests: Array<{ request: CommitRequest; bytes: string; headers: Record<string, string> }> = [];
   const compatibilityRequests: string[] = [];
   let currentHead = initial.head!.headRevisionId!;
@@ -56,19 +56,21 @@ function wireFixture(initial: TimelineData, reply?: (request: CommitRequest, cal
       const bytes = new TextDecoder().decode(body as Uint8Array);
       const request = JSON.parse(bytes) as CommitRequest;
       requests.push({ request, bytes, headers: { ...headers } });
-      const unavailable = await reply?.(request, requests.length) === 'unavailable';
-      if (!unavailable && !request.dry_run && !acceptedHeads.has(request.request_id)) {
+      const outcome = await reply?.(request, requests.length);
+      const unavailable = outcome === 'unavailable';
+      const failed = outcome === 'failed';
+      if (!unavailable && !failed && !request.dry_run && !acceptedHeads.has(request.request_id)) {
         currentHead = `parent-r${++acceptanceSequence}`;
         acceptedHeads.set(request.request_id, currentHead);
       }
       const response: CommitResult = {
-        status: unavailable ? 'error' : request.dry_run ? 'preview' : 'accepted', request_id: request.request_id, request_hash: 'fixture',
-        base_revision_id: request.base_revision_id, accepted_revision_id: unavailable || request.dry_run ? null : acceptedHeads.get(request.request_id)!,
+        status: unavailable || failed ? 'error' : request.dry_run ? 'preview' : 'accepted', request_id: request.request_id, request_hash: 'fixture',
+        base_revision_id: request.base_revision_id, accepted_revision_id: unavailable || failed || request.dry_run ? null : acceptedHeads.get(request.request_id)!,
         accepted_publication_id: null, previous_revision_id: request.base_revision_id, rebased_onto: request.dry_run ? currentHead : null,
         canonical_document: null, projection_version: 1, document_digest: null, id_map: {},
         change: { changes: [], commands: request.dry_run && 'commands' in request.change
           ? structuredClone(request.change.commands) : [], direct_writes: [], consequences: [], affected: [] },
-        conflicts: [], choices: [], provenance: null, evidence: null, schema_report: null, runtime_receipt: null, error: unavailable ? { code: 'runtime_unavailable', message: 'fixture unavailable', hint: 'retry', next_action: 'retry' } : null,
+        conflicts: [], choices: [], provenance: null, evidence: null, schema_report: null, runtime_receipt: null, error: unavailable ? { code: 'runtime_unavailable', message: 'fixture unavailable', hint: 'retry', next_action: 'retry' } : failed ? { code: 'validation_error', message: 'fixture refused batch', hint: 'invalid batch', next_action: 'fix' } : null,
       };
       return { status: unavailable ? 503 : 200, headers: {}, body: json(response) };
     }
@@ -88,7 +90,7 @@ async function initialData(media = false, crops: { cropTop?: number; cropBottom?
   data.head = { projectId: 'gesture-project', timelineId: 'gesture-timeline', headRevisionId: 'parent-r1' };
   return data;
 }
-async function setup(reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable'>, media = false, providedInitial?: TimelineData, currentTime = 1, editability?: TimelineEditability) {
+async function setup(reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable' | 'failed'>, media = false, providedInitial?: TimelineData, currentTime = 1, editability?: TimelineEditability) {
   const initial = providedInitial ?? await initialData(media);
   const fixture = wireFixture(initial, reply);
   const eventBus = new TimelineEventBus();
@@ -99,17 +101,18 @@ async function setup(reply?: (request: CommitRequest, call: number) => Promise<v
   const interactionStateRef = { current: createInteractionState() };
   const query = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
   const wrapper = ({ children }: { children: React.ReactNode }) => React.createElement(QueryClientProvider, { client: query }, children);
+  const selectClip = vi.fn();
   const hook = renderHook(() => {
     const commit = useTimelineCommit({ eventBus, lastSavedSignatureRef, initialData: initial, editability });
     const persistence = useTimelinePersistence({ provider: fixture.provider, assetResolver: fixture.provider, timelineId: 'gesture-timeline', eventBus, ...commit, savedSeqRef, configVersionRef, headRevisionRef, lastSavedSignatureRef, interactionStateRef });
     useEffect(() => eventBus.on('scheduleSave', persistence.scheduleSave), [persistence.scheduleSave]);
-    const editing = useClipEditing({ ...commit, selectedClipId: 'clip-1', selectedTrack: initial.tracks[0], currentTime, selectClip: vi.fn(), resolvedConfig: commit.data?.resolvedConfig ?? null });
+    const editing = useClipEditing({ ...commit, selectedClipId: 'clip-1', selectedTrack: initial.tracks[0], currentTime, selectClip, resolvedConfig: commit.data?.resolvedConfig ?? null });
     const tracks = useTimelineTrackManagement({ ...commit, resolvedConfig: commit.data?.resolvedConfig ?? null, eventBus });
     const resize = useClipResize(commit);
     const ops = useTimelineOps({ ...commit, createManualCheckpoint: vi.fn(), jumpToCheckpoint: vi.fn(), checkpoints: [], editability });
     return { ...commit, editing, tracks, resize, persistence, ops };
   }, { wrapper });
-  return { ...hook, ...fixture, initial, savedSeqRef, interactionStateRef, eventBus };
+  return { ...hook, ...fixture, initial, savedSeqRef, interactionStateRef, eventBus, selectClip };
 }
 beforeEach(() => { vi.stubGlobal('indexedDB', createFakeIndexedDB()); __resetSelectionStoreForTests(); });
 afterEach(() => { resetFakeIndexedDB(); vi.restoreAllMocks(); });
@@ -592,13 +595,106 @@ describe('supported detach and explicit unconverted structural seams', () => {
     expect(h.result.current.data!.config.clips.find((clip) => clip.id === 'clip-1')?.volume).toBe(0);
     h.unmount();
   });
-  it('audio detach that creates a track retains its existing unconverted edit path', async () => {
-    const h = await setup(undefined, true, await videoData(false));
+  it.each([false, true])('new-track audio detach is one ordered batch (unavailable retry: %s)', async (retry) => {
+    const initial = await videoData(false);
+    const source = initial.config.clips.find((clip) => clip.id === 'clip-1')!;
+    source.params = { data: { op: 'clear' }, opaque: null };
+    source.app = { ...source.app, opaque: { nested: null }, astrid: {
+      ...source.app?.astrid, sequence_index: 0, custom: { keep: true },
+    } };
+    // Exercise the existing allocator's collision suffix as well as retry stability.
+    vi.spyOn(Date, 'now').mockReturnValue(123456789);
+    const collision = { ...source, id: 'clip-1-123456789', track: 'V2' };
+    const rebuilt = await buildTimelineData({ ...initial.config, clips: [...initial.config.clips, collision] }, initial.registry);
+    rebuilt.head = initial.head;
+    const before = structuredClone(rebuilt.config);
+    const h = await setup(async (_request, call) => retry && call === 1 ? 'unavailable' : undefined, true, rebuilt);
+    const save = vi.fn();
+    const off = h.eventBus.on('scheduleSave', save);
     act(() => h.result.current.editing.handleDetachAudioClip('clip-1'));
+    await waitFor(() => expect(h.requests).toHaveLength(1));
+    const childId = 'clip-1-123456789-1';
+    const track = { id: 'A1', kind: 'audio', label: 'A1', scale: 1, fit: 'contain', opacity: 1, blendMode: 'normal' };
+    const commands = [{
+      op: 'timeline.add', select: 'parent/track:A1', args: { track }, created: ['parent/track:A1'],
+      expect: { 'parent/track:A1::': { state: 'absent' } },
+    }, {
+      op: 'clip.detach-audio', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'],
+      args: { track: 'A1' }, created: [`parent/clip:${childId}`],
+      expect: { '': { state: 'present', value: before.clips.find((clip) => clip.id === 'clip-1') } },
+    }];
+    expect(h.requests[0].request.change).toEqual({ commands });
+    expect(h.requests[0].request.source).toEqual({ via: 'app' });
+    expect(gestureCommandsFor(h.result.current.data!)).toEqual(commands);
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1), { timeout: 2500 });
+    expect(h.requests).toHaveLength(retry ? 2 : 1);
+    if (retry) {
+      expect(h.requests[1].bytes).toBe(h.requests[0].bytes);
+      expect(h.requests[1].headers).toEqual(h.requests[0].headers);
+    }
+    const { cut: _cut, layer: _layer, sequence: _sequence, sequence_index: _index, ...astrid } = source.app!.astrid!;
+    expect(h.result.current.data!.config.clips).toEqual([
+      ...before.clips.map((clip) => clip.id === source.id ? { ...clip, volume: 0 } : clip),
+      { ...source, id: childId, track: 'A1', app: { ...source.app, astrid } },
+    ]);
+    expect(h.result.current.data!.config.tracks!.find((row) => row.id === 'A1')).toEqual({ ...track, app: { scaleAppliesToPositionedClips: true } });
+    expect(h.result.current.data!.config.tracks!.filter((row) => row.id === 'A1')).toHaveLength(1);
     expect(h.result.current.editSeqRef.current).toBe(1);
-    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
-    expect(h.result.current.data!.tracks.some((track) => track.id === 'A1')).toBe(true);
-    expect(h.requests).toHaveLength(0);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(h.selectClip).not.toHaveBeenCalled();
+    expect(h.result.current.selectedClipId).toBe('clip-1');
+    expect(h.compatibilityRequests).toEqual([]);
+    off();
+    h.unmount();
+  });
+  it('failed new-track detach keeps the complete optimistic batch unsaved without split track/child state', async () => {
+    const initial = await videoData(false);
+    const h = await setup(async () => 'failed', true, initial);
+    act(() => h.result.current.editing.handleDetachAudioClip('clip-1'));
+    await waitFor(() => expect(h.result.current.persistence.saveStatus).toBe('error'));
+    await waitFor(() => expect(h.requests).toHaveLength(1));
+    expect(h.savedSeqRef.current).toBe(0);
+    expect(h.result.current.data!.head).toEqual(initial.head);
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    const child = h.result.current.data!.config.clips.find((clip) => !initial.config.clips.some((before) => before.id === clip.id))!;
+    expect(child).toBeDefined();
+    expect(h.result.current.data!.config.tracks!.filter((track) => track.id === child.track)).toHaveLength(1);
+    expect(h.result.current.data!.config.clips.find((clip) => clip.id === 'clip-1')!.volume).toBe(0);
+    expect((h.requests[0].request.change as { commands: unknown[] }).commands).toHaveLength(2);
+    expect(h.compatibilityRequests).toEqual([]);
+    h.unmount();
+  });
+  it('read-only new-track detach refuses before any track or child edit', async () => {
+    const initial = await videoData(false);
+    const h = await setup(undefined, true, initial, 1, {
+      check: () => ({ allowed: false, reason: 'timeline_read_only' }),
+      checkTimeline: () => ({ allowed: false, reason: 'timeline_read_only' }),
+    });
+    act(() => h.result.current.editing.handleDetachAudioClip('clip-1'));
+    expect(h.result.current.data!.config).toEqual(initial.config);
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(h.requests).toEqual([]);
+    expect(h.compatibilityRequests).toEqual([]);
+    h.unmount();
+  });
+  it.each(['missing', 'muted', 'image', 'audio', 'missing-asset', 'invalid-source', 'ambiguous-source', 'invalid-track'] as const)('%s audio detach sends nothing', async (kind) => {
+    const initial = await videoData(kind === 'audio' || kind === 'invalid-track');
+    if (kind === 'muted') initial.config.clips[0].volume = 0;
+    if (kind === 'image') initial.registry.assets.video.type = 'image/png';
+    if (kind === 'audio') initial.config.clips[0].track = 'A1';
+    if (kind === 'missing-asset') delete initial.config.clips[0].asset;
+    if (kind === 'invalid-source') initial.config.clips[0].id = 'invalid/source';
+    if (kind === 'invalid-track') initial.config.tracks!.find((track) => track.id === 'A1')!.id = 'invalid/track';
+    const rebuilt = await buildTimelineData(initial.config, initial.registry);
+    rebuilt.head = initial.head;
+    const h = await setup(undefined, true, rebuilt);
+    if (kind === 'ambiguous-source') h.result.current.dataRef.current!.config.clips.push({ ...rebuilt.config.clips[0] });
+    const before = structuredClone(h.result.current.data!.config);
+    act(() => h.result.current.editing.handleDetachAudioClip(kind === 'missing' ? 'absent' : kind === 'invalid-source' ? 'invalid/source' : 'clip-1'));
+    expect(h.result.current.data!.config).toEqual(before);
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(h.requests).toEqual([]);
+    expect(h.compatibilityRequests).toEqual([]);
     h.unmount();
   });
   it('tied split refuses without inventing clip.split or cut.split', async () => {
