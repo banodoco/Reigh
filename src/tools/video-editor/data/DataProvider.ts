@@ -35,6 +35,17 @@ export interface TimelineHeadRevision {
   headRevisionId: string | null;
 }
 
+/** Gesture-owned occurrence pins, captured with its base and commands. */
+export interface TimelineOccurrenceContext {
+  readonly projectId: string;
+  readonly parentDocumentId: string;
+  readonly headRevisionId: string;
+  readonly occurrenceId: string;
+  readonly shotId: string;
+  readonly shotRevisionId: string;
+  readonly internalRevisionId: string;
+}
+
 export interface TimelineSaveReceipt {
   configVersion: number;
   head: TimelineHeadRevision;
@@ -384,6 +395,7 @@ export interface DataProvider extends AssetResolver {
     registry?: AssetRegistry,
     bundle?: TimelineBundleEnvelope | null,
     editCommands?: readonly EditCommand[],
+    occurrenceContext?: TimelineOccurrenceContext,
   ): Promise<TimelineSaveReceipt>;
   /** Optional canonical shot-composition boundary. Legacy shot records are not a fallback. */
   shotComposition?: ShotCompositionPort;

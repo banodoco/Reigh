@@ -1,5 +1,6 @@
 import type { DataProvider } from '@/tools/video-editor/data/DataProvider.ts';
-import type { LoadedTimeline } from '@/tools/video-editor/data/DataProvider.ts';
+import type { LoadedTimeline, TimelineOccurrenceContext, TimelineSaveReceipt } from '@/tools/video-editor/data/DataProvider.ts';
+import { occurrenceIdentityFor } from '@/tools/video-editor/commands/semanticGestures.ts';
 import {
   advanceTimelineDraftBaseAfterAcknowledgement,
   clearTimelineDraftIfMatches,
@@ -114,6 +115,7 @@ function createShotTimelineConfig(config: ResolvedTimelineConfig): TimelineConfi
 export function createShotTimelineInitialData(
   config: ResolvedTimelineConfig,
   configVersion = 1,
+  composition?: PreparedShotComposition,
 ): TimelineData {
   const registry = {
     assets: Object.fromEntries(Object.entries(config.registry).map(([assetId, entry]) => ([assetId, {
@@ -122,7 +124,7 @@ export function createShotTimelineInitialData(
     }]))),
   };
   const timelineConfig = createShotTimelineConfig(config);
-  return assembleTimelineData({
+  const data = assembleTimelineData({
     config: timelineConfig,
     configVersion,
     registry,
@@ -130,6 +132,9 @@ export function createShotTimelineInitialData(
     output: config.output,
     assetMap: buildAssetReferenceMap(registry),
   });
+  if (composition) data.head = { projectId: composition.projectId, timelineId: composition.parentDocumentId,
+    headRevisionId: composition.headRevisionId };
+  return data;
 }
 
 function createCanonicalTimeline(config: TimelineConfig, occurrenceId: string): Record<string, unknown> {
@@ -318,12 +323,136 @@ export function createShotTimelineDataProvider(
   let draftDirty = false;
   let pendingPublishes = 0;
 
+  const head = () => ({ projectId: composition.projectId, timelineId: composition.parentDocumentId,
+    headRevisionId: canonicalBase.headRevisionId });
+  const projectCanonicalBase = (next: PreparedShotComposition) => {
+    const occurrence = next.occurrences.find((candidate) => candidate.occurrenceId === occurrenceId);
+    if (!occurrence) throw new Error('The canonical shot occurrence is unavailable');
+    const projected = projectCanonicalComposition(
+      { ...next, occurrences: [occurrence] },
+      { ...canonicalTimelineConfig, clips: [], tracks: [], registry: {} },
+      { clampToOccurrenceDuration: false },
+    ).config;
+    const offsetSeconds = occurrence.atMs / 1000;
+    const canonicalResolvedConfig = {
+      ...projected,
+      clips: projected.clips.map((clip) => {
+        const app = clip.app && typeof clip.app === 'object' && !Array.isArray(clip.app) ? clip.app : null;
+        const timing = app?.canonicalTiming && typeof app.canonicalTiming === 'object'
+          && !Array.isArray(app.canonicalTiming) ? app.canonicalTiming : null;
+        return {
+          ...clip,
+          at: Math.max(0, clip.at - offsetSeconds),
+          ...(app && timing
+            ? { app: { ...app, canonicalTiming: { ...timing, occurrenceStartMs: 0 } } }
+            : {}),
+        };
+      }),
+    };
+    registry = {
+      assets: Object.fromEntries(Object.entries(canonicalResolvedConfig.registry).map(([assetId, entry]) => ([assetId, {
+        ...entry,
+        file: entry.file ?? entry.media_id ?? entry.url,
+      }]))),
+    };
+    canonicalTimelineConfig = createShotTimelineConfig(canonicalResolvedConfig);
+  };
+  // A receipt survives an exact-head read failure; retry must not issue a new write.
+  const semanticAttempts = new WeakMap<TimelineConfig, {
+    context: TimelineOccurrenceContext; receipt?: TimelineSaveReceipt;
+    send: () => Promise<TimelineSaveReceipt>;
+    adopted?: TimelineSaveReceipt;
+    flight?: Promise<TimelineSaveReceipt>;
+  }>();
+
   const provider: ShotTimelineDataProvider = {
     get timelineQueryIdentity() {
       return timelineQueryIdentity;
     },
     persistenceEnabled: Boolean(shotCompositionAdapter?.publish),
     supportsEditorSync: false,
+    semanticCommandSaving: shotCompositionAdapter?.semanticCommandSaving === true
+      && Boolean(shotCompositionAdapter.saveTimelineAtHead),
+    saveTimelineAtHead: async (timelineId, nextConfig, expectedHead, nextRegistry, bundle, commands, occurrenceContext) => {
+      if (expectedHead.projectId !== composition.projectId
+        || expectedHead.timelineId !== composition.parentDocumentId) {
+        throw new StaleWriteError('The popup save has no trusted parent head.');
+      }
+      let attempt = semanticAttempts.get(nextConfig);
+      if (!attempt && provider.semanticCommandSaving && commands?.length && occurrenceContext) {
+        assertEditorHeadIsCurrent();
+        const occurrence = canonicalBase.occurrences.filter((item) => item.occurrenceId === occurrenceId);
+        const context = occurrenceContext;
+        const selected = commands.map((command) => nextConfig.clips.filter((clip) => {
+          const identity = occurrenceIdentityFor({ config: nextConfig }, clip.id);
+          return identity && command.select === `occurrence:${identity.occurrenceId}/clip:${identity.sourceClipId}`;
+        }));
+        const prepared = occurrence.length === 1 ? occurrence[0] : undefined;
+        const internal = prepared?.revision.internal_timeline_revision as JsonObject | undefined;
+        const rawTimeline = internal?.timeline as JsonObject | undefined;
+        const rawClips = rawTimeline?.clips as JsonObject[] | undefined;
+        const valid = context.projectId === composition.projectId
+          && context.parentDocumentId === composition.parentDocumentId
+          && context.headRevisionId === expectedHead.headRevisionId
+          && context.headRevisionId === canonicalBase.headRevisionId
+          && context.occurrenceId === occurrenceId
+          && context.shotId === prepared?.shotId && context.shotRevisionId === prepared?.revisionId
+          && context.internalRevisionId === internal?.revision_id
+          && stableStringify(nextConfig.app) === stableStringify(canonicalTimelineConfig.app)
+          && selected.every((clips, index) => {
+            if (clips.length !== 1) return false;
+            const identity = occurrenceIdentityFor({ config: nextConfig }, clips[0].id)!;
+            const source = rawClips?.filter((clip) => clip.id === identity.sourceClipId);
+            return identity.projectId === context.projectId && identity.parentDocumentId === context.parentDocumentId
+              && identity.outputIdentity === prepared?.outputIdentity
+              && identity.occurrenceId === occurrenceId && identity.headRevisionId === context.headRevisionId
+              && identity.shotId === context.shotId && identity.revisionId === context.shotRevisionId
+              && identity.internalTimelineRevisionId === context.internalRevisionId
+              && source?.length === 1 && stableStringify(source[0]) === stableStringify(identity.sourceClip)
+              && ['clip.nudge', 'clip.set-track', 'clip.set-look', 'clip.set-param', 'clip.clear'].includes(commands[index].op)
+              && commands[index].resolved?.length === 1 && commands[index].resolved?.[0] === commands[index].select;
+          });
+        if (valid) {
+          const capturedContext = structuredClone(context);
+          const capturedHead = structuredClone(expectedHead);
+          const capturedCommands = structuredClone(commands);
+          attempt = { context: capturedContext, send: () => shotCompositionAdapter!.saveTimelineAtHead!(
+            composition.parentDocumentId, nextConfig, capturedHead, nextRegistry, bundle, capturedCommands, capturedContext) };
+          semanticAttempts.set(nextConfig, attempt);
+        }
+      }
+      if (!attempt) {
+        if (expectedHead.headRevisionId !== canonicalBase.headRevisionId) {
+          throw new StaleWriteError('The popup draft belongs to an older canonical head.');
+        }
+        const version = await provider.saveTimeline(timelineId, nextConfig, configVersion, nextRegistry, bundle);
+        return { configVersion: version, head: head() };
+      }
+      if (attempt.flight) return attempt.flight;
+      if (attempt.adopted) return attempt.adopted;
+      const captured = attempt;
+      const publicationGeneration = draftGeneration;
+      pendingPublishes += 1;
+      captured.flight = (async () => {
+        captured.receipt ??= await captured.send();
+        const acknowledged = await shotCompositionAdapter!.loadAtHead({
+          projectId: composition.projectId, parentDocumentId: composition.parentDocumentId,
+          headRevisionId: captured.receipt.head.headRevisionId!,
+        });
+        projectCanonicalBase(acknowledged);
+        adoptCanonicalBase(acknowledged, true);
+        // The clean-baseline gate advances the query identity. An ACK must
+        // not replace a mounted editor that contains a newer local draft.
+        timelineConfig = canonicalTimelineConfig;
+        pendingPublication = null;
+        configVersion = Math.max(configVersion + 1, captured.receipt.configVersion);
+        publishCallback?.(acknowledged, publicationGeneration, captured.context.headRevisionId);
+        captured.adopted = { configVersion, head: head() };
+        return captured.adopted;
+      })().finally(() => { pendingPublishes -= 1; captured.flight = undefined; });
+      return captured.flight;
+    },
+
     setShotTimelineTraceId: (traceId) => { activeTimingTraceId = traceId; },
     getTimelineDraftRecoveryMetadata: (): TimelineDraftRecoveryMetadata => ({
       recoveryKey,
@@ -386,7 +515,7 @@ export function createShotTimelineDataProvider(
           };
         }
       }
-      return { config: timelineConfig, configVersion };
+      return { config: timelineConfig, configVersion, ...(provider.semanticCommandSaving ? { head: head() } : {}) };
     },
     loadCanonicalTimeline: async (_timelineId): Promise<LoadedTimeline> => {
       if (shotCompositionAdapter) {
@@ -397,40 +526,11 @@ export function createShotTimelineDataProvider(
         if (!latest) throw new Error('The canonical shot composition is unavailable');
         adoptCanonicalBase(latest);
         timelineQueryIdentity = latest.headRevisionId;
-        const occurrence = latest.occurrences.find((candidate) => candidate.occurrenceId === occurrenceId);
-        if (!occurrence) throw new Error('The canonical shot occurrence is unavailable');
-        const projected = projectCanonicalComposition(
-          { ...latest, occurrences: [occurrence] },
-          { ...canonicalTimelineConfig, clips: [], tracks: [], registry: {} },
-          { clampToOccurrenceDuration: false },
-        ).config;
-        const offsetSeconds = occurrence.atMs / 1000;
-        const canonicalResolvedConfig = {
-          ...projected,
-          clips: projected.clips.map((clip) => {
-            const app = clip.app && typeof clip.app === 'object' && !Array.isArray(clip.app) ? clip.app : null;
-            const timing = app?.canonicalTiming && typeof app.canonicalTiming === 'object'
-              && !Array.isArray(app.canonicalTiming) ? app.canonicalTiming : null;
-            return {
-              ...clip,
-              at: Math.max(0, clip.at - offsetSeconds),
-              ...(app && timing
-                ? { app: { ...app, canonicalTiming: { ...timing, occurrenceStartMs: 0 } } }
-                : {}),
-            };
-          }),
-        };
-        registry = {
-          assets: Object.fromEntries(Object.entries(canonicalResolvedConfig.registry).map(([assetId, entry]) => ([assetId, {
-            ...entry,
-            file: entry.file ?? entry.media_id ?? entry.url,
-          }]))),
-        };
-        canonicalTimelineConfig = createShotTimelineConfig(canonicalResolvedConfig);
+        projectCanonicalBase(latest);
       }
       timelineConfig = canonicalTimelineConfig;
       pendingPublication = null;
-      return { config: timelineConfig, configVersion };
+      return { config: timelineConfig, configVersion, ...(provider.semanticCommandSaving ? { head: head() } : {}) };
     },
     loadAssetRegistry: async () => registry,
     saveTimeline: async (timelineId, nextConfig, expectedVersion) => {
@@ -612,5 +712,6 @@ export function createShotTimelineDataProvider(
       return true;
     },
   };
+  if (!provider.semanticCommandSaving) delete provider.saveTimelineAtHead;
   return provider;
 }

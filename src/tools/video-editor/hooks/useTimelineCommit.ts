@@ -403,7 +403,7 @@ export function useTimelineCommit({
     }
 
     if (shouldSave) {
-      if (options?.editCommands) attachGestureCommands(nextData, options.editCommands);
+      if (options?.editCommands) attachGestureCommands(nextData, options.editCommands, currentData ?? nextData);
       editSeqRef.current += 1;
       eventBus.emit('scheduleSave', nextData);
     }

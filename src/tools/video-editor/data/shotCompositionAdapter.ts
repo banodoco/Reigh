@@ -10,6 +10,7 @@ import {
 } from './shotCompositionTiming.ts';
 import { assertVisualSeamAdmission } from './visualSeamContract.ts';
 import { projectCanonicalComposition } from './shotCompositionProjection.ts';
+import type { DataProvider } from './DataProvider.ts';
 
 type JsonObject = Record<string, unknown>;
 
@@ -72,6 +73,8 @@ export type ShotCompositionPublishRequest = Readonly<{
  * deterministic and makes the expected-head CAS explicit at the boundary.
  */
 export interface ShotCompositionPort {
+  readonly semanticCommandSaving?: boolean;
+  saveTimelineAtHead?: DataProvider['saveTimelineAtHead'];
   load(request: ShotCompositionReadRequest): Promise<unknown>;
   loadAtHead?(request: ShotCompositionHeadReadRequest): Promise<unknown>;
   publish?(request: ShotCompositionPublishRequest): Promise<unknown>;
@@ -270,6 +273,8 @@ function assertRequestIdentity(
 
 export function createShotCompositionAdapter(port: ShotCompositionPort) {
   return {
+    get semanticCommandSaving() { return port.semanticCommandSaving === true; },
+    saveTimelineAtHead: port.saveTimelineAtHead?.bind(port),
     getSourceFrameThumbnailUrl: port.getSourceFrameThumbnailUrl
       ? (request: SourceFrameThumbnailRequest) => port.getSourceFrameThumbnailUrl!(request)
       : undefined,

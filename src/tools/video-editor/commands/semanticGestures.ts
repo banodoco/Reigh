@@ -1,13 +1,77 @@
 import type { EditCommand } from '@/integrations/runtime/generated.ts';
+import type { TimelineOccurrenceContext } from '../data/DataProvider.ts';
+import type { CanonicalClipIdentity } from '../data/shotCompositionProjection.ts';
 import type { ClipMeta, TimelineData } from '../lib/timeline-data.ts';
 
 /** Intent is attached by the handler, never inferred from the resulting document. */
 const authoredCommands = new WeakMap<TimelineData, readonly EditCommand[]>();
-export function attachGestureCommands(data: TimelineData, commands: readonly EditCommand[]): void {
+const authoredOccurrences = new WeakMap<TimelineData, TimelineOccurrenceContext>();
+const occurrenceOps = new Set(['clip.nudge', 'clip.set-track', 'clip.set-look', 'clip.set-param', 'clip.clear']);
+
+export function occurrenceIdentityFor(data: Pick<TimelineData, 'config'>, id: string): CanonicalClipIdentity | undefined {
+  const clips = data.config.clips.filter((clip) => clip.id === id);
+  if (clips.length !== 1) return undefined;
+  const identity = clips[0].app?.canonical as CanonicalClipIdentity | undefined;
+  if (!identity || ![identity.projectId, identity.parentDocumentId, identity.headRevisionId,
+    identity.occurrenceId, identity.shotId, identity.revisionId, identity.internalTimelineRevisionId,
+    identity.sourceClipId, identity.outputIdentity].every((value) => typeof value === 'string' && value.length > 0)
+    || identity.occurrenceId.includes('/') || identity.sourceClipId!.includes('/')
+    || identity.sourceClip?.id !== identity.sourceClipId) return undefined;
+  return identity;
+}
+function contextFor(identity: CanonicalClipIdentity): TimelineOccurrenceContext {
+  return { projectId: identity.projectId, parentDocumentId: identity.parentDocumentId,
+    headRevisionId: identity.headRevisionId!, occurrenceId: identity.occurrenceId,
+    shotId: identity.shotId, shotRevisionId: identity.revisionId,
+    internalRevisionId: identity.internalTimelineRevisionId };
+}
+export function attachGestureCommands(data: TimelineData, commands: readonly EditCommand[], source: TimelineData = data): void {
+  authoredCommands.delete(data);
+  authoredOccurrences.delete(data);
+  let context: TimelineOccurrenceContext | undefined;
+  let parent = false;
+  for (const command of commands) {
+    if (typeof command.select !== 'string') {
+      if (source.config.clips.some((clip) => clip.app?.canonical)) return;
+      parent = true;
+      continue;
+    }
+    if (command.select.startsWith('occurrence:')) {
+      if (!occurrenceOps.has(command.op) || command.resolved?.length !== 1
+        || command.resolved[0] !== command.select) return;
+      const matches = source.config.clips.flatMap((clip) => {
+        const identity = occurrenceIdentityFor(source, clip.id);
+        return identity && `occurrence:${identity.occurrenceId}/clip:${identity.sourceClipId}` === command.select ? [identity] : [];
+      });
+      if (matches.length !== 1) return;
+      const next = contextFor(matches[0]);
+      if (context && JSON.stringify(context) !== JSON.stringify(next)) return;
+      context = next;
+    } else {
+      if (source.config.clips.some((clip) => clip.app?.canonical && command.select === `parent/clip:${clip.id}`)) return;
+      parent = true;
+    }
+  }
+  if (context && parent) return;
+  if (context) authoredOccurrences.set(data, structuredClone(context));
   authoredCommands.set(data, structuredClone(commands));
 }
 export function gestureCommandsFor(data: TimelineData): readonly EditCommand[] | undefined {
   return authoredCommands.get(data);
+}
+export function gestureOccurrenceFor(data: TimelineData): TimelineOccurrenceContext | undefined {
+  return authoredOccurrences.get(data);
+}
+
+function gestureTarget(data: Pick<TimelineData, 'config'>, id: string): string | undefined {
+  const clips = data.config.clips.filter((clip) => clip.id === id);
+  if (clips.length !== 1) return undefined;
+  if (!clips[0].app?.canonical) return id.startsWith('occurrence:') ? undefined : id;
+  const identity = occurrenceIdentityFor(data, id);
+  return identity ? `occurrence:${identity.occurrenceId}/clip:${identity.sourceClipId}` : undefined;
+}
+function gestureSource(data: Pick<TimelineData, 'config'>, id: string) {
+  return (occurrenceIdentityFor(data, id)?.sourceClip ?? originalClip(data, id)) as ReturnType<typeof originalClip>;
 }
 
 export function scopedGestureClipId(id: string): string {
@@ -40,7 +104,9 @@ const lookFields: Record<string, string> = {
 export function propertyGestureCommands(data: Pick<TimelineData, 'config'>, id: string, patch: Partial<ClipMeta>, options?: { mergeParams: boolean }): EditCommand[] | undefined {
   const entries = Object.entries(patch);
   if (entries.some(([key, value]) => key !== 'params' && (!lookFields[key] || value === null || (key === 'transition' && value !== undefined)))) return undefined;
-  const clip = originalClip(data, id);
+  const target = gestureTarget(data, id);
+  if (!target) return undefined;
+  const clip = gestureSource(data, id);
   if (typeof clip.hold === 'number' && 'speed' in patch) return undefined;
   const result: EditCommand[] = [];
   for (const [key, value] of entries) {
@@ -54,12 +120,12 @@ export function propertyGestureCommands(data: Pick<TimelineData, 'config'>, id: 
         || (!options?.mergeParams && Object.keys(clip.params ?? {}).some((key) => !hasOwn(value, key)))) return undefined;
       for (const [param, next] of Object.entries(value)) {
         const before = clip.params ?? {};
-        result.push(command(id, next === undefined ? 'clip.clear' : 'clip.set-param',
+        result.push(command(target, next === undefined ? 'clip.clear' : 'clip.set-param',
           next === undefined ? { keys: [param] } : { path: param, value: next },
           { [`params.${param}`]: state(before[param], hasOwn(before, param)) }));
       }
     } else {
-      result.push(command(id, value === undefined ? 'clip.clear' : 'clip.set-look',
+      result.push(command(target, value === undefined ? 'clip.clear' : 'clip.set-look',
         value === undefined ? { keys: [lookFields[key]] } : { [lookFields[key]]: value },
         { [key]: state(clip[key as keyof typeof clip], hasOwn(clip, key)) }));
     }
@@ -122,7 +188,10 @@ export function tiedEndResizeGesture(data: TimelineData, id: string, duration: n
   return { commands: [command(id, 'clip.until', { moment }, expect)], astrid: { ...astrid, until: moment } };
 }
 export function moveGestureCommands(data: TimelineData, id: string, start: number, track?: string): EditCommand[] | undefined {
-  const clip = originalClip(data, id);
+  const target = gestureTarget(data, id);
+  if (!target) return undefined;
+  const clip = gestureSource(data, id);
+  if (occurrenceIdentityFor(data, id) && typeof clip.at !== 'number') return undefined;
   const action = data.rows.flatMap((row) => row.actions).find((candidate) => candidate.id === id);
   if (!action) return undefined;
   const intent = clip.app?.astrid as Record<string, unknown> | undefined;
@@ -130,12 +199,12 @@ export function moveGestureCommands(data: TimelineData, id: string, start: numbe
   if (intent?.until) return undefined;
   const commands: EditCommand[] = [];
   const deltaFrames = Math.round((start - action.start) * data.output.fps);
-  if (deltaFrames) commands.push(command(id, 'clip.nudge', { frames: deltaFrames }, {
+  if (deltaFrames) commands.push(command(target, 'clip.nudge', { frames: deltaFrames }, {
     at: state(clip.at, hasOwn(clip, 'at')),
     'app.astrid.on': state(intent?.on, Boolean(intent && hasOwn(intent, 'on'))),
     'app.astrid.until': state(intent?.until, Boolean(intent && hasOwn(intent, 'until'))),
   }));
-  if (track && track !== clip.track) commands.push(command(id, 'clip.set-track', { track }, {
+  if (track && track !== clip.track) commands.push(command(target, 'clip.set-track', { track }, {
     track: state(clip.track, true),
   }));
   return commands;

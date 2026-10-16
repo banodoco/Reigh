@@ -49,6 +49,9 @@ export type CanonicalClipIdentity = Readonly<{
   revisionId: string;
   internalTimelineRevisionId: string;
   outputIdentity: string;
+  headRevisionId?: string;
+  sourceClipId?: string;
+  sourceClip?: Readonly<JsonObject>;
 }>;
 
 export type CanonicalCompositionProjection = Readonly<{
@@ -312,9 +315,14 @@ function projectClip(
   clipIndex: number,
   clipIdentities: Map<string, CanonicalClipIdentity>,
   clampToOccurrenceDuration: boolean,
+  headRevisionId: string,
 ): TimelineClip | null {
   assertSupportedChildClip(rawClip, occurrence);
-  const identity = identityForOccurrence(occurrence);
+  const identity = Object.freeze({ ...identityForOccurrence(occurrence), headRevisionId,
+    // Synthetic display IDs never establish semantic ownership.
+    sourceClipId: text(record(occurrence.revision.internal_timeline_revision)?.revision_id)
+      ? text(rawClip.id) : undefined,
+    sourceClip: structuredClone(rawClip) });
   const clipId = text(rawClip.id) ?? `child-${clipIndex}`;
   const id = `${occurrence.occurrenceId}:${clipId}`;
   // Runtime canonical revisions use one of two timeline encodings:
@@ -496,6 +504,7 @@ export function projectCanonicalComposition(
           index,
           clipIdentities,
           options.clampToOccurrenceDuration !== false,
+          composition.headRevisionId,
         );
         if (projected) {
           if (Array.isArray(timeline.effects) && timeline.effects.length > 0) {
