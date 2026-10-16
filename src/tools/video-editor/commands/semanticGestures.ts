@@ -141,6 +141,18 @@ export function moveGestureCommands(data: TimelineData, id: string, start: numbe
   return commands;
 }
 
+/** A declined tied-start drag stays on compatibility; never normalize its anchor
+ * through a generic nudge. Presence matters, including null/empty/legacy values.
+ */
+export function fallbackDragGestureCommands(data: TimelineData, id: string, start: number, track: string): EditCommand[] | undefined {
+  const commands = moveGestureCommands(data, id, start, track);
+  if (commands?.some((command) => command.op === 'clip.nudge') && data.config.clips.some((clip) => clip.id === id && (
+    hasOwn(clip.app ?? {}, 'on') || hasOwn((clip.app?.astrid as object | undefined) ?? {}, 'on')
+  ))) return undefined;
+  // A track-only command does not touch timing or normalize the authored on.
+  return commands;
+}
+
 /** Plain, same-track drag only. D's clip.nudge parses then formats a TimeRef;
  * admit only the canonical word / word-relative music subset whose anchor bytes
  * survive that round trip. This is an eligibility check, never an anchor resolver.

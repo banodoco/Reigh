@@ -1,4 +1,4 @@
-import { emptyTrackGestureCommands, moveGestureCommands, tiedStartDragGesture } from '../commands/semanticGestures.ts';
+import { emptyTrackGestureCommands, moveGestureCommands, tiedStartDragGesture, fallbackDragGestureCommands } from '../commands/semanticGestures.ts';
 import { addTrackGestureCommands, authoredTracks, reorderTrackGestureCommands, trackPropertyGesture } from '../commands/trackGestures.ts';
 import { trackRole } from '@/tools/video-editor/data/timelineOutputProjection.ts';
 import { useCallback, useMemo } from 'react';
@@ -381,7 +381,7 @@ export function useTimelineTrackManagement({
       rows: nextRows,
       metaUpdates: { [clipId]: { track: finalTrackId, ...tiedStart?.meta } },
       clipOrderOverride: moveClipBetweenTracks(current.clipOrder, clipId, sourceRow.id, finalTrackId),
-    }, { transactionId, editCommands: tiedStart?.commands ?? (targetAlreadyExists && !needsNewTrack ? moveGestureCommands(current, clipId, start, finalTrackId) : undefined) });
+    }, { transactionId, editCommands: tiedStart?.commands ?? (targetAlreadyExists && !needsNewTrack ? fallbackDragGestureCommands(current, clipId, start, finalTrackId) : undefined) });
   }, [applyEdit, dataRef, editability]);
   /**
    * Move a clip to `targetRowId`, optionally landing it at `newStartTime`.
@@ -586,7 +586,7 @@ export function useTimelineTrackManagement({
       },
       clipOrderOverride: nextClipOrder,
     }, { transactionId, editCommands: tiedStart?.commands ?? (finalTrackId === targetRowId
-      ? moveGestureCommands(current, clipId, effectiveStart, finalTrackId) : undefined) });
+      ? fallbackDragGestureCommands(current, clipId, effectiveStart, finalTrackId) : undefined) });
   }, [applyEdit, dataRef, editability, eventBus]);
 
   const createTrackAndMoveClip = useCallback((clipId: string, kind: TrackKind, newStartTime?: number, insertAtTop = false) => {
