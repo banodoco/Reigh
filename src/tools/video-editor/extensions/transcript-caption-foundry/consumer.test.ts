@@ -147,6 +147,48 @@ function host(overrides: Partial<TranscriptCaptionFoundryHost> = {}) {
 afterEach(() => vi.restoreAllMocks());
 
 describe('mounted read-only transcript consumer', () => {
+  it('scopes the creative.project host override to the exact declared contribution', () => {
+    const projectHost = host();
+    const admitted = createExtensionContext(
+      transcriptCaptionFoundryExtension,
+      { project: projectHost } as never,
+    );
+    expect(admitted.creative.project).toBe(projectHost);
+
+    const unrelatedExtension = {
+      ...transcriptCaptionFoundryExtension,
+      manifest: {
+        ...transcriptCaptionFoundryExtension.manifest,
+        id: 'com.reigh.unrelated',
+      },
+    } as unknown as typeof transcriptCaptionFoundryExtension;
+    const wrongKindExtension = {
+      ...transcriptCaptionFoundryExtension,
+      manifest: {
+        ...transcriptCaptionFoundryExtension.manifest,
+        contributions: transcriptCaptionFoundryExtension.manifest.contributions.map((item) => ({
+          ...item,
+          kindId: 'media.other',
+        })),
+      },
+    } as unknown as typeof transcriptCaptionFoundryExtension;
+    const wrongSchemaExtension = {
+      ...transcriptCaptionFoundryExtension,
+      manifest: {
+        ...transcriptCaptionFoundryExtension.manifest,
+        contributions: transcriptCaptionFoundryExtension.manifest.contributions.map((item) => ({
+          ...item,
+          schemaRef: 'media.transcript/v2',
+        })),
+      },
+    } as unknown as typeof transcriptCaptionFoundryExtension;
+
+    for (const extension of [unrelatedExtension, wrongKindExtension, wrongSchemaExtension]) {
+      const context = createExtensionContext(extension, { project: projectHost } as never);
+      expect(() => context.creative.project).toThrow();
+    }
+  });
+
   it('reads one exact pinned source and submits bind then captions in one command transaction', async () => {
     const correspondence = [{
       from: { lineage_id: 'old-lineage', word_id: 'word-old' },

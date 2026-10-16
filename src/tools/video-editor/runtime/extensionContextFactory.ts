@@ -504,16 +504,24 @@ export function createExtensionContext(
       && contribution.kindId === 'media.transcript'
       && contribution.schemaRef === 'media.transcript/v1'
     )) === true;
-  const scopedCreativeOverrides = creativeOverrides?.timeline
+  // `creative.project` is an App host port, not a general extension context
+  // capability. Keep any supplied host value confined to the one declared
+  // Caption Foundry contribution that is allowed to use it.
+  const projectScopedCreativeOverrides = creativeOverrides && !transcriptConsumerAdmitted
+    ? Object.fromEntries(
+        Object.entries(creativeOverrides).filter(([key]) => key !== 'project'),
+      ) as Partial<CreativeContext>
+    : creativeOverrides;
+  const scopedCreativeOverrides = projectScopedCreativeOverrides?.timeline
     ? {
-        ...creativeOverrides,
+        ...projectScopedCreativeOverrides,
         timeline: createExtensionTimelineOps(
-          creativeOverrides.timeline,
+          projectScopedCreativeOverrides.timeline,
           extensionId,
           transcriptConsumerAdmitted,
         ),
       }
-    : creativeOverrides;
+    : projectScopedCreativeOverrides;
   const creative = createCreativeContext(scopedCreativeOverrides);
 
   // ---- commands service (optional, wired by provider) -----------------------
