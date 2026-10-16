@@ -425,6 +425,26 @@ export class RuntimeDataProvider implements DataProvider {
     );
   }
 
+  async getProjectMediaSelectionForOutput(request: {
+    projectId: string;
+    association_id: string;
+    object_id: string;
+    version: number;
+  }) {
+    if (request.projectId !== this.projectId) {
+      throw new Error('Runtime media selection belongs to a different project');
+    }
+    if (!request.association_id || !request.object_id
+      || !Number.isSafeInteger(request.version) || request.version < 1) {
+      throw new Error('Runtime output media selection requires an exact association, object, and version');
+    }
+    return this.client.getProjectMediaSelectionForOutput(this.projectId, {
+      association_id: request.association_id,
+      object_id: request.object_id,
+      version: request.version,
+    });
+  }
+
   private async loadRuntimeShotComposition(projectId: string, timelineId: string): Promise<unknown> {
     const startedAt = import.meta.env.DEV ? performance.now() : 0;
     const inspection = await this.inspectCanonicalTimelineHead(projectId, timelineId);

@@ -14,6 +14,9 @@ import { useTimelineCommit } from '@/tools/video-editor/hooks/useTimelineCommit'
 import type { TimelineRow } from '@/tools/video-editor/types/timeline-canvas';
 import type { AssetRegistry, TimelineConfig } from '@/tools/video-editor/types';
 import { extractVideoMetadataFromUrl } from '@/shared/lib/media/videoMetadata';
+import type { ManagedOutput } from '@/integrations/runtime/generated.ts';
+import type { SelectedProjectMediaIdentity } from '@/shared/contracts/selectedProjectMedia.ts';
+import type { RuntimeShotFinalVideo } from '@/tools/video-editor/hooks/useFinalVideoAvailable.ts';
 
 vi.mock('@/shared/components/ui/runtime/sonner', () => ({
   toast: {
@@ -108,6 +111,50 @@ function makeConfigTimelineData(config: TimelineConfig, registry: AssetRegistry)
     clipOrder: rowData.clipOrder,
     signature: 'signature',
     stableSignature: 'stable-signature',
+  };
+}
+
+const outputObjectId = `sha256:${'a'.repeat(64)}`;
+const outputSelection: SelectedProjectMediaIdentity = {
+  asset: 'output-asset',
+  generation_id: 'output-generation',
+  variant_id: 'output-variant',
+  object_id: outputObjectId,
+  catalog_digest: `sha256:${'b'.repeat(64)}`,
+};
+
+function makeRuntimeFinalVideo(projectId = 'project-1'): RuntimeShotFinalVideo {
+  const managedOutput: ManagedOutput = {
+    association_id: 'association-output-17',
+    project_id: projectId,
+    run_id: 'run-output',
+    task_id: 'task-output',
+    attempt_id: 'attempt-output',
+    output_port: 'video',
+    group_key: 'render',
+    variant_key: 'default',
+    selector: { group_key: 'render', variant_key: 'default' },
+    object_id: outputObjectId,
+    digest: outputSelection.catalog_digest,
+    manifest_ref: null,
+    size: 128,
+    filename: 'final.mp4',
+    media_type: 'video/mp4',
+    ordinal: 0,
+    role: 'render',
+    producer: {},
+    provenance: {},
+    durability: 'durable',
+    state: 'available',
+    version: 17,
+    lifecycle: {},
+  };
+  return {
+    id: outputObjectId,
+    location: 'https://example.com/final.mp4',
+    thumbnailUrl: null,
+    variantFetchGenerationId: null,
+    managedOutput,
   };
 }
 
@@ -861,6 +908,133 @@ describe('useSwitchToFinalVideo', () => {
     expect(patchRegistry).not.toHaveBeenCalled();
     expect(registerAsset).not.toHaveBeenCalled();
     expect(applyEdit).not.toHaveBeenCalled();
+  });
+
+  it('resolves the exact managed output and passes its response into the semantic media command', async () => {
+    const applyEdit = vi.fn();
+    const getProjectMediaSelectionForOutput = vi.fn().mockResolvedValue(outputSelection);
+    const finalVideo = makeRuntimeFinalVideo();
+    const dataRef = {
+      current: makeConfigTimelineData(
+        {
+          output: { resolution: '1920x1080', fps: 30, file: 'out.mp4' },
+          tracks: [{ id: 'V1', kind: 'visual', label: 'V1' }],
+          clips: [{ id: 'clip-1', at: 0, track: 'V1', clipType: 'hold', asset: 'image-1', hold: 3 }],
+          pinnedShotGroups: [makePinnedGroup({ shotId: 'shot-1', trackId: 'V1', clipIds: ['clip-1'], mode: 'images' })],
+        },
+        { assets: { 'image-1': { file: 'one.png', type: 'image/png' } } },
+      ),
+    };
+    const { result } = renderHook(() => useSwitchToFinalVideo({
+      applyEdit,
+      dataRef,
+      finalVideoMap: new Map([['shot-1', finalVideo]]),
+      semanticCommands: true,
+      projectId: 'project-1',
+      getProjectMediaSelectionForOutput,
+    }));
+
+    await act(async () => {
+      await result.current.switchToFinalVideo({ shotId: 'shot-1', clipIds: ['clip-1'], rowId: 'V1' });
+    });
+
+    expect(getProjectMediaSelectionForOutput).toHaveBeenCalledExactlyOnceWith({
+      projectId: 'project-1',
+      association_id: 'association-output-17',
+      object_id: outputObjectId,
+      version: 17,
+    });
+    expect(applyEdit).toHaveBeenCalledTimes(1);
+    expect(applyEdit.mock.calls[0][1].editCommands[0].args.media).toBe(outputSelection);
+  });
+
+  it('fails closed on a stale or cross-project output selection without retrying', async () => {
+    const applyEdit = vi.fn();
+    const onMissingMediaSelection = vi.fn();
+    const getProjectMediaSelectionForOutput = vi.fn().mockRejectedValue(new Error('stale managed output'));
+    const finalVideo = makeRuntimeFinalVideo();
+    const dataRef = { current: makeConfigTimelineData({
+      output: { resolution: '1920x1080', fps: 30, file: 'out.mp4' },
+      tracks: [{ id: 'V1', kind: 'visual', label: 'V1' }],
+      clips: [{ id: 'clip-1', at: 0, track: 'V1', clipType: 'hold', asset: 'image-1', hold: 3 }],
+      pinnedShotGroups: [makePinnedGroup({ shotId: 'shot-1', trackId: 'V1', clipIds: ['clip-1'], mode: 'images' })],
+    }, { assets: { 'image-1': { file: 'one.png', type: 'image/png' } } }) };
+    const { result } = renderHook(() => useSwitchToFinalVideo({
+      applyEdit,
+      dataRef,
+      finalVideoMap: new Map([['shot-1', finalVideo]]),
+      semanticCommands: true,
+      projectId: 'project-1',
+      getProjectMediaSelectionForOutput,
+      onMissingMediaSelection,
+    }));
+
+    await act(async () => {
+      await result.current.switchToFinalVideo({ shotId: 'shot-1', clipIds: ['clip-1'], rowId: 'V1' });
+    });
+
+    expect(getProjectMediaSelectionForOutput).toHaveBeenCalledExactlyOnceWith({
+      projectId: 'project-1',
+      association_id: 'association-output-17',
+      object_id: outputObjectId,
+      version: 17,
+    });
+    expect(applyEdit).not.toHaveBeenCalled();
+    expect(onMissingMediaSelection).toHaveBeenCalledOnce();
+
+    const wrongProjectRead = vi.fn();
+    const { result: wrongProjectResult } = renderHook(() => useSwitchToFinalVideo({
+      applyEdit,
+      dataRef,
+      finalVideoMap: new Map([['shot-1', finalVideo]]),
+      semanticCommands: true,
+      projectId: 'other-project',
+      getProjectMediaSelectionForOutput: wrongProjectRead,
+      onMissingMediaSelection,
+    }));
+    await act(async () => {
+      await wrongProjectResult.current.switchToFinalVideo({ shotId: 'shot-1', clipIds: ['clip-1'], rowId: 'V1' });
+    });
+    expect(wrongProjectRead).not.toHaveBeenCalled();
+    expect(applyEdit).not.toHaveBeenCalled();
+  });
+
+  it('refuses a selection response bound to a different output object', async () => {
+    const applyEdit = vi.fn();
+    const onMissingMediaSelection = vi.fn();
+    const getProjectMediaSelectionForOutput = vi.fn().mockResolvedValue({
+      ...outputSelection,
+      object_id: `sha256:${'c'.repeat(64)}`,
+    });
+    const finalVideo = makeRuntimeFinalVideo();
+    const dataRef = { current: makeConfigTimelineData({
+      output: { resolution: '1920x1080', fps: 30, file: 'out.mp4' },
+      tracks: [{ id: 'V1', kind: 'visual', label: 'V1' }],
+      clips: [{ id: 'clip-1', at: 0, track: 'V1', clipType: 'hold', asset: 'image-1', hold: 3 }],
+      pinnedShotGroups: [makePinnedGroup({ shotId: 'shot-1', trackId: 'V1', clipIds: ['clip-1'], mode: 'images' })],
+    }, { assets: { 'image-1': { file: 'one.png', type: 'image/png' } } }) };
+    const { result } = renderHook(() => useSwitchToFinalVideo({
+      applyEdit,
+      dataRef,
+      finalVideoMap: new Map([['shot-1', finalVideo]]),
+      semanticCommands: true,
+      projectId: 'project-1',
+      getProjectMediaSelectionForOutput,
+      onMissingMediaSelection,
+    }));
+
+    await act(async () => {
+      await result.current.switchToFinalVideo({ shotId: 'shot-1', clipIds: ['clip-1'], rowId: 'V1' });
+    });
+
+    expect(getProjectMediaSelectionForOutput).toHaveBeenCalledExactlyOnceWith({
+      projectId: 'project-1',
+      association_id: 'association-output-17',
+      object_id: outputObjectId,
+      version: 17,
+    });
+    expect(applyEdit).not.toHaveBeenCalled();
+    expect(onMissingMediaSelection).toHaveBeenCalledOnce();
   });
 
   it('restores image clips from snapshot in one edit when switching back to images', () => {

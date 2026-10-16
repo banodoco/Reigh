@@ -173,6 +173,10 @@ interface ProjectMediaSelectionClient {
     generationId: string,
     variantId: string,
   ) => Promise<SelectedProjectMediaIdentity>;
+  getProjectMediaSelectionForOutput?: (
+    projectId: string,
+    selectors: { association_id: string; object_id: string; version: number },
+  ) => Promise<SelectedProjectMediaIdentity>;
 }
 
 export class ReighRuntimeClient {
@@ -452,6 +456,22 @@ export class ReighRuntimeClient {
         throw new RuntimeCompatibilityError('generated client has no getProjectMediaSelection (C007)', this.baseUrl);
       }
       return client.getProjectMediaSelection(projectId, asset, generationId, variantId);
+    });
+  }
+
+  async getProjectMediaSelectionForOutput(
+    projectId: string,
+    selectors: { association_id: string; object_id: string; version: number },
+  ): Promise<SelectedProjectMediaIdentity> {
+    return this.withSession(() => {
+      const client: WorkspaceClient & ProjectMediaSelectionClient = this.client;
+      if (!client.getProjectMediaSelectionForOutput) {
+        throw new RuntimeCompatibilityError(
+          'generated client has no getProjectMediaSelectionForOutput (E069)',
+          this.baseUrl,
+        );
+      }
+      return client.getProjectMediaSelectionForOutput(projectId, selectors);
     });
   }
 

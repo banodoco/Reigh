@@ -22,8 +22,21 @@ import type { TimelineCommands, AddClipCommandInput } from '@/tools/video-editor
 import type { TimelineProvisionedAsset } from '@/tools/video-editor/commands/provisioning.ts';
 import type { PlacePreparedMediaCommand } from '@/tools/video-editor/commands/media.ts';
 import type { TimelineData } from '@/tools/video-editor/lib/timeline-data.ts';
-import type { ShotFinalVideo } from '@/tools/video-editor/hooks/useFinalVideoAvailable.ts';
+import { readSelectedProjectMediaIdentity } from '@/tools/video-editor/commands/selectedProjectMedia.ts';
+import type { SelectedProjectMediaIdentity } from '@/shared/contracts/selectedProjectMedia.ts';
+import type { RuntimeShotFinalVideo, ShotFinalVideo } from '@/tools/video-editor/hooks/useFinalVideoAvailable.ts';
 import type { CanonicalShotOccurrence } from '@/tools/video-editor/data/shotCompositionAdapter.ts';
+
+type OutputMediaSelectionRequest = {
+  projectId: string;
+  association_id: string;
+  object_id: string;
+  version: number;
+};
+
+type GetOutputMediaSelection = (
+  request: OutputMediaSelectionRequest,
+) => Promise<SelectedProjectMediaIdentity>;
 
 interface UseSwitchToFinalVideoArgs {
   applyEdit: TimelineApplyEdit;
@@ -34,6 +47,8 @@ interface UseSwitchToFinalVideoArgs {
   commands?: Pick<TimelineCommands, 'addClip'>;
   /** Canonical parent edits use shot-group OpCalls and the ordinary commit queue. */
   semanticCommands?: boolean;
+  projectId?: string | null;
+  getProjectMediaSelectionForOutput?: GetOutputMediaSelection;
   onMissingMediaSelection?: () => void;
   /** Kept for compatibility with older embedders; compound paths ignore them. */
   patchRegistry?: unknown;
@@ -90,8 +105,37 @@ export function useSwitchToFinalVideo({
   finalVideoMap,
   commands,
   semanticCommands = false,
+  projectId,
+  getProjectMediaSelectionForOutput,
   onMissingMediaSelection,
 }: UseSwitchToFinalVideoArgs) {
+  const selectOutputBoundMedia = useCallback(async (finalVideo: ShotFinalVideo): Promise<ShotFinalVideo | null> => {
+    const output = (finalVideo as RuntimeShotFinalVideo).managedOutput;
+    if (!projectId || !getProjectMediaSelectionForOutput || !output
+      || output.project_id !== projectId
+      || output.object_id !== finalVideo.id
+      || typeof output.association_id !== 'string' || output.association_id.length === 0
+      || !Number.isSafeInteger(output.version) || output.version < 1) {
+      return null;
+    }
+
+    try {
+      const selectedMedia = await getProjectMediaSelectionForOutput({
+        projectId,
+        association_id: output.association_id,
+        object_id: output.object_id,
+        version: output.version,
+      });
+      const identity = readSelectedProjectMediaIdentity(selectedMedia);
+      if (!identity || identity.object_id !== output.object_id) return null;
+      return { ...finalVideo, selectedMedia };
+    } catch {
+      // A stale/refused output is terminal for this action. Keep the captured
+      // association and version; never resolve a newer selection here.
+      return null;
+    }
+  }, [getProjectMediaSelectionForOutput, projectId]);
+
   const applyPreparedPlacement = useCallback((input: AddClipCommandInput, command: PlacePreparedMediaCommand) => {
     if (commands) {
       const result = commands.addClip(input);
@@ -187,7 +231,12 @@ export function useSwitchToFinalVideo({
     }
 
     if (semanticCommands) {
-      const command = buildSetShotGroupVideoCommand(dataRef.current, { shotId, trackId: rowId }, finalVideo, generateUUID());
+      const selectedFinalVideo = await selectOutputBoundMedia(finalVideo);
+      if (!selectedFinalVideo) {
+        onMissingMediaSelection?.();
+        return;
+      }
+      const command = buildSetShotGroupVideoCommand(dataRef.current, { shotId, trackId: rowId }, selectedFinalVideo, generateUUID());
       if (!command) {
         onMissingMediaSelection?.();
         return;
@@ -223,7 +272,7 @@ export function useSwitchToFinalVideo({
     const placement = buildPreparedPlacement(mutation, preparedAsset);
     if (!placement) return;
     applyPreparedPlacement(placement.input, placement.command);
-  }, [applyEdit, applyPreparedPlacement, buildPreparedPlacement, dataRef, finalVideoMap, getTargetFingerprint, onMissingMediaSelection, semanticCommands]);
+  }, [applyEdit, applyPreparedPlacement, buildPreparedPlacement, dataRef, finalVideoMap, getTargetFingerprint, onMissingMediaSelection, selectOutputBoundMedia, semanticCommands]);
 
   const updateToLatestVideo = useCallback(async ({ shotId, rowId, canonicalIdentity }: { shotId: string; rowId: string; canonicalIdentity?: CanonicalShotOccurrence }) => {
     const finalVideo = finalVideoMap.get(canonicalIdentity?.occurrenceId ?? shotId);
@@ -232,7 +281,12 @@ export function useSwitchToFinalVideo({
     }
 
     if (semanticCommands) {
-      const command = buildReplaceShotGroupVideoCommand(dataRef.current, { shotId, trackId: rowId }, finalVideo);
+      const selectedFinalVideo = await selectOutputBoundMedia(finalVideo);
+      if (!selectedFinalVideo) {
+        onMissingMediaSelection?.();
+        return;
+      }
+      const command = buildReplaceShotGroupVideoCommand(dataRef.current, { shotId, trackId: rowId }, selectedFinalVideo);
       if (!command) {
         onMissingMediaSelection?.();
         return;
@@ -272,7 +326,7 @@ export function useSwitchToFinalVideo({
     const placement = buildPreparedPlacement(mutation, preparedAsset, replacementClipId);
     if (!placement) return;
     applyPreparedPlacement(placement.input, placement.command);
-  }, [applyEdit, applyPreparedPlacement, buildPreparedPlacement, dataRef, finalVideoMap, getTargetFingerprint, onMissingMediaSelection, semanticCommands]);
+  }, [applyEdit, applyPreparedPlacement, buildPreparedPlacement, dataRef, finalVideoMap, getTargetFingerprint, onMissingMediaSelection, selectOutputBoundMedia, semanticCommands]);
 
   const switchToImages = useCallback(({ shotId, rowId }: { shotId: string; rowId: string }) => {
     if (semanticCommands) {

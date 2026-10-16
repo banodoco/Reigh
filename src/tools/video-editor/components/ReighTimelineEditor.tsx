@@ -480,6 +480,10 @@ function ReighTimelineEditorComponent({ onOpenSequenceCreator, onOpenElementCrea
     finalVideoMap,
     commands,
     semanticCommands: isCanonicalEditor,
+    projectId: selectedProjectId,
+    getProjectMediaSelectionForOutput: runtime.provider.getProjectMediaSelectionForOutput
+      ? (request) => runtime.provider.getProjectMediaSelectionForOutput!(request)
+      : undefined,
     onMissingMediaSelection: () => toast.error('The selected final video has no exact Runtime media selection.'),
   });
   const {

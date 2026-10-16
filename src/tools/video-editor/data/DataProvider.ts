@@ -394,6 +394,14 @@ export interface DataProvider extends AssetResolver {
     variantId: string;
   }): Promise<SelectedProjectMediaIdentity>;
 
+  /** Resolve the exact Runtime media selection captured by a managed output. */
+  getProjectMediaSelectionForOutput?(request: {
+    projectId: string;
+    association_id: string;
+    object_id: string;
+    version: number;
+  }): Promise<SelectedProjectMediaIdentity>;
+
   /** True only for the explicit semantic save flag; legacy debounce remains unchanged. */
   readonly semanticCommandSaving?: boolean;
   /** When present, writes MUST use this immutable-head CAS path, never numeric versions. */
