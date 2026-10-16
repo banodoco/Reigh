@@ -42,7 +42,8 @@ test('only consumer and media framing headers are forwarded with canonical names
   const positive = Object.fromEntries([...policy.PAIRED_FORWARD_HEADERS].map(name => [name.toUpperCase(), 'fixture']));
   assert.equal(policy.hasUnapprovedHeaders(positive), false);
   assert.deepEqual(Object.keys(policy.forwardHeaders(positive)).sort(), [...policy.PAIRED_FORWARD_HEADERS].sort());
-  for (const name of ['x-hostile-canary', 'x-astrid-session', 'authorization', 'x-output-binding', 'x-astrid-bridge-version', 'x-filename', 'x-expected-version', 'unknown']) {
+  assert.deepEqual(policy.forwardHeaders({ 'X-Astrid-Session': 'disposable-session' }), { 'x-astrid-session': 'disposable-session' });
+  for (const name of ['x-hostile-canary', 'x-reigh-paired-session', 'authorization', 'x-output-binding', 'x-astrid-bridge-version', 'x-filename', 'x-expected-version', 'unknown']) {
     assert(policy.hasUnapprovedHeaders({ [name]: 'disposable' }), name);
     assert.deepEqual(policy.forwardHeaders({ [name]: 'disposable' }), {});
   }
@@ -106,7 +107,7 @@ async function withRelay(run: (venue: {port: number; origin: string; cookie: str
 test('live relay refuses hostile headers and unsupported paths/methods before the connector', {timeout: 10000}, async () => {
   await withRelay(async ({port, origin, cookie, frames}) => {
     const headers = { Origin: origin, Cookie: cookie };
-    for (const name of ['X-Hostile-Canary', 'X-Astrid-Session', 'Authorization', 'X-Output-Binding']) {
+    for (const name of ['X-Hostile-Canary', 'X-Reigh-Paired-Session', 'Authorization', 'X-Output-Binding']) {
       const result = await call(port, '/api/runtime/v1/health', 'GET', { ...headers, [name]: 'disposable' });
       assert.equal(result.status, 403); assert.equal(JSON.parse(result.body).error, 'paired_header_not_allowed');
     }

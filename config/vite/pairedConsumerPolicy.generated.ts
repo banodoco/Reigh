@@ -2,8 +2,8 @@
 // Routes are observed from the generated client with disposable offline fixtures.
 export const PAIRED_COMPOSE_ROUTE = "/api/astrid/generation/compose";
 export const PAIRED_CONSUMER_SOURCE_DIGESTS = {
-  "src/integrations/runtime/generated.ts": "6d745e6dd41b204eea72c6628fbb18f13916e08a16fea1f7782057874c69f2e4",
-  "src/integrations/runtime/client.ts": "01aca702e659e3e548ff799b3e78af66ba4ee51eb526a836892ec0555e453f19",
+  "src/integrations/runtime/generated.ts": "17805ffa5079ee3eefd59c621af8b8d6dc312624b2cc5c8e48c26a280961f8bb",
+  "src/integrations/runtime/client.ts": "7a45238bef59741ce859d5663dd8f3bbbc15228031c03c7aa69bccb115a1a524",
   "src/integrations/astrid/projectRoutes.ts": "e1e430ce26df6a0b059b2f7f05ccd065014d113fe4f7e9ff9a1f317e05aceed7",
   "src/integrations/astrid/taskRoutes.ts": "50b4169c7cc97e8652b03197387be6a5583b7b7953aa76887ba0287b4f107540",
   "src/integrations/astrid/objectRoutes.ts": "7d3b84d96c0ef38c417ce730269146f92d3a21cc3b8c7351f53d8351527142ee",
@@ -42,6 +42,7 @@ export const PAIRED_CONSUMER_ROUTES = [
   {"service":"runtime","operation":"updateTimelineDocument","method":"GET","path":"/v1/projects/:project/documents/timeline%3A:timeline","headers":["accept"]},
   {"service":"runtime","operation":"updateTimelineDocument","method":"PATCH","path":"/v1/projects/:project/documents/timeline%3A:timeline","headers":["accept","content-type","idempotency-key"]},
   {"service":"runtime","operation":"updateTimelineDocument","method":"GET","path":"/v1/projects/:project/timelines/:timeline","headers":["accept"]},
+  {"service":"runtime","operation":"commitTimeline","method":"POST","path":"/astrid/v1/projects/:project/timelines/:timeline/commit","headers":["accept","content-type","idempotency-key","x-astrid-session"]},
   {"service":"runtime","operation":"ingestProjectObject","method":"POST","path":"/v1/projects/:project/objects","headers":["accept","content-type","idempotency-key","x-original-name"]},
   {"service":"astrid","operation":"ingestProjectObject","method":"POST","path":"/v1/projects/:project/objects","headers":["accept","content-type","idempotency-key","x-original-name"]},
   {"service":"runtime","operation":"importProjectMedia","method":"POST","path":"/v1/projects/:project/media-imports","headers":["accept","content-type","idempotency-key","x-expected-digest","x-media-duration-seconds","x-media-height","x-media-width","x-original-name"]},

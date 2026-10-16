@@ -19,6 +19,13 @@ const fixtures = {
   getProjectShotRevision: [project, 'fixture-shot', revision],
   getProjectTimelineRevision: [project, timeline, revision],
   updateTimelineDocument: [project, timeline, 1, key, {}, {}],
+  commitTimeline: [{
+    api_version: 1, project_id: project, timeline_id: timeline, request_id: key,
+    session_id: 'disposable-session', session_sequence: 1,
+    base_revision_id: revision, base_publication_id: null,
+    scope: { target: 'parent', complete: [], projection_version: 1 },
+    change: { commands: [] }, source: { via: 'app' }, dry_run: false,
+  }],
   ingestProjectObject: [project, new Uint8Array([0]), 'image/png', key, 'disposable.png'],
   importProjectMedia: [project, new Uint8Array([0]), 'image/png', key, { filename: 'disposable.png', expectedDigest: 'sha256:fixture', width: 1, height: 1, durationSeconds: 1 }],
   getProjectMediaImport: [project, 'fixture-import'], getProjectObjectLocation: [project, object],
