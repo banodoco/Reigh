@@ -7,7 +7,7 @@ import {mediaModifierBounds} from './lib/modifier-bounds';
 import type {AssetRegistry, TimelineClip, TrackDefinition} from './types';
 import type {ModifierRegistry, ModifierBounds} from './modifier-types';
 
-export type SceneFinding = {code: string; clipId: string; reason: string};
+export type SceneFinding = {code: string; clipId: string; reason: string; instanceId?: string; element?: string};
 export type SceneTrackInput = {track: TrackDefinition; clips: readonly TimelineClip[];
   transitions: readonly (TransitionSpec | null)[]};
 export type PreparedScene = {tracks: (SceneTrackInput & {prepared: PreparedTrack})[];
@@ -15,7 +15,9 @@ export type PreparedScene = {tracks: (SceneTrackInput & {prepared: PreparedTrack
   elements: ReadonlySet<string>; modifiers: ModifierRegistry; roles: Readonly<Record<string, string>>};
 export type SceneLayer = {clipId: string; track: string; clipIndex: number; z: number;
   drawLocalFrame: number; ownFrame: number; transitionOpacity: number; opacity: number | null;
-  visible: boolean | 'unknown'; bounds: ModifierBounds; role: string; fullFrame: boolean;
+  visible: boolean | 'unknown';
+  /** Evaluated target geometry, independent of uncertain modified output bounds. */
+  targetBounds: ModifierBounds; bounds: ModifierBounds; role: string; fullFrame: boolean;
   coverage: 'covered' | 'partial' | 'unknown'; findings: SceneFinding[]; dip: boolean};
 export type SceneFrame = {frame: number; layers: SceneLayer[]; coverage: 'COVERED' | 'DIP' | 'GAP' | 'UNKNOWN';
   content: 'CONTENT' | 'EMPTY' | 'UNKNOWN' | null; findings: SceneFinding[]};
@@ -66,8 +68,9 @@ export const querySceneFrame = (scene: PreparedScene, frame: number): SceneFrame
       const unknown = (code: string, reason: string) => {findings.push({code, clipId: clip.id, reason});};
       const element = scene.elements.has(clip.clipType ?? '');
       const asset = clip.asset ? scene.assets.assets[clip.asset] : undefined;
-      let bounds: ModifierBounds = element ? {status: 'unknown', reason: 'Component has no declared evaluated bounds'}
+      const targetBounds: ModifierBounds = element ? {status: 'unknown', reason: 'Component has no declared evaluated bounds'}
         : mediaModifierBounds(clip, track, asset, scene.width, scene.height);
+      let bounds = targetBounds;
       let opacity: number | null = Math.min(1, Math.max(0, track.opacity ?? 1))
         * clipOpacity(clip, draw.ownFrame, scene.fps) * draw.opacity;
       const absent = clip.clipType === 'effect-layer' || (!element && !asset?.file);
@@ -76,13 +79,24 @@ export const querySceneFrame = (scene: PreparedScene, frame: number): SceneFrame
         unknown('unknown-animation-geometry', 'Animation does not declare evaluated support and alpha');
         bounds = {status: 'unknown', reason: 'Animation geometry is undeclared'};
       }
-      try {
-        admitModifiers(clip.modifiers ?? [], scene.modifiers);
-      } catch (error) {
-        unknown('unknown-modifier-bounds', error instanceof Error ? error.message : String(error));
-        bounds = {status: 'unknown', reason: 'Modifier bounds, alpha or support are undeclared'};
+      const instances = clip.modifiers ?? [];
+      if (targetBounds.status === 'unknown' && !absent) {
+        unknown(instances.length ? 'unknown-target-bounds' : 'unknown-component-bounds', targetBounds.reason);
       }
-      if (bounds.status === 'unknown' && !absent) unknown(clip.modifiers?.length ? 'unknown-modifier-bounds' : 'unknown-component-bounds', bounds.reason);
+      try {
+        const declarations = admitModifiers(instances, scene.modifiers);
+        declarations.forEach((declaration, index) => {
+          if (declaration.bounds === 'unknown') {
+            const reason = 'Modifier declares unknown output bounds';
+            findings.push({code: 'unknown-modifier-bounds', clipId: clip.id,
+              instanceId: instances[index].id, element: declaration.element, reason});
+            bounds = {status: 'unknown', reason};
+          }
+        });
+      } catch (error) {
+        unknown('modifier-admission-refused', error instanceof Error ? error.message : String(error));
+        bounds = {status: 'unknown', reason: 'Modifier admission refused'};
+      }
       // Unresolved intrinsic alpha (e.g. PNG/video alpha) cannot establish opaque coverage.
       const opaqueMedia = asset?.type === 'image/jpeg';
       if (!absent && !element && !opaqueMedia) unknown('unknown-media-alpha', 'Media does not declare opaque alpha');
@@ -98,7 +112,7 @@ export const querySceneFrame = (scene: PreparedScene, frame: number): SceneFrame
         || fadeMultiplier(clip, draw.ownFrame, scene.fps) < 1);
       layers.push({clipId: clip.id, track: track.id, clipIndex: draw.clipIndex, z: 0,
         drawLocalFrame: draw.drawLocalFrame, ownFrame: draw.ownFrame, transitionOpacity: draw.opacity,
-        opacity, visible, bounds, fullFrame, role: scene.roles[clip.id] ?? (track.id === 'plate' ? 'picture' : 'content'),
+        opacity, visible, targetBounds, bounds, fullFrame, role: scene.roles[clip.id] ?? (track.id === 'plate' ? 'picture' : 'content'),
         coverage: bounds.status === 'unknown' || uncertain ? 'unknown' : fullFrame && opacity! >= .999 ? 'covered' : 'partial', findings, dip});
     }
   }

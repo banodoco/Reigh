@@ -22,6 +22,7 @@ export type ModifierContext = {
   readonly keyframeFrame: number;
   readonly keyframeTime: number;
   readonly globalFrame: number;
+  /** Known target rectangle required by the component, independent of output bounds behavior. */
   readonly bounds: ModifierBounds;
   readonly theme: RuntimeTheme;
 };
@@ -38,7 +39,8 @@ export type ModifierDeclaration = {
   /** Exact qualified element identity supplied by the admitted element producer. */
   readonly element: string;
   readonly hosts: readonly string[];
-  readonly bounds: 'preserve';
+  /** Output bounds behavior; context.bounds remains the evaluated target geometry. */
+  readonly bounds: 'preserve' | 'unknown';
   readonly alpha: 'preserve';
   readonly support: 'preserve';
   readonly wrap: (instance: ClipModifierReference, context: ModifierContext, children: ReactNode) => ReactElement;
@@ -55,7 +57,12 @@ export type ModifierDefinition<TParams> = Omit<ModifierDeclaration, 'wrap'> & {
 export type ModifierRegistry = Readonly<Record<string, ModifierDeclaration>>;
 
 export type ModifierFinding = {
-  code: 'unknown-modifier-bounds';
   clipId: string;
   reason: string;
-};
+} & ({
+  code: 'unknown-modifier-bounds';
+  instanceId: string;
+  element: string;
+} | {
+  code: 'unknown-target-bounds';
+});

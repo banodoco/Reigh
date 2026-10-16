@@ -25,8 +25,8 @@ export const admitModifiers = (instances: readonly ClipModifierReference[], regi
     if (!declaration.hosts.includes(host)) {
       throw new ModifierAdmissionError('unsupported-host', `${instance.element} does not support ${host}`);
     }
-    if (declaration.bounds !== 'preserve' || declaration.alpha !== 'preserve' || declaration.support !== 'preserve') {
-      throw new ModifierAdmissionError('unsupported-geometry', `${instance.element} must preserve target bounds, alpha and support`);
+    if ((declaration.bounds !== 'preserve' && declaration.bounds !== 'unknown') || declaration.alpha !== 'preserve' || declaration.support !== 'preserve') {
+      throw new ModifierAdmissionError('unsupported-geometry', `${instance.element} must declare preserve/unknown bounds and preserve alpha and support`);
     }
     if (!instance.params || typeof instance.params !== 'object' || Array.isArray(instance.params)) {
       throw new ModifierAdmissionError('invalid-params', `${instance.element} params must be an object`);
