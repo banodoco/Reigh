@@ -1,3 +1,4 @@
+import type { SelectedProjectMediaIdentity } from '@/shared/contracts/selectedProjectMedia.ts';
 import {
   ApiError,
   PROTOCOL,
@@ -162,6 +163,16 @@ export function isRuntimeCanonicalPayloadConflict(error: unknown): error is ApiE
   return error instanceof ApiError
     && error.status === 409
     && /canonical parent clips and config\.clips disagree/i.test(error.message);
+}
+
+/** C007 is optional until A admits the generated-client successor. */
+interface ProjectMediaSelectionClient {
+  getProjectMediaSelection?: (
+    projectId: string,
+    asset: string,
+    generationId: string,
+    variantId: string,
+  ) => Promise<SelectedProjectMediaIdentity>;
 }
 
 export class ReighRuntimeClient {
@@ -427,6 +438,21 @@ export class ReighRuntimeClient {
       idempotencyKey,
       { filename, expectedDigest, width, height, durationSeconds },
     ));
+  }
+
+  async getProjectMediaSelection(
+    projectId: string,
+    asset: string,
+    generationId: string,
+    variantId: string,
+  ): Promise<SelectedProjectMediaIdentity> {
+    return this.withSession(() => {
+      const client: WorkspaceClient & ProjectMediaSelectionClient = this.client;
+      if (!client.getProjectMediaSelection) {
+        throw new RuntimeCompatibilityError('generated client has no getProjectMediaSelection (C007)', this.baseUrl);
+      }
+      return client.getProjectMediaSelection(projectId, asset, generationId, variantId);
+    });
   }
 
   async getProjectMediaImport(projectId: string, importOperationId: string): Promise<MediaImport> {

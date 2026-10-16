@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 
 import React from 'react';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   VideoEditorRuntimeProvider,
   type VideoEditorRuntimeContextValue,
 } from '@/tools/video-editor/contexts/VideoEditorRuntimeContext.tsx';
 import { useAssetManagement } from './useAssetManagement';
+import { handleFileDrop } from '@/tools/video-editor/lib/external-drop-utils.ts';
 import { RUNTIME_MEDIA_IMPORT_MAX_BYTES } from '@/tools/video-editor/data/AssetResolver.ts';
 import type { TimelineData } from '@/tools/video-editor/lib/timeline-data.ts';
 
@@ -197,6 +198,119 @@ describe('useAssetManagement Runtime media imports', () => {
     expect(editCommand.expect).toEqual({
       [`${editCommand.created[0]}::`]: { state: 'absent' },
     });
+  });
+
+  const selection = {
+    asset: 'asset-selected', generation_id: 'generation-selected', variant_id: 'variant-selected',
+    object_id: `sha256:${'a'.repeat(64)}`, catalog_digest: `sha256:${'b'.repeat(64)}`,
+  };
+  const imported = {
+    provider: 'runtime', project: 'runtime-project-id', importOperationId: 'operation-selected',
+    generationId: selection.generation_id, variantId: selection.variant_id, assetId: selection.asset,
+    entry: { file: 'https://runtime.test/selected.mp4', type: 'video/mp4', duration: 2.5 },
+  };
+
+  it.each(['image', 'video'] as const)('reads one exact selection for a real %s file-drop placement', async (kind) => {
+    extractVideoMetadataMock.mockResolvedValue({ duration_seconds: 2.5 });
+    const getProjectMediaSelection = vi.fn().mockResolvedValue(selection);
+    const prepareMediaImport = vi.fn().mockResolvedValue({ ...imported, entry: { file: `https://runtime.test/selected.${kind === 'image' ? 'png' : 'mp4'}`, type: `${kind}/${kind === 'image' ? 'png' : 'mp4'}`, ...(kind === 'video' ? { duration: 2.5 } : {}) } });
+    const applyEdit = vi.fn();
+    const args = buildArgs(buildTimelineData(), applyEdit);
+    const { result } = renderAssetManagement({ prepareMediaImport, getProjectMediaSelection }, args);
+    // Model the existing local uploading-row mutation before async placement.
+    applyEdit.mockImplementation((mutation) => {
+      if (mutation.type === 'rows' && args.dataRef.current) {
+        args.dataRef.current = { ...args.dataRef.current, rows: mutation.rows,
+          meta: { ...args.dataRef.current.meta, ...mutation.metaUpdates } };
+      }
+    });
+    const pendingOpsRef = { current: 0 };
+    const onAssetDropError = vi.fn();
+    await act(async () => {
+      await handleFileDrop({
+        files: [new File(['bytes'], kind === 'image' ? 'frame.png' : 'clip.mp4', { type: kind === 'image' ? 'image/png' : 'video/mp4' })],
+        dataRef: args.dataRef, pendingOpsRef,
+        dropPosition: { trackId: 'V1', time: 1.5, isNewTrack: false },
+        insertAtTop: false, selectedTrackId: 'V1', applyEdit,
+        invalidateAssetRegistry: vi.fn(), resolveAssetUrl: args.resolveAssetUrl,
+        registerGenerationAsset: result.current.registerGenerationAsset,
+        prepareGenerationAsset: result.current.prepareGenerationAsset,
+        uploadImageGeneration: result.current.uploadImageGeneration,
+        uploadVideoGeneration: result.current.uploadVideoGeneration,
+        dropAsset: result.current.handleAssetDrop,
+        directAssetUploadAllFiles: true, mediaImportForImageVideo: true, onAssetDropError,
+      });
+    });
+    await waitFor(() => expect(pendingOpsRef.current).toBe(0));
+    expect(onAssetDropError).not.toHaveBeenCalled();
+    expect(prepareMediaImport).toHaveBeenCalledTimes(1);
+    expect(getProjectMediaSelection).toHaveBeenCalledExactlyOnceWith({
+      projectId: imported.project, asset: imported.assetId,
+      generationId: imported.generationId, variantId: imported.variantId,
+    });
+    const placements = applyEdit.mock.calls.filter(([mutation]) => mutation.type === 'prepared-media');
+    expect(placements).toHaveLength(1);
+    expect(placements[0][0].command.payload.asset.selectedMedia).toBe(selection);
+    const commands = applyEdit.mock.calls.flatMap(([, options]) => options?.editCommands ?? []);
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toMatchObject({ op: 'timeline.add', args: { media: selection, at: 1.5 } });
+    expect(commands[0].args.media).toBe(selection);
+  });
+
+  it.each([
+    ['unavailable', undefined],
+    ['refused', new Error('Runtime refused selection')],
+    ['wrong asset', { ...selection, asset: 'other' }],
+    ['wrong generation', { ...selection, generation_id: 'other' }],
+    ['wrong variant', { ...selection, variant_id: 'other' }],
+    ['invalid object', { ...selection, object_id: 'guessed' }],
+    ['invalid digest', { ...selection, catalog_digest: 'guessed' }],
+  ])('preserves compatibility placement with no fabricated OpCall when selection is %s', async (_label, response) => {
+    const getProjectMediaSelection = response instanceof Error
+      ? vi.fn().mockRejectedValue(response) : vi.fn().mockResolvedValue(response);
+    const applyEdit = vi.fn();
+    const { result } = renderAssetManagement({
+      prepareMediaImport: vi.fn().mockResolvedValue(imported),
+      ...(response !== undefined ? { getProjectMediaSelection } : {}),
+    }, buildArgs(buildTimelineData(), applyEdit));
+    const uploaded = await result.current.uploadVideoGeneration(new File(['video'], 'clip.mp4', { type: 'video/mp4' }));
+    const prepared = result.current.prepareGenerationAsset(uploaded)!;
+    expect(prepared.selectedMedia).toBeUndefined();
+    expect(prepared.entry.file).toBe(imported.entry.file);
+    expect(result.current.handleAssetDrop(prepared.assetKey, 'V1', 0, false, false, prepared)).toBe(true);
+    expect(applyEdit).toHaveBeenCalledTimes(1);
+    expect(applyEdit.mock.calls[0][1].editCommands).toBeUndefined();
+    expect(getProjectMediaSelection).toHaveBeenCalledTimes(response === undefined ? 0 : 1);
+  });
+
+  it.each([selection, { ...selection, variant_id: 'other' }])('does not reread an attached matched or mismatched selection', async (attached) => {
+    const getProjectMediaSelection = vi.fn();
+    const { result } = renderAssetManagement({
+      prepareMediaImport: vi.fn().mockResolvedValue({ ...imported, selectedMedia: attached }), getProjectMediaSelection,
+    });
+    const uploaded = await result.current.uploadImageGeneration(new File(['image'], 'frame.png', { type: 'image/png' }));
+    expect(getProjectMediaSelection).not.toHaveBeenCalled();
+    expect(result.current.prepareGenerationAsset(uploaded)?.selectedMedia).toBe(attached === selection ? selection : undefined);
+  });
+
+  it('does not query missing import selectors or gallery locators for authority', async () => {
+    const getProjectMediaSelection = vi.fn();
+    const { result } = renderAssetManagement({
+      prepareMediaImport: vi.fn().mockResolvedValue({ ...imported, variantId: '' }), getProjectMediaSelection,
+    });
+    await result.current.uploadImageGeneration(new File(['image'], 'frame.png', { type: 'image/png' }));
+    const prepared = result.current.prepareGenerationAsset({ generationId: 'gallery-gen', variantId: 'gallery-variant', mediaId: selection.object_id, imageUrl: 'https://runtime.test/gallery.png' });
+    expect(prepared?.selectedMedia).toBeUndefined();
+    expect(getProjectMediaSelection).not.toHaveBeenCalled();
+  });
+
+  it('rejects a different import project before selection IO', async () => {
+    const getProjectMediaSelection = vi.fn();
+    const { result } = renderAssetManagement({
+      prepareMediaImport: vi.fn().mockResolvedValue({ ...imported, project: 'other-project' }), getProjectMediaSelection,
+    });
+    await expect(result.current.uploadImageGeneration(new File(['image'], 'frame.png', { type: 'image/png' }))).rejects.toThrow('different project');
+    expect(getProjectMediaSelection).not.toHaveBeenCalled();
   });
 
   it('fails closed for a direct Bridge provider instead of using the legacy generation writer', async () => {

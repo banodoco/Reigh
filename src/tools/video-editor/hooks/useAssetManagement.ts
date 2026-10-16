@@ -407,6 +407,31 @@ export function useAssetManagement({
     return true;
   }, [getApplyEdit, getDataRef, getSelectedTrackId, getSelectClip, getSetSelectedTrackId, placePreparedAsset, runtime.toast]);
 
+  const selectImportedMedia = useCallback(async (mediaImport: PreparedMediaImport): Promise<PreparedMediaImport> => {
+    // A supplied tuple still goes through prepareGenerationAsset's existing exact
+    // validation. Never replace a refused tuple with a second authority read.
+    if (mediaImport.selectedMedia !== undefined || !runtime.provider.getProjectMediaSelection
+      || mediaImport.project !== selectedProjectId
+      || ![mediaImport.project, mediaImport.assetId, mediaImport.generationId, mediaImport.variantId]
+        .every((value) => typeof value === 'string' && value.length > 0)) {
+      return mediaImport;
+    }
+    try {
+      const selectedMedia = await runtime.provider.getProjectMediaSelection({
+        projectId: mediaImport.project,
+        asset: mediaImport.assetId,
+        generationId: mediaImport.generationId,
+        variantId: mediaImport.variantId,
+      });
+      // Preserve the Runtime record itself. The existing consumer validates its
+      // fields against this import before attaching a semantic command.
+      return { ...mediaImport, selectedMedia };
+    } catch (error) {
+      normalizeAndPresentError(error, { context: 'video-editor:project-media-selection', showToast: false });
+      return mediaImport;
+    }
+  }, [runtime.provider, selectedProjectId]);
+
   const uploadImageGeneration = useCallback(async (file: File) => {
     if (!selectedProjectId) {
       throw new Error('External image drop requires a selected project');
@@ -436,7 +461,7 @@ export function useAssetManagement({
           content_type: file.type || 'image/png',
           original_filename: file.name,
         },
-        mediaImport,
+        mediaImport: await selectImportedMedia(mediaImport),
       };
     }
 
@@ -484,7 +509,7 @@ export function useAssetManagement({
         original_filename: file.name,
       },
     };
-  }, [runtime.provider, selectedProjectId]);
+  }, [runtime.provider, selectImportedMedia, selectedProjectId]);
 
   const uploadVideoGeneration = useCallback(async (file: File) => {
     if (!selectedProjectId) {
@@ -525,7 +550,7 @@ export function useAssetManagement({
           content_type: file.type || 'video/mp4',
           original_filename: file.name,
         },
-        mediaImport,
+        mediaImport: await selectImportedMedia(mediaImport),
       };
     }
 
@@ -570,7 +595,7 @@ export function useAssetManagement({
         original_filename: file.name,
       },
     };
-  }, [runtime.provider, selectedProjectId]);
+  }, [runtime.provider, selectImportedMedia, selectedProjectId]);
 
   return {
     prepareGenerationAsset,

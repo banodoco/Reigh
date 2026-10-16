@@ -19,6 +19,8 @@ import { createInteractionState, notifyInteractionEndIfIdle } from '../lib/inter
 import { __resetSelectionStoreForTests } from '@/shared/state/selectionStore.ts';
 import { TimelineEventBus } from './useTimelineEventBus.ts';
 import { useTimelineCommit } from './useTimelineCommit.ts';
+import { useAssetManagement } from './useAssetManagement.ts';
+import { VideoEditorRuntimeProvider, type VideoEditorRuntimeContextValue } from '../contexts/VideoEditorRuntimeContext.tsx';
 import { useTimelinePersistence } from './useTimelinePersistence.ts';
 import { useClipResize } from './useClipResize.ts';
 import { useClipEditing } from './useClipEditing.ts';
@@ -1249,4 +1251,47 @@ describe('D008 source-backed track consumers', () => {
     h.unmount();
   });
 
+});
+
+
+describe('C007 selected import through the existing semantic commit retry', () => {
+  it('reads once and retries byte-identical timeline.add identity and selection after an unavailable acknowledgement', async () => {
+    const h = await setup(async (_request, call) => call === 1 ? 'unavailable' : undefined);
+    const selection = {
+      asset: 'import-asset', generation_id: 'import-gen', variant_id: 'import-variant',
+      object_id: `sha256:${'a'.repeat(64)}`, catalog_digest: `sha256:${'b'.repeat(64)}`,
+    };
+    vi.spyOn(h.provider, 'prepareMediaImport').mockResolvedValue({
+      provider: 'runtime', project: 'gesture-project', importOperationId: 'import-op',
+      assetId: selection.asset, generationId: selection.generation_id, variantId: selection.variant_id,
+      entry: { file: 'https://runtime.fixture/import.png', type: 'image/png' },
+    });
+    const read = vi.spyOn(h.provider, 'getProjectMediaSelection').mockResolvedValue(selection);
+    const runtime = { provider: h.provider, toast: { error: vi.fn() } } as unknown as VideoEditorRuntimeContextValue;
+    const assets = renderHook(() => useAssetManagement({
+      dataRef: h.result.current.dataRef, selectedTrackId: 'V1', selectedProjectId: 'gesture-project',
+      selectClip: vi.fn(), setSelectedTrackId: vi.fn(), applyEdit: h.result.current.applyEdit,
+      patchRegistry: vi.fn(), invalidateAssetRegistry: vi.fn(), resolveAssetUrl: vi.fn(),
+    }), { wrapper: ({ children }) => <VideoEditorRuntimeProvider value={runtime}>{children}</VideoEditorRuntimeProvider> });
+    const commits = vi.fn(); h.eventBus.on('beforeCommit', commits);
+    await act(async () => {
+      const uploaded = await assets.result.current.uploadImageGeneration(new File(['image'], 'frame.png', { type: 'image/png' }));
+      const prepared = assets.result.current.prepareGenerationAsset(uploaded)!;
+      expect(prepared.selectedMedia).toBe(selection);
+      expect(assets.result.current.handleAssetDrop(prepared.assetKey, 'V1', 10, false, false, prepared)).toBe(true);
+    });
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1), { timeout: 2500 });
+    expect(read).toHaveBeenCalledExactlyOnceWith({ projectId: 'gesture-project', asset: selection.asset, generationId: selection.generation_id, variantId: selection.variant_id });
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(h.requests).toHaveLength(2);
+    expect(h.requests[0].bytes).toBe(h.requests[1].bytes);
+    expect(h.requests[0].headers).toEqual(h.requests[1].headers);
+    expect(h.requests[0].request.change).toEqual({ commands: [expect.objectContaining({
+      op: 'timeline.add', select: 'parent/track:V1', args: { media: selection, at: 10, duration: 5 },
+      created: [expect.stringMatching(/^parent\/clip:/)],
+    })] });
+    expect(h.result.current.data!.config.clips.filter((clip) => clip.asset === selection.asset)).toHaveLength(1);
+    expect(h.compatibilityRequests).toEqual([]);
+    assets.unmount(); h.unmount();
+  });
 });

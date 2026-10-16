@@ -1,3 +1,4 @@
+import type { SelectedProjectMediaIdentity } from '@/shared/contracts/selectedProjectMedia.ts';
 import type { EditCommand } from '@/integrations/runtime/generated.ts';
 export type {
   ImmutableProjectPackageDescriptor,
@@ -374,6 +375,14 @@ export interface ExtensionPersistenceService {
 // ---------------------------------------------------------------------------
 
 export interface DataProvider extends AssetResolver {
+  /** Request-bound Runtime selection; providers without this capability retain compatibility placement. */
+  getProjectMediaSelection?(request: {
+    projectId: string;
+    asset: string;
+    generationId: string;
+    variantId: string;
+  }): Promise<SelectedProjectMediaIdentity>;
+
   /** True only for the explicit semantic save flag; legacy debounce remains unchanged. */
   readonly semanticCommandSaving?: boolean;
   /** When present, writes MUST use this immutable-head CAS path, never numeric versions. */

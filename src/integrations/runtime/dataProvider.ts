@@ -387,6 +387,20 @@ export class RuntimeDataProvider implements DataProvider {
     this.apiBaseUrl = this.client.baseUrl;
   }
 
+  async getProjectMediaSelection(request: {
+    projectId: string;
+    asset: string;
+    generationId: string;
+    variantId: string;
+  }) {
+    if (request.projectId !== this.projectId) {
+      throw new Error('Runtime media selection belongs to a different project');
+    }
+    return this.client.getProjectMediaSelection(
+      this.projectId, request.asset, request.generationId, request.variantId,
+    );
+  }
+
   private async loadRuntimeShotComposition(projectId: string, timelineId: string): Promise<unknown> {
     const startedAt = import.meta.env.DEV ? performance.now() : 0;
     const inspection = await this.inspectCanonicalTimelineHead(projectId, timelineId);
