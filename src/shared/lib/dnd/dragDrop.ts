@@ -9,6 +9,7 @@
  */
 
 import { normalizeAndPresentError } from '@/shared/lib/errorHandling/runtimeError';
+import type { SelectedProjectMediaIdentity } from '@/shared/contracts/selectedProjectMedia.ts';
 
 // MIME type for generation drag data
 const GENERATION_MIME_TYPE = 'application/x-generation';
@@ -53,6 +54,8 @@ export interface GenerationDropData {
   variantType?: string;
   /** Stable provider-managed identity; imageUrl is only the display locator. */
   mediaId?: string;
+  /** Exact Runtime selection tuple; no identity fields are inferred in the drop target. */
+  selectedMedia?: SelectedProjectMediaIdentity;
   imageUrl: string;
   thumbUrl?: string;
   metadata?: Record<string, unknown>;

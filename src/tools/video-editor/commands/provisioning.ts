@@ -1,4 +1,5 @@
 import type { AssetRegistryEntry } from '@/tools/video-editor/types/index.ts';
+import type { SelectedProjectMediaIdentity } from '@/shared/contracts/selectedProjectMedia.ts';
 
 export type TimelineProvisionedMediaType = 'image' | 'video' | 'audio';
 
@@ -8,6 +9,8 @@ export type TimelineProvisionedAsset = {
   durationSeconds: number | null;
   entry: AssetRegistryEntry;
   source: 'registered' | 'external-media';
+  /** Passed unchanged from the Runtime project-media selection response. */
+  selectedMedia?: SelectedProjectMediaIdentity;
 };
 
 export type RegisteredTimelineMediaSource = {

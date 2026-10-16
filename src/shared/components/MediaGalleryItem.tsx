@@ -106,6 +106,7 @@ function toGenerationDragData(image: GeneratedImageWithMetadata): GenerationDrop
     variantId,
     variantType: isAudioMedia(image) ? 'audio' : isVideoMedia(image) ? 'video' : 'image',
     mediaId: image.media_id ?? undefined,
+    ...(image.selectedMedia ? { selectedMedia: image.selectedMedia } : {}),
     imageUrl,
     thumbUrl: getThumbnailUrl(image),
     metadata: image.metadata,

@@ -116,6 +116,29 @@ describe('setGenerationDragData / getGenerationDropData round-trip', () => {
     expect(result).toEqual(data);
   });
 
+  it('round-trips a Runtime selected-media tuple without rebuilding its identities', () => {
+    const data: GenerationDropData = {
+      generationId: 'generation-selected',
+      variantId: 'variant-selected',
+      mediaId: `sha256:${'a'.repeat(64)}`,
+      selectedMedia: {
+        asset: 'asset-selected',
+        generation_id: 'generation-selected',
+        variant_id: 'variant-selected',
+        object_id: `sha256:${'a'.repeat(64)}`,
+        catalog_digest: `sha256:${'b'.repeat(64)}`,
+      },
+      imageUrl: 'https://example.com/selected.mp4',
+    };
+    const storedData: Record<string, string> = {};
+    setGenerationDragData(createMockDragEvent({ data: storedData }), data);
+    const result = getGenerationDropData(createMockDragEvent({
+      types: ['application/x-generation'],
+      data: storedData,
+    }));
+    expect(result?.selectedMedia).toEqual(data.selectedMedia);
+  });
+
   it('returns null when no data in dataTransfer', () => {
     const event = createMockDragEvent({ data: {} });
     expect(getGenerationDropData(event)).toBeNull();

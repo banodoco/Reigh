@@ -9,6 +9,7 @@ import {
 } from '@/tools/video-editor/contexts/VideoEditorRuntimeContext.tsx';
 import { useAssetManagement } from './useAssetManagement';
 import { RUNTIME_MEDIA_IMPORT_MAX_BYTES } from '@/tools/video-editor/data/AssetResolver.ts';
+import type { TimelineData } from '@/tools/video-editor/lib/timeline-data.ts';
 
 const extractVideoMetadataMock = vi.fn();
 
@@ -33,14 +34,43 @@ function buildRuntimeValue(provider: Record<string, unknown>): VideoEditorRuntim
   };
 }
 
-function buildArgs() {
+function buildTimelineData(): TimelineData {
+  const entry = { src: 'https://example.com/asset.mp4', file: 'https://example.com/asset.mp4', type: 'video/mp4', duration: 4 };
   return {
-    dataRef: { current: null },
+    config: {
+      output: { width: 1280, height: 720, fps: 30 },
+      tracks: [{ id: 'V1', kind: 'visual' }],
+      clips: [],
+      registry: { assets: { asset1: entry } },
+    },
+    configVersion: 1,
+    registry: { assets: { asset1: entry } },
+    resolvedConfig: {
+      output: { width: 1280, height: 720, fps: 30 },
+      tracks: [{ id: 'V1', kind: 'visual' }],
+      clips: [],
+      registry: { asset1: entry },
+    },
+    rows: [{ id: 'V1', actions: [] }],
+    meta: {},
+    effects: {},
+    assetMap: {},
+    output: { width: 1280, height: 720, fps: 30 },
+    tracks: [{ id: 'V1', kind: 'visual' }],
+    clipOrder: { V1: [] },
+    signature: 'sig',
+    stableSignature: 'stable',
+  } as unknown as TimelineData;
+}
+
+function buildArgs(data: TimelineData | null = null, applyEdit = vi.fn()) {
+  return {
+    dataRef: { current: data },
     selectedTrackId: null,
     selectedProjectId: 'runtime-project-id',
     selectClip: vi.fn(),
     setSelectedTrackId: vi.fn(),
-    applyEdit: vi.fn(),
+    applyEdit,
     patchRegistry: vi.fn(),
     uploadAsset: vi.fn(),
     invalidateAssetRegistry: vi.fn(),
@@ -48,8 +78,8 @@ function buildArgs() {
   };
 }
 
-function renderAssetManagement(provider: Record<string, unknown>) {
-  return renderHook(() => useAssetManagement(buildArgs()), {
+function renderAssetManagement(provider: Record<string, unknown>, args = buildArgs()) {
+  return renderHook(() => useAssetManagement(args), {
     wrapper: ({ children }) => (
       <VideoEditorRuntimeProvider value={buildRuntimeValue(provider)}>
         {children}
@@ -118,6 +148,55 @@ describe('useAssetManagement Runtime media imports', () => {
       'huge.png exceeds the Workspace Runtime media limit of 5 GiB',
     );
     expect(prepareMediaImport).not.toHaveBeenCalled();
+  });
+
+  it('carries the exact Runtime selection from media import through a timeline drop OpCall', async () => {
+    extractVideoMetadataMock.mockResolvedValue({ duration_seconds: 2.5 });
+    const selection = {
+      asset: 'asset-selected',
+      generation_id: 'generation-selected',
+      variant_id: 'variant-selected',
+      object_id: `sha256:${'a'.repeat(64)}`,
+      catalog_digest: `sha256:${'b'.repeat(64)}`,
+    };
+    const mediaImport = {
+      provider: 'runtime',
+      project: 'runtime-project-id',
+      importOperationId: 'operation-selected',
+      generationId: 'generation-selected',
+      variantId: 'variant-selected',
+      assetId: 'asset-selected',
+      entry: { file: 'https://runtime.test/selected.mp4', type: 'video/mp4', duration: 2.5 },
+      selectedMedia: selection,
+    };
+    const applyEdit = vi.fn();
+    const prepareMediaImport = vi.fn().mockResolvedValue(mediaImport);
+    const { result } = renderAssetManagement({
+      supportsDirectAssetUpload: true,
+      prepareMediaImport,
+      resolveAssetUrl: vi.fn(),
+    }, buildArgs(buildTimelineData(), applyEdit));
+
+    const uploaded = await result.current.uploadVideoGeneration(new File(['video'], 'selected.mp4', { type: 'video/mp4' }));
+    const prepared = result.current.prepareGenerationAsset(uploaded);
+    expect(prepared?.selectedMedia).toBe(selection);
+    expect(prepared?.assetKey).toBe(selection.asset);
+
+    expect(result.current.handleAssetDrop(prepared!.assetKey, 'V1', 1.5, false, false, prepared!)).toBe(true);
+    expect(applyEdit).toHaveBeenCalledTimes(1);
+    const [mutation, options] = applyEdit.mock.calls[0];
+    expect(mutation.type).toBe('prepared-media');
+    expect(options.editCommands).toHaveLength(1);
+    const [editCommand] = options.editCommands;
+    expect(editCommand).toMatchObject({
+      op: 'timeline.add',
+      select: 'parent/track:V1',
+      args: { media: selection, at: 1.5, duration: 2.5 },
+      created: [expect.stringMatching(/^parent\/clip:/)],
+    });
+    expect(editCommand.expect).toEqual({
+      [`${editCommand.created[0]}::`]: { state: 'absent' },
+    });
   });
 
   it('fails closed for a direct Bridge provider instead of using the legacy generation writer', async () => {

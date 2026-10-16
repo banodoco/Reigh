@@ -3,6 +3,7 @@ import type { GalleryFilterState } from '@/shared/contracts/galleryFilters';
 import type { AddToShotHandler } from '@/shared/types/imageHandlers';
 import type { AsyncImageDeleteHandler } from '@/shared/types/imageHandlers';
 import type { DisplayableMetadata } from '@/shared/types/displayableMetadata';
+import type { SelectedProjectMediaIdentity } from '@/shared/contracts/selectedProjectMedia.ts';
 import type { MouseEvent } from 'react';
 
 export type { DisplayableMetadata } from '@/shared/types/displayableMetadata';
@@ -54,6 +55,8 @@ export interface GeneratedImageWithMetadata {
   primary_variant_id?: string | null;
   /** Stable media/object identity used when resolving a dragged asset. */
   media_id?: string | null;
+  /** Exact Runtime selection tuple supplied by a project-media projection. */
+  selectedMedia?: SelectedProjectMediaIdentity;
   storage_mode?: 'remote' | 'local' | 'uploading' | null;
   local_handle_id?: string | null;
   local_file_name?: string | null;

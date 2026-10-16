@@ -14,6 +14,7 @@ import {
   previewPreparedMediaCommand,
   type PlacePreparedMediaCommand,
 } from '@/tools/video-editor/commands/media.ts';
+import { buildSelectedProjectMediaAddCommand, readSelectedProjectMediaIdentity } from '@/tools/video-editor/commands/selectedProjectMedia.ts';
 import {
   assertRuntimeMediaImportSize,
   type PreparedMediaImport,
@@ -207,12 +208,30 @@ export function useAssetManagement({
     if (!imageUrl) {
       return null;
     }
+    const candidateSelection = readSelectedProjectMediaIdentity(
+      generationData.mediaImport?.selectedMedia ?? generationData.selectedMedia,
+    );
+    const declaredAssetId = generationData.assetId ?? generationData.mediaImport?.assetId;
+    const declaredVariantId = generationData.variantId ?? generationData.mediaImport?.variantId;
+    const selectedMedia = candidateSelection
+      && candidateSelection.generation_id === generationData.generationId
+      && (!declaredVariantId || candidateSelection.variant_id === declaredVariantId)
+      && (!declaredAssetId || candidateSelection.asset === declaredAssetId)
+      && (!generationData.mediaId || candidateSelection.object_id === generationData.mediaId)
+      && (!generationData.mediaImport || (
+        generationData.mediaImport.project === selectedProjectId
+        && candidateSelection.asset === generationData.mediaImport.assetId
+        && candidateSelection.generation_id === generationData.mediaImport.generationId
+        && candidateSelection.variant_id === generationData.mediaImport.variantId
+      ))
+      ? candidateSelection
+      : undefined;
     const plan = planGenerationAssetRegistration({
       generationId: generationData.generationId,
-      assetId: generationData.assetId ?? generationData.mediaImport?.assetId,
-      variantId: generationData.variantId,
+      assetId: generationData.assetId ?? generationData.mediaImport?.assetId ?? selectedMedia?.asset,
+      variantId: generationData.variantId ?? selectedMedia?.variant_id,
       variantType: generationData.variantType,
-      mediaId: generationData.mediaId ?? generationData.mediaImport?.assetId,
+      mediaId: generationData.mediaId ?? generationData.mediaImport?.assetId ?? selectedMedia?.object_id,
       imageUrl,
       thumbUrl: getThumbnailUrl(generationData),
       assetDurationSeconds: generationData.durationSeconds,
@@ -245,8 +264,9 @@ export function useAssetManagement({
       durationSeconds: assetEntry.duration ?? null,
       entry: assetEntry,
       source: 'registered',
+      ...(selectedMedia ? { selectedMedia } : {}),
     };
-  }, []);
+  }, [selectedProjectId]);
 
   const registerGenerationAsset = useCallback((generationData: UploadedGenerationData | null) => {
     const prepared = prepareGenerationAsset(generationData);
@@ -300,10 +320,35 @@ export function useAssetManagement({
       return false;
     }
 
+    const insertedClip = preview.nextData.config.clips.find((clip) => clip.id === clipId);
+    const track = current.config.tracks?.find((candidate) => candidate.id === resolvedTrackId);
+    const insertedDuration = insertedClip && typeof insertedClip.hold === 'number'
+      ? insertedClip.hold
+      : insertedClip && typeof insertedClip.from === 'number' && typeof insertedClip.to === 'number'
+        ? insertedClip.to - insertedClip.from
+        : null;
+    const editCommand = prepared.selectedMedia && insertedClip && track
+      && typeof insertedClip.at === 'number' && insertedDuration !== null
+      ? buildSelectedProjectMediaAddCommand({
+          selection: prepared.selectedMedia,
+          assetKey: prepared.assetKey,
+          mediaType: prepared.mediaType,
+          trackId: resolvedTrackId,
+          trackKind: track.kind,
+          clipId,
+          at: insertedClip.at,
+          durationSeconds: insertedDuration,
+          intrinsicDurationSeconds: prepared.durationSeconds,
+          existingTrackIds: current.config.tracks?.map((candidate) => candidate.id) ?? [],
+          existingClipIds: current.config.clips.map((clip) => clip.id),
+        })
+      : undefined;
+
     getApplyEdit()({ type: 'prepared-media', command }, {
       selectedClipId: clipId,
       selectedTrackId: resolvedTrackId,
       semantic: true,
+      ...(editCommand ? { editCommands: [editCommand] } : {}),
     });
     return true;
   }, [getApplyEdit, getDataRef, getSelectedTrackId]);

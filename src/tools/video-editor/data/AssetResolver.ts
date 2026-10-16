@@ -4,6 +4,7 @@ import type {
   TimelineClip,
   TimelineConfig,
 } from '@/tools/video-editor/types/index.ts';
+import type { SelectedProjectMediaIdentity } from '@/shared/contracts/selectedProjectMedia.ts';
 
 export interface SilenceRegion {
   start: number;
@@ -35,6 +36,8 @@ export interface PreparedMediaImport {
   variantId: string;
   assetId: string;
   entry: AssetRegistryEntry;
+  /** Runtime-authored OpCall selection, when the provider can resolve it. */
+  selectedMedia?: SelectedProjectMediaIdentity;
 }
 
 export interface MediaImportOptions {

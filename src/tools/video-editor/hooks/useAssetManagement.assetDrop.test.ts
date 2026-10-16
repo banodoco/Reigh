@@ -3,6 +3,7 @@ import {
   buildAssetDropEdit,
   buildPlacePreparedMediaCommand,
 } from '@/tools/video-editor/hooks/useAssetManagement';
+import { buildSelectedProjectMediaAddCommand } from '@/tools/video-editor/commands/selectedProjectMedia.ts';
 import { applyPreparedMediaCommand } from '@/tools/video-editor/commands/media';
 import {
   EXTERNAL_DROP_VISIBLE_VIDEO_FALLBACK_SECONDS,
@@ -265,6 +266,50 @@ describe('buildAssetDropEdit media kind validation', () => {
       variantType: 'video',
       metadata: { content_type: 'video/mp4' },
     }).clipSpanSeconds).toBe(EXTERNAL_DROP_VISIBLE_VIDEO_FALLBACK_SECONDS);
+  });
+});
+
+describe('selected Runtime project-media insertion adapter', () => {
+  const selection = {
+    asset: 'asset-selected',
+    generation_id: 'generation-selected',
+    variant_id: 'variant-selected',
+    object_id: `sha256:${'a'.repeat(64)}`,
+    catalog_digest: `sha256:${'b'.repeat(64)}`,
+  };
+
+  const build = (overrides: Record<string, unknown> = {}) => buildSelectedProjectMediaAddCommand({
+    selection,
+    assetKey: 'asset-selected',
+    mediaType: 'video',
+    trackId: 'V1',
+    trackKind: 'visual',
+    clipId: 'clip-selected',
+    at: 1.5,
+    durationSeconds: 2.5,
+    intrinsicDurationSeconds: 2.5,
+    existingTrackIds: ['V1'],
+    existingClipIds: [],
+    ...overrides,
+  });
+
+  it('forwards the exact Runtime tuple with one reserved clip and an absent-identity guard', () => {
+    expect(build()).toEqual({
+      op: 'timeline.add',
+      select: 'parent/track:V1',
+      args: { media: selection, at: 1.5, duration: 2.5 },
+      created: ['parent/clip:clip-selected'],
+      expect: { 'parent/clip:clip-selected::': { state: 'absent' } },
+    });
+  });
+
+  it('leaves invalid identities, key mismatches, collisions, and unsupported timing on the existing fallback route', () => {
+    expect(build({ selection: { ...selection, catalog_digest: 'sha256:invented' } })).toBeUndefined();
+    expect(build({ assetKey: 'different-owner-key' })).toBeUndefined();
+    expect(build({ existingClipIds: ['clip-selected'] })).toBeUndefined();
+    expect(build({ existingTrackIds: [] })).toBeUndefined();
+    expect(build({ mediaType: 'audio', trackKind: 'audio', intrinsicDurationSeconds: null })).toBeUndefined();
+    expect(build({ durationSeconds: 3 })).toBeUndefined();
   });
 });
 
