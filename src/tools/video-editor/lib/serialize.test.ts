@@ -1092,6 +1092,10 @@ describe('Runtime persisted preservation siblings', () => {
   it('clones registry metadata and asset identity without persisting resolved state', () => {
     const registry = {
       metadata: { x0RegistryMetadata: { sentinel: 'preserve-registry-metadata' } },
+      opaqueValues: { nested: [null, false, '', [], {}, { op: 'clear' }] },
+      opaqueNull: null,
+      opaqueFalse: false,
+      opaqueEmpty: '',
       assets: { 'asset-x0-sentinel-audio.wav': {
         asset_id: 'asset-x0-sentinel-audio.wav',
         digest: 'sha256:226f1a1b7d7ba27fe193c6ccbaa03aebd24ec1f6a4330d308c2f40ad7bbea2d4',
@@ -1104,6 +1108,9 @@ describe('Runtime persisted preservation siblings', () => {
     const cloned = cloneAssetRegistry(registry);
     expect(cloned).toEqual(registry);
     expect(Reflect.get(cloned, 'metadata')).not.toBe(registry.metadata);
+    expect(Reflect.get(cloned, 'opaqueValues')).not.toBe(registry.opaqueValues);
+    expect(Reflect.get(cloned, 'opaqueValues').nested).not.toBe(registry.opaqueValues.nested);
+    expect(cloned).not.toHaveProperty('opaqueAbsent');
     expect(Reflect.get(cloned.assets['asset-x0-sentinel-audio.wav'], 'scope'))
       .not.toBe(registry.assets['asset-x0-sentinel-audio.wav'].scope);
     const resolvedEntry = { ...registry.assets['asset-x0-sentinel-audio.wav'], src: 'blob:resolved-only' };
@@ -1114,5 +1121,8 @@ describe('Runtime persisted preservation siblings', () => {
     const registry = { assets: { 'asset-x0-sentinel-audio.wav': { type: 'audio' } } };
     expect(cloneAssetRegistry(registry)).toEqual(registry);
     expect(cloneAssetRegistry(cloneAssetRegistry(registry))).toEqual(registry);
+    const cleared = { assets: {}, opaqueValues: null };
+    expect(cloneAssetRegistry(cleared)).toEqual(cleared);
+    expect(cloneAssetRegistry(cleared)).not.toHaveProperty('metadata');
   });
 });

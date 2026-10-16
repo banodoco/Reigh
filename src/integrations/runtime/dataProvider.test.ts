@@ -4,7 +4,8 @@ import { splitClipAtPlayhead } from '@/tools/video-editor/lib/editor-utils.ts';
 import { serializeForDisk } from '@/tools/video-editor/lib/serialize.ts';
 import gesturePreservation from './fixtures/gesture-preservation.json';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { ReighRuntimeClient, RuntimeAuthenticationError, RUNTIME_CLIENT_SCOPES } from './client.ts';
@@ -435,7 +436,8 @@ function runtimeFixture(options: {
       const request = parsedBody as {
         expected_head: string | null;
         parent_revision_id: string;
-        parent_composition: { config: typeof config; registry: typeof registry };
+        parent_composition: { config: typeof config; registry: typeof registry;
+          clips?: TimelineConfig['clips']; occurrences?: unknown[] };
       };
       const requestJson = JSON.stringify(parsedBody);
       const receipt = receipts.get(headers['Idempotency-Key']);
@@ -451,7 +453,8 @@ function runtimeFixture(options: {
       config = request.parent_composition.config;
       registry = request.parent_composition.registry;
       const clips = request.parent_composition.clips ?? request.parent_composition.config.clips;
-      revisions.set(headRevisionId, structuredClone({ ...request.parent_composition, clips, occurrences: [] }));
+      const payload = { ...request.parent_composition, clips, occurrences: request.parent_composition.occurrences ?? [] };
+      revisions.set(headRevisionId, structuredClone(payload));
       const response = {
         status: 200,
         headers: {},
@@ -463,7 +466,7 @@ function runtimeFixture(options: {
             parent_revision_id: headRevisionId,
             new_head: headRevisionId,
             content_digest: `sha256:${'1'.repeat(64)}`,
-            payload: { config, registry, clips, occurrences: [] },
+            payload,
           },
           receipt: {
             receipt_id: `receipt-${documentVersion}`,
@@ -2482,8 +2485,137 @@ describe('RuntimeDataProvider commit save routing', () => {
 
 describe('gesture compatibility preservation witness', () => {
   it('retains B 23 repaired values and 11 unaffected sentinels across all three captured writer snapshots', async () => {
-    // Reuses the synthetic B witness with a fixture transport. This is not the
-    // original real Runtime reload and does not resolve its project-id mismatch.
+    // Captured configs/registries already contain the historical losses. Rebuild
+    // their gestures from current loaded data; never feed a lossy old registry
+    // back as an explicitly authored replacement. Keep every original predicate.
+    const readyPath = process.env.PRES_GESTURE_RUNTIME_READY;
+    const evidenceDirectory = process.env.PRES_GESTURE_EVIDENCE_DIR;
+    const evidence = (name: string, value: unknown) => {
+      if (evidenceDirectory) writeFileSync(path.join(evidenceDirectory, name), JSON.stringify(value, null, 2));
+    };
+    const ready = readyPath ? JSON.parse(readFileSync(readyPath, 'utf8')) as {
+      endpoint: string; project_id: string; timeline_id: string; base_revision: string; token_file: string;
+    } : null;
+    const exchanges: Array<{ method: string; path: string; request: unknown; idempotencyKey?: string;
+      status: number; result: unknown; responseUtf8: string }> = [];
+    const fixture = ready ? null : runtimeFixture({ parentComposition: {
+      ...structuredClone(gesturePreservation.base),
+      registry: { ...structuredClone(gesturePreservation.base.registry), opaqueValues: {
+        null: null, false: false, emptyString: '', array: [], object: {}, literalClear: { op: 'clear' },
+      } },
+    } });
+    const transport: Transport = ready ? async (method, route, headers, body) => {
+      expect(evidenceDirectory).toBeTruthy();
+      expect(new URL(ready.endpoint).hostname).toBe('127.0.0.1');
+      const token = readFileSync(ready.token_file, 'utf8').trim();
+      const bytes = body === undefined ? undefined : Buffer.from(await requestBodyBytes(body));
+      const response = await new Promise<{ status: number; headers: Record<string, string>; body: Buffer }>((resolve, reject) => {
+        const req = httpRequest(ready.endpoint + route, { method, headers: { ...headers,
+          Authorization: `Bearer ${token}`, ...(bytes ? { 'Content-Length': String(bytes.length) } : {}) } }, (res) => {
+          const chunks: Buffer[] = [];
+          res.on('data', (chunk: Buffer) => chunks.push(chunk));
+          res.on('end', () => resolve({ status: res.statusCode!, body: Buffer.concat(chunks),
+            headers: Object.fromEntries(Object.entries(res.headers)
+              .filter((entry): entry is [string, string] => typeof entry[1] === 'string')) }));
+        });
+        req.on('error', reject);
+        if (bytes) req.write(bytes);
+        req.end();
+      });
+      exchanges.push({ method, path: route, request: bytes ? JSON.parse(bytes.toString('utf8')) : null,
+        idempotencyKey: headers['Idempotency-Key'], status: response.status,
+        result: JSON.parse(response.body.toString('utf8')), responseUtf8: response.body.toString('utf8') });
+      evidence('gesture-http.json', exchanges);
+      return response;
+    } : fixture!.transport;
+    const projectId = ready?.project_id ?? PROJECT_ID;
+    const timelineId = ready?.timeline_id ?? TIMELINE_ID;
+    const provider = new RuntimeDataProvider({ projectId, transport, commitRouting: { enabled: true }, commitSessionStorage: null });
+    const client = new ReighRuntimeClient({ transport });
+    let loaded = await provider.loadTimeline(timelineId);
+    if (ready) expect(loaded.head!.headRevisionId).toBe(ready.base_revision);
+    let registry = await provider.loadAssetRegistry(timelineId);
+    const base = await client.getProjectParentCompositionRevision(projectId, timelineId, loaded.head!.headRevisionId!);
+    const counts = { repaired: 0, unaffected: 0, absent: 0 };
+    expect(gesturePreservation.checks.filter((check) => check.category === 'repaired')).toHaveLength(23);
+    expect(gesturePreservation.checks.filter((check) => check.category === 'unaffected')).toHaveLength(11);
+    for (const input of gesturePreservation.authored) {
+      const data = await buildTimelineData(loaded.config, registry);
+      let resolved = data.resolvedConfig;
+      if (input.gesture === 'opacity') {
+        const captured = input.config.tracks.find((track) => track.id === 'video')!;
+        resolved = { ...resolved, tracks: resolved.tracks.map((track) => track.id === captured.id
+          ? { ...track, opacity: captured.opacity } : track) };
+      } else if (input.gesture === 'split') {
+        const child = input.config.clips.find((clip) => clip.id !== 'parent-clip-one' && clip.id !== 'parent-clip-two')!;
+        resolved = splitClipAtPlayhead(resolved, 'parent-clip-one', child.at, child.id).config;
+      } else {
+        resolved = { ...resolved, tracks: input.config.tracks.map((track) => resolved.tracks.find((before) => before.id === track.id)!) };
+      }
+      const config = serializeForDisk(resolved);
+      const receipt = await provider.saveTimelineAtHead(timelineId, config, loaded.head!, data.registry);
+      evidence(`${input.gesture}-app-receipt.json`, receipt);
+      const revision = receipt.head.headRevisionId!;
+      expect(revision).not.toBe(loaded.head!.headRevisionId);
+      const first = await client.getProjectParentCompositionRevision(projectId, timelineId, revision);
+      const second = await client.getProjectParentCompositionRevision(projectId, timelineId, revision);
+      evidence(`${input.gesture}-exact-1.json`, first);
+      evidence(`${input.gesture}-exact-2.json`, second);
+      expect(first).toMatchObject({ project_id: projectId, timeline_id: timelineId, revision_id: revision });
+      expect(second).toEqual(first);
+      if (ready) {
+        const reads = exchanges.filter((item) => item.method === 'GET' && item.path.endsWith(`/composition-revisions/${revision}`));
+        expect(reads).toHaveLength(2);
+        expect(reads[0].responseUtf8).toBe(reads[1].responseUtf8);
+        const publication = exchanges.filter((item) => item.method === 'POST' && item.path.endsWith('/composition-revisions')).at(-1)!;
+        expect(publication.status).toBe(200);
+        expect(publication.idempotencyKey).toBeTruthy();
+        evidence(`${input.gesture}-publication.json`, publication);
+      }
+      const parent = first.payload as Record<string, any>;
+      expect(parent.clips).toEqual(parent.config.clips);
+      expect(parent.clips).toEqual(input.config.clips);
+      // Check the captured edit geometry too, so an unchanged round trip cannot pass.
+      expect(parent.config.tracks.map((track: { id: string }) => track.id)).toEqual(input.config.tracks.map((track) => track.id));
+      expect(parent.config.tracks.find((track: { id: string }) => track.id === 'video').opacity).toBe(0.95);
+      expect(parent.clips.map((clip: { id: string; at: number; hold: number }) => [clip.id, clip.at, clip.hold]))
+        .toEqual(input.config.clips.map((clip) => [clip.id, clip.at, clip.hold]));
+      const predicates = [];
+      for (const check of gesturePreservation.checks) {
+        let actual: any = parent;
+        for (const segment of check.segments) actual = typeof segment === 'string'
+          ? actual?.[segment] : actual?.find((row: { id: string }) => row.id === segment.id);
+        expect(actual, `${input.gesture}: ${check.path}`).toEqual(check.expected);
+        predicates.push({ ...check, actual });
+        counts[check.category as 'repaired' | 'unaffected']++;
+      }
+      for (const absence of gesturePreservation.split_child_absences.filter((item) => item.gesture === input.gesture)) {
+        const clips = absence.representation === 'clips' ? parent.clips : parent.config.clips;
+        const child = clips.find((clip: { id: string }) => clip.id === absence.clip_id);
+        expect(child, 'The split child must exist for its absence checks').toBeDefined();
+        expect(child).not.toHaveProperty(absence.field);
+        counts.absent++;
+      }
+      // Include all opaque parent/config/registry siblings, preserving absent,
+      // null, false, empty and literal-clear distinctions without special defaults.
+      const opaque = (value: Record<string, unknown>, edited: string[]) =>
+        Object.fromEntries(Object.entries(value).filter(([key]) => !edited.includes(key)));
+      expect(opaque(parent, ['clips', 'config', 'registry'])).toEqual(opaque(base.payload, ['clips', 'config', 'registry']));
+      expect(opaque(parent.config, ['clips', 'tracks'])).toEqual(opaque((base.payload as Record<string, any>).config, ['clips', 'tracks']));
+      expect(parent.registry).toEqual(base.payload.registry);
+      evidence(`${input.gesture}-predicates.json`, predicates);
+      loaded = await provider.loadTimeline(timelineId);
+      registry = await provider.loadAssetRegistry(timelineId);
+      expect(loaded.head).toEqual(receipt.head);
+      expect(loaded.config.clips).toEqual(parent.clips);
+    }
+    expect(counts).toEqual({ repaired: 69, unaffected: 33, absent: 16 });
+    evidence('gesture-verification.json', { counts, projectId, timelineId });
+  }, 30_000);
+
+  it('inventories the immutable historical snapshot losses separately from current serialization', async () => {
+    // The captured registry lacks metadata plus six fields per asset, and each
+    // captured track lacks its name: 19 + 4 losses before any provider request.
     const fixture = runtimeFixture({ parentComposition: structuredClone(gesturePreservation.base) });
     const provider = new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport, commitRouting: { enabled: true } });
     let head = (await provider.loadTimeline(TIMELINE_ID)).head!;
@@ -2500,7 +2632,8 @@ describe('gesture compatibility preservation witness', () => {
         let actual: any = parent;
         for (const segment of check.segments) actual = typeof segment === 'string'
           ? actual?.[segment] : actual?.find((row: { id: string }) => row.id === segment.id);
-        expect.soft(actual, `${input.gesture}: ${check.path}`).toEqual(check.expected);
+        if (check.category === 'repaired') expect(actual, `${input.gesture}: ${check.path}`).toBeUndefined();
+        else expect(actual, `${input.gesture}: ${check.path}`).toEqual(check.expected);
       }
       expect(parent.clips).toEqual(parent.config.clips);
       expect(parent.clips).toEqual(input.config.clips);

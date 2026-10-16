@@ -470,10 +470,12 @@ export const deriveTimelineShotGroupViews = (
 };
 
 export const cloneAssetRegistry = (registry: AssetRegistry): AssetRegistry => ({
-  // Runtime registry metadata is opaque authored state, not resolved media data.
-  ...(Reflect.get(registry, 'metadata') !== undefined
-    ? { metadata: cloneAppValue(Reflect.get(registry, 'metadata')) }
-    : {}),
+  // Registry-level siblings are opaque authored state. Clone the current
+  // snapshot, including explicit empty/null values, without merging an older
+  // registry that could resurrect removed assets or cleared metadata.
+  ...Object.fromEntries(Object.entries(registry)
+    .filter(([key]) => key !== 'assets')
+    .map(([key, value]) => [key, cloneAppValue(value)])),
   assets: Object.fromEntries(
     Object.entries(registry.assets ?? {}).map(([assetId, entry]) => [assetId, sanitizeAssetRegistryEntry(entry)]),
   ),
