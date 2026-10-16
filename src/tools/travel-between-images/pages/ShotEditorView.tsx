@@ -51,6 +51,7 @@ import {
 } from '@/tools/video-editor/data/shotCompositionEditor.ts';
 import { ShotTimelinePreview } from '../components/ShotTimelinePreview.tsx';
 import { normalizeVideoTravelSettings } from '../settings';
+import { createShotMetadataSaver, mergeShotSettings, shotSettingsValue } from '@/tools/video-editor/data/canonicalShotMetadata.ts';
 
 interface ShotEditorViewProps {
   /** The shot to edit */
@@ -114,9 +115,13 @@ export function ShotEditorView({
   const isMobile = useIsMobile();
   const isLocalMode = hasLocalModeUrlParams(location.search);
   const canEditCanonicalShot = Boolean(
-    canonicalShotComposition?.publish && canonicalComposition && canonicalOccurrence,
+    (canonicalShotComposition?.publish || (canonicalShotComposition?.semanticCommandSaving && canonicalShotComposition.saveTimelineAtHead))
+      && canonicalComposition && canonicalOccurrence,
   );
   const editorReadOnly = isLocalMode && !canEditCanonicalShot;
+
+  const saveShotMetadata = useMemo(() => canonicalShotComposition
+    ? createShotMetadataSaver(canonicalShotComposition) : undefined, [canonicalShotComposition]);
 
   const canonicalSettingsBase = useRef<{ scope: string; composition: PreparedShotComposition } | null>(null);
   const canonicalSettingsScope = canonicalComposition && canonicalOccurrence
@@ -145,17 +150,31 @@ export function ShotEditorView({
         const current = await canonicalShotComposition.load({ projectId, parentDocumentId });
         canonicalSettingsBase.current = { scope: canonicalSettingsScope!, composition: current };
         const occurrence = current.occurrences.find((candidate) => candidate.occurrenceId === occurrenceId);
-        const settings = occurrence?.revision.settings;
+        const settings = canonicalShotComposition.semanticCommandSaving && occurrence
+          ? shotSettingsValue(occurrence.revision) : occurrence?.revision.settings;
         return settings && typeof settings === 'object' && !Array.isArray(settings)
           ? normalizeVideoTravelSettings(settings)
           : null;
       },
       save: async (_entityId: string, settings: Parameters<typeof normalizeVideoTravelSettings>[0]) => {
-        if (!publish) throw new Error('The canonical shot-composition provider is read-only');
         const editingBase = canonicalSettingsBase.current;
         if (!editingBase || editingBase.scope !== canonicalSettingsScope) {
           throw new Error('The canonical shot-settings editing base is unavailable');
         }
+        if (canonicalShotComposition.semanticCommandSaving && saveShotMetadata) {
+          const current = editingBase.composition;
+          const occurrence = current.occurrences.find((candidate) => candidate.occurrenceId === occurrenceId);
+          if (!occurrence) throw new Error('The captured shot occurrence is unavailable');
+          const published = await saveShotMetadata(current, occurrenceId, { values: {
+            settings: settings === null ? null : mergeShotSettings(shotSettingsValue(occurrence.revision), settings as Record<string, unknown>),
+          } });
+          if (canonicalSettingsBase.current === editingBase) {
+            canonicalSettingsBase.current = { scope: editingBase.scope, composition: published };
+          }
+          onCanonicalCompositionPublished?.(published);
+          return;
+        }
+        if (!publish) throw new Error('The canonical shot-composition provider is read-only');
         await enqueueCanonicalShotPublish(projectId, parentDocumentId, async () => {
           const current = editingBase.composition;
           const graph = await updateCanonicalShotSettings(current.contract, occurrenceId, settings as Record<string, unknown>);
@@ -172,7 +191,7 @@ export function ShotEditorView({
         });
       },
     };
-  }, [canEditCanonicalShot, canonicalComposition, canonicalOccurrence, canonicalSettingsScope, canonicalShotComposition, onCanonicalCompositionPublished, shotToEdit.id]);
+  }, [canEditCanonicalShot, canonicalComposition, canonicalOccurrence, canonicalSettingsScope, canonicalShotComposition, onCanonicalCompositionPublished, saveShotMetadata, shotToEdit.id]);
 
   const { setCurrentShotId } = useCurrentShot();
   const { navigateToPreviousShot, navigateToNextShot } = useShotNavigation();
@@ -295,6 +314,14 @@ export function ShotEditorView({
   const handleUpdateShotName = useCallback((newName: string) => {
     if (canonicalSettingsPersistence && canonicalShotComposition && canonicalComposition && canonicalOccurrence) {
       const editingBase = canonicalComposition;
+      if (canonicalShotComposition.semanticCommandSaving && saveShotMetadata) {
+        void saveShotMetadata(editingBase, canonicalOccurrence.occurrenceId, { values: { name: newName } })
+          .then((published) => onCanonicalCompositionPublished?.(published))
+          .catch((error: unknown) => normalizeAndPresentError(error, {
+            context: 'canonical-shot:update-name', toastTitle: 'Failed to save shot name',
+          }));
+        return;
+      }
       void enqueueCanonicalShotPublish(
         editingBase.projectId,
         canonicalComposition.parentDocumentId,
@@ -322,7 +349,7 @@ export function ShotEditorView({
       newName: newName,
       projectId: selectedProjectId,
     });
-  }, [canonicalComposition, canonicalOccurrence, canonicalSettingsPersistence, canonicalShotComposition, onCanonicalCompositionPublished, selectedProjectId, shotToEdit.id]);
+  }, [canonicalComposition, canonicalOccurrence, canonicalSettingsPersistence, canonicalShotComposition, onCanonicalCompositionPublished, saveShotMetadata, selectedProjectId, shotToEdit.id]);
 
   const handleShotImagesUpdate = useCallback(async () => {
     invalidateGenerations(shotToEdit.id, {

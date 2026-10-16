@@ -45,3 +45,20 @@ describe('canonical shot view model', () => {
     expect(selectCanonicalShotViewModels(metadataPrepared)[0]?.name).toBe('Legacy metadata title');
   });
 });
+
+
+it('canonical semantic read model displays D012 provenance name and metadata settings on the semantic read model without changing compatibility precedence', () => {
+  const graph = cloneFixture();
+  const revision = graph.shot_revisions.find((item) => item.shot_id === 'shot-alpha')! as unknown as Record<string, unknown>;
+  revision.name = 'Legacy top-level name';
+  revision.provenance = { name: 'D012 name' };
+  revision.settings = { prompt: 'Legacy settings' };
+  revision.metadata = { settings: { prompt: 'D012 settings', opaque: null } };
+  const compatibility = createShotCompositionAdapter({ load: async () => graph }).prepare(graph);
+  const semantic = createShotCompositionAdapter({ load: async () => graph, semanticCommandSaving: true }).prepare(graph);
+  expect(selectCanonicalShotViewModels(compatibility)[0]?.name).toBe('Legacy top-level name');
+  expect(selectCanonicalShotViewModels(compatibility)[0]?.settings).toMatchObject({ 'travel-between-images': { prompt: 'Legacy settings' } });
+  expect(selectCanonicalShotViewModels(semantic)[0]?.name).toBe('D012 name');
+  expect(selectCanonicalShotViewModels(semantic)[0]?.settings).toMatchObject({ 'travel-between-images': { prompt: 'D012 settings', opaque: null } });
+  expect(graph.shot_revisions.find((item) => item.shot_id === 'shot-alpha')?.provenance).toEqual({ name: 'D012 name' });
+});

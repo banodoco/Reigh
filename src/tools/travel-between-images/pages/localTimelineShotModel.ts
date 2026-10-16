@@ -1,3 +1,4 @@
+import { shotSettingsValue } from '@/tools/video-editor/data/canonicalShotMetadata.ts';
 import type { AssetRegistry, AssetRegistryEntry } from '@/tools/video-editor/types/index.ts';
 import { bridgeMediaUrl } from '@/shared/lib/media/bridgeMediaUrl.ts';
 import type { GenerationRow, Shot } from '@/domains/generation/types';
@@ -149,19 +150,19 @@ function clipDurationSeconds(clip: JsonObject): number {
   return 0;
 }
 
-function shotName(occurrence: CanonicalShotOccurrence): string {
-  const revisionName = stringValue(occurrence.revision.name);
-  if (revisionName) return revisionName;
+function shotName(occurrence: CanonicalShotOccurrence, semanticCommandSaving: boolean): string {
   const provenance = isRecord(occurrence.revision.provenance) ? occurrence.revision.provenance : {};
   const metadata = isRecord(occurrence.revision.metadata) ? occurrence.revision.metadata : {};
-  return stringValue(provenance.name)
+  return (semanticCommandSaving ? stringValue(provenance.name) : undefined)
+    ?? stringValue(occurrence.revision.name)
+    ?? stringValue(provenance.name)
     ?? stringValue(provenance.title)
     ?? stringValue(metadata.name)
     ?? stringValue(metadata.title)
     ?? occurrence.shotId;
 }
 
-function toOccurrenceShot(occurrence: CanonicalShotOccurrence, registry: AssetRegistry | null | undefined, projectSlug?: string): LocalTimelineShot {
+function toOccurrenceShot(occurrence: CanonicalShotOccurrence, registry: AssetRegistry | null | undefined, projectSlug?: string, semanticCommandSaving = false): LocalTimelineShot {
   const revision = occurrence.revision;
   const timeline = revisionTimeline(occurrence.revision);
   const assetObjects = revisionAssets(occurrence.revision);
@@ -236,7 +237,7 @@ function toOccurrenceShot(occurrence: CanonicalShotOccurrence, registry: AssetRe
     parentDocumentId: occurrence.parentDocumentId,
     stableDeepLink: occurrence.stableDeepLink,
     outputIdentity: occurrence.outputIdentity,
-    name: shotName(occurrence),
+    name: shotName(occurrence, semanticCommandSaving),
     trackId: isRecord(firstTrack) ? stringValue(firstTrack.id) ?? 'video' : 'video',
     clips,
     nonVisualClipCount: 0,
@@ -249,12 +250,13 @@ function toOccurrenceShot(occurrence: CanonicalShotOccurrence, registry: AssetRe
     assets: Array.isArray(revision.assets) ? revision.assets.filter(isRecord) : [],
     dependencies: Array.isArray(revision.dependencies) ? revision.dependencies.filter(isRecord) : [],
     provenance: isRecord(revision.provenance) ? revision.provenance : {},
-    settings: isRecord(revision.settings) ? revision.settings : {},
+    settings: isRecord(semanticCommandSaving ? shotSettingsValue(revision) : revision.settings)
+      ? (semanticCommandSaving ? shotSettingsValue(revision) : revision.settings) as JsonObject : {},
   };
 }
 
 export function selectCanonicalShotOccurrences(composition: PreparedShotComposition | null | undefined, registry: AssetRegistry | null | undefined = undefined, projectSlug?: string): LocalTimelineShot[] {
-  return composition?.occurrences.map((occurrence) => toOccurrenceShot(occurrence, registry, projectSlug)) ?? [];
+  return composition?.occurrences.map((occurrence) => toOccurrenceShot(occurrence, registry, projectSlug, composition.semanticCommandSaving === true)) ?? [];
 }
 
 export function toCanonicalShotModel(shot: LocalTimelineShot, fps = 30, projectSlug?: string): LocalTimelineShotModel {

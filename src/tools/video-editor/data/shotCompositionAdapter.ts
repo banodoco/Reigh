@@ -125,6 +125,8 @@ export type PreparedShotComposition = Readonly<{
   projectId: string;
   parentDocumentId: string;
   headRevisionId: string;
+  /** Read-model capability only; never serialized into an authored graph. */
+  semanticCommandSaving?: boolean;
   occurrences: readonly CanonicalShotOccurrence[];
   /** Durable publication receipt, when this graph is the result of a commit. */
   publicationReceipt?: ShotCompositionPublicationReceipt;
@@ -272,6 +274,11 @@ function assertRequestIdentity(
 }
 
 export function createShotCompositionAdapter(port: ShotCompositionPort) {
+  const prepare = (raw: unknown): PreparedShotComposition => {
+    const composition = prepareContract(parseShotComposition(raw));
+    return port.semanticCommandSaving === true
+      ? Object.freeze({ ...composition, semanticCommandSaving: true }) : composition;
+  };
   return {
     get semanticCommandSaving() { return port.semanticCommandSaving === true; },
     saveTimelineAtHead: port.saveTimelineAtHead?.bind(port),
@@ -280,7 +287,7 @@ export function createShotCompositionAdapter(port: ShotCompositionPort) {
       : undefined,
     async load(request: ShotCompositionReadRequest): Promise<PreparedShotComposition> {
       try {
-        const composition = prepareContract(parseShotComposition(await port.load(request)));
+        const composition = prepare(await port.load(request));
         assertRequestIdentity(composition, request);
         return composition;
       } catch (error) {
@@ -294,7 +301,7 @@ export function createShotCompositionAdapter(port: ShotCompositionPort) {
         throw new ShotCompositionUnavailableError('The canonical shot-composition provider cannot resolve an exact head');
       }
       requiredString(request.headRevisionId, 'headRevisionId');
-      const composition = prepareContract(parseShotComposition(await port.loadAtHead(request)));
+      const composition = prepare(await port.loadAtHead(request));
       assertRequestIdentity(composition, request);
       if (composition.headRevisionId !== request.headRevisionId) {
         throw new ShotCompositionUnavailableError(
@@ -305,7 +312,7 @@ export function createShotCompositionAdapter(port: ShotCompositionPort) {
     },
 
     prepare(raw: unknown): PreparedShotComposition {
-      return prepareContract(parseShotComposition(raw));
+      return prepare(raw);
     },
 
     async publish(request: ShotCompositionPublishRequest): Promise<PreparedShotComposition> {
@@ -328,7 +335,7 @@ export function createShotCompositionAdapter(port: ShotCompositionPort) {
       }
       try {
         const published = await port.publish(request);
-        const composition = prepareContract(parseShotComposition(published));
+        const composition = prepare(published);
         assertRequestIdentity(composition, request);
         return composition;
       } catch (error) {

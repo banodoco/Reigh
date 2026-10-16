@@ -1,3 +1,4 @@
+import { shotSettingsValue } from './canonicalShotMetadata.ts';
 import type { Shot } from '@/domains/generation/types/index.ts';
 import { bridgeMediaUrl } from '@/shared/lib/media/bridgeMediaUrl.ts';
 import { TOOL_IDS } from '@/shared/lib/tooling/toolIds';
@@ -32,7 +33,7 @@ export function selectCanonicalShotViewModels(composition: PreparedShotCompositi
     const provenance = record(occurrence.revision.provenance);
     const metadata = record(occurrence.revision.metadata);
     const timing = record(occurrence.revision.timing);
-    const settings = record(occurrence.revision.settings);
+    const settings = record(composition.semanticCommandSaving ? shotSettingsValue(occurrence.revision) : occurrence.revision.settings);
     const images = (Array.isArray(occurrence.revision.assets) ? occurrence.revision.assets : [])
       .flatMap((asset, index) => {
         const value = record(asset);
@@ -57,7 +58,8 @@ export function selectCanonicalShotViewModels(composition: PreparedShotCompositi
       });
     return {
       id: occurrence.occurrenceId,
-      name: text(occurrence.revision.name)
+      name: (composition.semanticCommandSaving ? text(provenance.name) : undefined)
+        ?? text(occurrence.revision.name)
         ?? text(provenance.name)
         ?? text(provenance.title)
         ?? text(metadata.name)

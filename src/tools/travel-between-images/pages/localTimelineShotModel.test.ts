@@ -347,3 +347,20 @@ describe('canonical local timeline shot model', () => {
     expect(shot?.clips[0]?.clip).toMatchObject({ hold: 4, speed: 2 });
   });
 });
+
+
+it('reads D012 metadata fields only on the semantic shot read model', () => {
+  const graph = structuredClone(fixture);
+  const revision = graph.shot_revisions.find((item) => item.shot_id === 'shot-alpha')! as unknown as Record<string, unknown>;
+  revision.name = 'Legacy name';
+  revision.provenance = { name: 'Authored name' };
+  revision.settings = { prompt: 'Legacy settings' };
+  revision.metadata = { settings: { prompt: 'Authored settings', opaque: null } };
+  const compatibility = createShotCompositionAdapter({ load: async () => graph }).prepare(graph);
+  const semantic = createShotCompositionAdapter({ load: async () => graph, semanticCommandSaving: true }).prepare(graph);
+  expect(selectCanonicalShotOccurrences(compatibility)[0]).toMatchObject({ name: 'Legacy name', settings: { prompt: 'Legacy settings' } });
+  expect(selectCanonicalShotOccurrences(semantic)[0]).toMatchObject({ name: 'Authored name', settings: { prompt: 'Authored settings', opaque: null } });
+  revision.metadata = { settings: null };
+  const nullSettings = createShotCompositionAdapter({ load: async () => graph, semanticCommandSaving: true }).prepare(graph);
+  expect(selectCanonicalShotOccurrences(nullSettings)[0]?.settings).toEqual({});
+});

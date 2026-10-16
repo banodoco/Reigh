@@ -1,3 +1,4 @@
+import { isCapturedShotMetadataCommand } from '@/tools/video-editor/data/canonicalShotMetadata.ts';
 import { RuntimeCommitSession, browserCommitSessionStorage, type CommitSessionStorage } from './commitSession.ts';
 import type { TimelineDraftRecoveryMetadata } from '@/tools/video-editor/data/timelineDraftIndexedDb.ts';
 import { ApiError, type ByteResponse, type MediaImportOperation as MediaImport, type RequestBody, type CommitRequest, type CommitResult, type EditCommand } from './generated.ts';
@@ -709,12 +710,15 @@ export class RuntimeDataProvider implements DataProvider {
       throw new TimelineSchemaIncompatibleError('Semantic gestures require an existing exact revision.');
     }
     const occurrence = save.occurrenceContext;
+    const shotMetadata = save.editCommands?.some((command) => command.op === 'shot.set');
     if (occurrence && (occurrence.projectId !== this.projectId || occurrence.parentDocumentId !== save.timelineId
       || occurrence.headRevisionId !== save.expectedHead.headRevisionId
       || ![occurrence.occurrenceId, occurrence.shotId, occurrence.shotRevisionId, occurrence.internalRevisionId].every(Boolean)
       || !save.editCommands?.length || save.editCommands.some((command) =>
-        !command.select?.startsWith(`occurrence:${occurrence.occurrenceId}/clip:`)
-        || command.resolved?.length !== 1 || command.resolved[0] !== command.select))) {
+        !(shotMetadata
+          ? save.editCommands?.length === 1 && isCapturedShotMetadataCommand(command as EditCommand, occurrence)
+          : command.select?.startsWith(`occurrence:${occurrence.occurrenceId}/clip:`)
+            && command.resolved?.length === 1 && command.resolved[0] === command.select)))) {
       throw new TimelineSchemaIncompatibleError('Semantic occurrence gestures require one captured owner and exact pins.');
     }
     if (!occurrence && save.editCommands?.some((command) => command.select?.startsWith('occurrence:'))) {
