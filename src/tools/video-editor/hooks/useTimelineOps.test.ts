@@ -96,7 +96,10 @@ describe('useTimelineOps', () => {
         operations: [{ op: 'track.update', target: 'A1', payload: { muted: true } }],
       });
       expect(diff).not.toBeInstanceOf(Promise);
-      expect(commitData).toHaveBeenCalledWith(expect.anything(), { save: true, semantic: true });
+      expect(commitData).toHaveBeenCalledWith(expect.anything(), { save: true, semantic: true, editCommands: [{
+        op: 'timeline.set', select: 'parent/track:A1', args: { values: { muted: true }, clear: [] },
+        expect: { 'parent/track:A1::muted': { state: 'present', value: false } },
+      }] });
       expect(flushPendingSave).not.toHaveBeenCalled();
 
       let settled = false;

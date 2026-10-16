@@ -13,6 +13,7 @@
 
 import { useCallback, useMemo, useRef } from 'react';
 import { propertyGestureCommands, deleteGestureCommands } from '../commands/semanticGestures.ts';
+import { trackPropertyGesture } from '../commands/trackGestures.ts';
 import type { EditCommand } from '@/integrations/runtime/generated.ts';
 import type {
   TimelineOps,
@@ -280,6 +281,19 @@ export function useTimelineOps({
       let captured = current;
       const commands: EditCommand[] = [];
       const supported = patch.operations.length > 0 && patch.operations.every((operation) => {
+        if (operation.op === 'track.update') {
+          const { mode, ...properties } = operation.payload ?? {};
+          // The existing patch compiler merges only these scalar track fields.
+          if ((mode !== undefined && mode !== 'merge')
+            || Object.keys(properties).some((key) => !['label', 'role', 'muted'].includes(key))) return false;
+          const gesture = trackPropertyGesture(captured, operation.target, properties);
+          if (!gesture?.commands.length) return false;
+          commands.push(...gesture.commands);
+          const step = compileTimelinePatch({ ...patch, operations: [operation] }, captured);
+          if (!step.valid || !step.nextData) return false;
+          captured = step.nextData;
+          return true;
+        }
         if (!captured.config.clips.some((clip) => clip.id === operation.target)) return false;
         if (operation.op === 'clip.remove') {
           commands.push(...deleteGestureCommands(captured, [operation.target]));

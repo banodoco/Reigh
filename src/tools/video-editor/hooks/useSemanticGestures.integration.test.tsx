@@ -11,6 +11,7 @@ import { RUNTIME_CLIENT_SCOPES } from '@/integrations/runtime/client.ts';
 import { RUNTIME_SCHEMA_DIGEST, RUNTIME_TARGETED_EXECUTION_CAPABILITY } from '@/integrations/runtime/contract-metadata.ts';
 import type { CommitRequest, CommitResult, Transport } from '@/integrations/runtime/generated.ts';
 import { buildTimelineData, type TimelineData } from '../lib/timeline-data.ts';
+import type { TimelineEditability } from '../lib/timeline-editability.ts';
 import { commitDraggingSession, type InternalDragSession } from './useClipDrag.helpers.ts';
 import { createInteractionState, notifyInteractionEndIfIdle } from '../lib/interaction-state.ts';
 import { __resetSelectionStoreForTests } from '@/shared/state/selectionStore.ts';
@@ -84,7 +85,7 @@ async function initialData(media = false, crops: { cropTop?: number; cropBottom?
   data.head = { projectId: 'gesture-project', timelineId: 'gesture-timeline', headRevisionId: 'parent-r1' };
   return data;
 }
-async function setup(reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable'>, media = false, providedInitial?: TimelineData, currentTime = 1) {
+async function setup(reply?: (request: CommitRequest, call: number) => Promise<void | 'unavailable'>, media = false, providedInitial?: TimelineData, currentTime = 1, editability?: TimelineEditability) {
   const initial = providedInitial ?? await initialData(media);
   const fixture = wireFixture(initial, reply);
   const eventBus = new TimelineEventBus();
@@ -96,13 +97,13 @@ async function setup(reply?: (request: CommitRequest, call: number) => Promise<v
   const query = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
   const wrapper = ({ children }: { children: React.ReactNode }) => React.createElement(QueryClientProvider, { client: query }, children);
   const hook = renderHook(() => {
-    const commit = useTimelineCommit({ eventBus, lastSavedSignatureRef, initialData: initial });
+    const commit = useTimelineCommit({ eventBus, lastSavedSignatureRef, initialData: initial, editability });
     const persistence = useTimelinePersistence({ provider: fixture.provider, assetResolver: fixture.provider, timelineId: 'gesture-timeline', eventBus, ...commit, savedSeqRef, configVersionRef, headRevisionRef, lastSavedSignatureRef, interactionStateRef });
     useEffect(() => eventBus.on('scheduleSave', persistence.scheduleSave), [persistence.scheduleSave]);
     const editing = useClipEditing({ ...commit, selectedClipId: 'clip-1', selectedTrack: initial.tracks[0], currentTime, selectClip: vi.fn(), resolvedConfig: commit.data?.resolvedConfig ?? null });
     const tracks = useTimelineTrackManagement({ ...commit, resolvedConfig: commit.data?.resolvedConfig ?? null, eventBus });
     const resize = useClipResize(commit);
-    const ops = useTimelineOps({ ...commit, createManualCheckpoint: vi.fn(), jumpToCheckpoint: vi.fn(), checkpoints: [] });
+    const ops = useTimelineOps({ ...commit, createManualCheckpoint: vi.fn(), jumpToCheckpoint: vi.fn(), checkpoints: [], editability });
     return { ...commit, editing, tracks, resize, persistence, ops };
   }, { wrapper });
   return { ...hook, ...fixture, initial, savedSeqRef, interactionStateRef, eventBus };
@@ -573,19 +574,7 @@ describe('supported detach and explicit unconverted structural seams', () => {
     expect(h.requests).toHaveLength(0);
     h.unmount();
   });
-  it.each(['add', 'reorder', 'property'] as const)('track %s retains its explicit unconverted path', async (operation) => {
-    const h = await setup();
-    act(() => {
-      if (operation === 'add') h.result.current.tracks.handleAddTrack('audio');
-      if (operation === 'reorder') h.result.current.tracks.handleMoveTrack('V1', 'V2');
-      if (operation === 'remove') h.result.current.tracks.handleRemoveTrack('V2');
-      if (operation === 'property') h.result.current.tracks.handleTrackPopoverChange('V1', { label: 'Changed' });
-    });
-    expect(h.result.current.editSeqRef.current).toBe(1);
-    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
-    expect(h.requests).toHaveLength(0);
-    h.unmount();
-  });
+
 });
 
 describe('WRITERS census converted handlers and route intercept', () => {
@@ -661,7 +650,7 @@ describe('WRITERS census converted handlers and route intercept', () => {
     expect(result.config!.clips[0].app).toEqual(initial.config.clips[0].app);
   });
   it.each([
-    ['mixed track batch', [{ op: 'clip.update', target: 'clip-1', payload: { opacity: 0.2 } }, { op: 'track.update', target: 'V1', payload: { label: 'Changed' } }]],
+    ['mixed unsupported track batch', [{ op: 'clip.update', target: 'clip-1', payload: { opacity: 0.2 } }, { op: 'track.update', target: 'V1', payload: { app: { newMetadata: true } } }]],
     ['replacement properties', [{ op: 'clip.update', target: 'clip-1', payload: { mode: 'replace', opacity: 0.2 } }]],
     ['omitted params', [{ op: 'clip.update', target: 'clip-1', payload: { params: { added: 1 } } }]],
     ['top-level keyframes', [{ op: 'clip.update', target: 'clip-1', payload: { keyframes: {} } }]],
@@ -696,16 +685,6 @@ describe('WRITERS explicit unsupported property and track census', () => {
     const h = await setup();
     act(() => h.result.current.editing.handleSelectedClipChange(patch));
     expect(h.result.current.editSeqRef.current).toBe(1);
-    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
-    expect(h.requests).toHaveLength(0);
-    h.unmount();
-  });
-  it('mute-all keeps one track patch transaction on its explicit fallback', async () => {
-    const initial = await videoData(true);
-    const h = await setup(undefined, false, initial);
-    act(() => h.result.current.ops.setAllTracksMuted(true));
-    expect(h.result.current.editSeqRef.current).toBe(1);
-    expect(h.result.current.data!.config.tracks!.find((track) => track.id === 'A1')!.muted).toBe(true);
     expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
     expect(h.requests).toHaveLength(0);
     h.unmount();
@@ -1004,4 +983,234 @@ describe('D source-backed structural gesture consumers', () => {
     expect(h.compatibilityRequests).toEqual([]);
     h.unmount();
   });
+});
+
+describe('D008 source-backed track consumers', () => {
+  const commands = (request: CommitRequest) => {
+    if (!('commands' in request.change)) throw new Error('Expected command envelope');
+    return request.change.commands;
+  };
+  async function trackData(audio = false) {
+    const initial = await initialData();
+    const data = await buildTimelineData({ ...initial.config, tracks: [
+      { ...initial.config.tracks![0], app: { sentinel: null, object: { op: 'clear' }, removable: null } },
+      ...(audio ? [{ id: 'A1', kind: 'audio' as const, label: 'Audio', volume: 0.7, app: { audio: null } }] : []),
+      initial.config.tracks![1],
+      ...(audio ? [{ id: 'A4', kind: 'audio' as const, label: 'Source audio', role: 'source' as const, muted: false }] : []),
+    ] }, initial.registry, undefined, 1, undefined, initial.head);
+    // Persisted name is outside the editor's display TrackDefinition surface.
+    Reflect.set(data.config.tracks![0], 'name', 'persisted-track-name');
+    return data;
+  }
+  it.each(['visual', 'audio'] as const)('add %s captures the complete default row, absence and reserved identity in one transaction', async (kind) => {
+    const h = await setup(undefined, false, await trackData(true));
+    const before = structuredClone(h.initial.config);
+    const commits = vi.fn(); h.eventBus.on('beforeCommit', commits);
+    act(() => h.result.current.tracks.handleAddTrack(kind));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    const id = kind === 'visual' ? 'V3' : 'A5';
+    const row = { id, kind, label: id, scale: 1, fit: kind === 'visual' ? 'manual' : 'contain', opacity: 1, blendMode: 'normal' };
+    expect(h.requests).toHaveLength(1);
+    expect(commands(h.requests[0].request)).toEqual([{ op: 'timeline.add', select: `parent/track:${id}`,
+      args: { track: row }, created: [`parent/track:${id}`], expect: { [`parent/track:${id}::`]: { state: 'absent' } } }]);
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(h.result.current.data!.config.tracks!.slice(0, -1)).toEqual(before.tracks);
+    expect(h.result.current.data!.config.tracks!.at(-1)).toEqual({ ...row, app: { scaleAppliesToPositionedClips: true } });
+    expect(h.result.current.data!.config.clips).toEqual(before.clips);
+    expect(h.result.current.selectedTrackId).toBe(id);
+    expect(h.compatibilityRequests).toEqual([]);
+    h.unmount();
+  });
+  it('add retries the same identity, command, request bytes and headers after an unavailable acknowledgement', async () => {
+    const h = await setup(async (_request, call) => call === 1 ? 'unavailable' : undefined, false, await trackData());
+    act(() => h.result.current.tracks.handleAddTrack('visual'));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1), { timeout: 2500 });
+    expect(h.requests).toHaveLength(2);
+    expect(h.requests[0].bytes).toBe(h.requests[1].bytes);
+    expect(h.requests[0].headers).toEqual(h.requests[1].headers);
+    expect(commands(h.requests[1].request)[0].created).toEqual(['parent/track:V3']);
+    expect(h.result.current.data!.config.tracks!.filter((track) => track.id === 'V3')).toHaveLength(1);
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    h.unmount();
+  });
+  it('within-kind reorder guards every parent track including interleaved audio and preserves rows and selection', async () => {
+    const h = await setup(undefined, false, await trackData(true));
+    const before = structuredClone(h.initial.config);
+    act(() => h.result.current.tracks.handleMoveTrack('V1', 'V2'));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    const expected_order = ['V1', 'A1', 'V2', 'A4'].map((id) => `parent/track:${id}`);
+    expect(h.requests).toHaveLength(1);
+    expect(commands(h.requests[0].request)).toEqual([{ op: 'timeline.reorder', select: 'parent/track:V1',
+      args: { order: ['A1', 'V2', 'V1', 'A4'].map((id) => `parent/track:${id}`), expected_order },
+      expect: { 'parent/track:V1::track_order': { state: 'present', value: expected_order } } }]);
+    expect(h.result.current.data!.config.tracks).toEqual([before.tracks![1], before.tracks![2], before.tracks![0], before.tracks![3]]);
+    expect(h.result.current.data!.config.clips).toEqual(before.clips);
+    expect(h.result.current.selectedTrackId).toBe('V1');
+    h.unmount();
+  });
+  const properties = [
+    ['label', 'Renamed'], ['role', 'source'], ['scale', 1.5], ['fit', 'cover'],
+    ['opacity', 0.4], ['volume', 0.3], ['muted', true], ['blendMode', 'multiply'],
+  ] as const;
+  it.each(properties)('property %s targets only the explicit path and preserves opaque/null siblings', async (key, value) => {
+    const h = await setup(undefined, false, await trackData());
+    const before = structuredClone(h.initial.config.tracks![0]);
+    const tagged = Object.prototype.hasOwnProperty.call(before, key)
+      ? { state: 'present', value: before[key] } : { state: 'absent' };
+    act(() => h.result.current.tracks.handleTrackPopoverChange('V1', { [key]: value }));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(commands(h.requests[0].request)).toEqual([{ op: 'timeline.set', select: 'parent/track:V1',
+      args: { values: { [key]: value }, clear: [] }, expect: { [`parent/track:V1::${key}`]: tagged } }]);
+    expect(h.result.current.data!.config.tracks![0]).toEqual({ ...before, [key]: value });
+    expect(h.result.current.selectedTrackId).toBe('V1');
+    h.unmount();
+  });
+  it.each(properties.filter(([key]) => key !== 'label'))('explicit clear %s retains a captured present-null expectation', async (key) => {
+    const initial = await trackData();
+    Reflect.set(initial.config.tracks![0], key, null);
+    const h = await setup(undefined, false, initial);
+    const before = structuredClone(initial.config.tracks![0]); Reflect.deleteProperty(before, key);
+    act(() => h.result.current.tracks.handleTrackPopoverChange('V1', { [key]: undefined }));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(commands(h.requests[0].request)).toEqual([{ op: 'timeline.set', select: 'parent/track:V1',
+      args: { values: {}, clear: [key] }, expect: { [`parent/track:V1::${key}`]: { state: 'present', value: null } } }]);
+    expect(h.result.current.data!.config.tracks![0]).toEqual(before);
+    expect(Object.prototype.hasOwnProperty.call(h.result.current.data!.config.tracks![0], key)).toBe(false);
+    h.unmount();
+  });
+  it('app paths distinguish null, absence, ordinary object values and explicit clear in one command', async () => {
+    const h = await setup(undefined, false, await trackData());
+    const before = structuredClone(h.initial.config.tracks![0]);
+    act(() => h.result.current.tracks.handleTrackPopoverChange('V1', { app: {
+      sentinel: 'changed', newNull: null, object: { $absent: true }, removable: undefined,
+    } }));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(commands(h.requests[0].request)).toEqual([{ op: 'timeline.set', select: 'parent/track:V1', args: {
+      values: { 'app.sentinel': 'changed', 'app.newNull': null, 'app.object': { $absent: true } }, clear: ['app.removable'],
+    }, expect: {
+      'parent/track:V1::app.sentinel': { state: 'present', value: null },
+      'parent/track:V1::app.newNull': { state: 'absent' },
+      'parent/track:V1::app.object': { state: 'present', value: { op: 'clear' } },
+      'parent/track:V1::app.removable': { state: 'present', value: null },
+    } }]);
+    expect(h.result.current.data!.config.tracks![0]).toEqual({ ...before, app: { scaleAppliesToPositionedClips: true, sentinel: 'changed', newNull: null, object: { $absent: true } } });
+    h.unmount();
+  });
+  it('clears an absent app path without synthesizing a value or changing an opaque sibling', async () => {
+    const h = await setup(undefined, false, await trackData());
+    act(() => h.result.current.tracks.handleTrackPopoverChange('V1', { app: { missing: undefined } }));
+    expect(gestureCommandsFor(h.result.current.data!)![0]).toMatchObject({ args: { values: {}, clear: ['app.missing'] },
+      expect: { 'parent/track:V1::app.missing': { state: 'absent' } } });
+    expect(h.result.current.data!.config.tracks![0].app!.sentinel).toBeNull();
+    h.unmount();
+  });
+  it.each(['same', 'missing', 'empty'] as const)('track no-op %s emits no transaction or request', async (reason) => {
+    const h = await setup();
+    act(() => {
+      if (reason === 'empty') h.result.current.tracks.handleTrackPopoverChange('V1', {});
+      else h.result.current.tracks.handleMoveTrack('V1', reason === 'same' ? 'V1' : 'missing');
+    });
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(h.requests).toEqual([]);
+    h.unmount();
+  });
+  it.each([{ kind: 'audio' as const }, { label: undefined }, { fit: 'invalid' }, { volume: null }, { app: { 'dotted.key': 1 } }, { app: { scaleAppliesToPositionedClips: false } }])(
+    'unsupported property patch stays entirely on its fallback: %j', async (patch) => {
+      const h = await setup();
+      act(() => h.result.current.tracks.handleTrackPopoverChange('V1', patch as Partial<import('../types/index.ts').TrackDefinition>));
+      expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+      expect(h.requests).toEqual([]);
+      h.unmount();
+    });
+  it('cross-kind drag preserves its existing fallback behavior', async () => {
+    const h = await setup(undefined, false, await trackData(true));
+    act(() => h.result.current.tracks.handleMoveTrack('V1', 'A1'));
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined();
+    expect(h.result.current.data!.tracks.map((track) => track.id)).toEqual(['A1', 'V1', 'V2', 'A4']);
+    h.unmount();
+  });
+  it.each([true, false])('mute-all %s issues one transaction and one batch for all current audio tracks only', async (muted) => {
+    const initial = await trackData(true);
+    if (!muted) for (const track of initial.config.tracks!) if (track.kind === 'audio') track.muted = true;
+    const h = await setup(undefined, false, initial);
+    const before = structuredClone(initial.config.tracks);
+    const commits = vi.fn(); h.eventBus.on('beforeCommit', commits);
+    act(() => h.result.current.ops.setAllTracksMuted(muted));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(commands(h.requests[0].request)).toEqual(before!.filter((track) => track.kind === 'audio').map((track) => ({
+      op: 'timeline.set', select: `parent/track:${track.id}`, args: { values: { muted }, clear: [] },
+      expect: { [`parent/track:${track.id}::muted`]: Object.prototype.hasOwnProperty.call(track, 'muted')
+        ? { state: 'present', value: track.muted } : { state: 'absent' } },
+    })));
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(h.result.current.data!.config.tracks).toEqual(before!.map((track) => track.kind === 'audio' ? { ...track, muted } : track));
+    expect(h.compatibilityRequests).toEqual([]);
+    h.unmount();
+  });
+  it('mute-all with no audio tracks returns an empty diff and makes no edit', async () => {
+    const h = await setup();
+    let diff;
+    act(() => { diff = h.result.current.ops.setAllTracksMuted(true); });
+    expect(diff).toMatchObject({ entries: [], affectedObjectIds: [] });
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(h.requests).toEqual([]);
+    h.unmount();
+  });
+  it.each(['add', 'reorder', 'property', 'mute-all'] as const)('%s obeys the existing whole-timeline refusal with no partial local edit', async (operation) => {
+    const initial = await trackData(true);
+    const before = structuredClone(initial.config);
+    const editability: TimelineEditability = {
+      check: () => ({ allowed: false, reason: 'timeline_read_only' }),
+      checkTimeline: () => ({ allowed: false, reason: 'timeline_read_only' }),
+    };
+    const h = await setup(undefined, false, initial, 1, editability);
+    const invoke = () => act(() => {
+      if (operation === 'add') h.result.current.tracks.handleAddTrack('visual');
+      if (operation === 'reorder') h.result.current.tracks.handleMoveTrack('V1', 'V2');
+      if (operation === 'property') h.result.current.tracks.handleTrackPopoverChange('V1', { label: 'Changed' });
+      if (operation === 'mute-all') h.result.current.ops.setAllTracksMuted(true);
+    });
+    if (operation === 'mute-all') expect(invoke).toThrow(); else invoke();
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(h.result.current.data!.config).toEqual(before);
+    expect(h.requests).toEqual([]);
+    h.unmount();
+  });
+  it.each(['add', 'reorder', 'property', 'mute-all'] as const)('%s retains strict invalid-row refusal before any transaction', async (operation) => {
+    const initial = await trackData(true);
+    Reflect.set(initial.config.tracks![0], 'future', { opaque: null });
+    const before = structuredClone(initial.config);
+    const h = await setup(undefined, false, initial);
+    expect(() => act(() => {
+      if (operation === 'mute-all') h.result.current.ops.setAllTracksMuted(true);
+      if (operation === 'add') h.result.current.tracks.handleAddTrack('visual');
+      if (operation === 'reorder') h.result.current.tracks.handleMoveTrack('V1', 'V2');
+      if (operation === 'property') h.result.current.tracks.handleTrackPopoverChange('V1', { label: 'Changed' });
+    })).toThrow(/unexpected key 'future'/);
+    expect(h.result.current.data!.config).toEqual(before);
+    expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(h.requests).toEqual([]);
+    h.unmount();
+  });
+
+  it('a mixed supported clip and track patch retains one explicit command batch', async () => {
+    const h = await setup();
+    act(() => h.result.current.ops.apply({ version: 1, operations: [
+      { op: 'clip.update', target: 'clip-1', payload: { opacity: 0.2 } },
+      { op: 'track.update', target: 'V1', payload: { label: 'Changed' } },
+    ] }));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(commands(h.requests[0].request)).toEqual([
+      { op: 'clip.set-look', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args: { opacity: 0.2 }, expect: { opacity: { state: 'present', value: 0.9 } } },
+      { op: 'timeline.set', select: 'parent/track:V1', args: { values: { label: 'Changed' }, clear: [] }, expect: { 'parent/track:V1::label': { state: 'present', value: 'V1' } } },
+    ]);
+    h.unmount();
+  });
+
 });

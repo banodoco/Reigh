@@ -1,4 +1,5 @@
 import { emptyTrackGestureCommands, moveGestureCommands } from '../commands/semanticGestures.ts';
+import { addTrackGestureCommands, authoredTracks, reorderTrackGestureCommands, trackPropertyGesture } from '../commands/trackGestures.ts';
 import { trackRole } from '@/tools/video-editor/data/timelineOutputProjection.ts';
 import { useCallback, useMemo } from 'react';
 import { arrayMove } from '@dnd-kit/sortable';
@@ -950,17 +951,32 @@ export function useTimelineTrackManagement({
   }, [applyEdit, dataRef, editability, moveClipToRow, selectedClipId, setSelectedTrackId]);
 
   const handleAddTrack = useCallback((kind: TrackKind) => {
+    const current = dataRef.current;
+    if (!resolvedConfig || !current) {
+      return;
+    }
+
+    // Allocate once from the live authored base; the captured command survives retries.
+    const tracks = authoredTracks(current);
+    if (!tracks) return;
+    const nextResolvedConfig = addTrack({ ...resolvedConfig, tracks }, kind);
+    const nextTrack = nextResolvedConfig.tracks[nextResolvedConfig.tracks.length - 1] ?? null;
+    const editCommands = nextTrack && addTrackGestureCommands(current, nextTrack);
+    if (!editCommands) return;
+    applyEdit({ type: 'tracks', tracks: nextResolvedConfig.tracks }, { selectedTrackId: nextTrack.id, semantic: true, editCommands });
+  }, [applyEdit, dataRef, resolvedConfig]);
+
+  const handleTrackPopoverChange = useCallback((trackId: string, patch: Partial<TrackDefinition>) => {
     if (!resolvedConfig) {
       return;
     }
 
-    const nextResolvedConfig = addTrack(resolvedConfig, kind);
-    const nextTrack = nextResolvedConfig.tracks[nextResolvedConfig.tracks.length - 1] ?? null;
-    applyEdit({ type: 'config', resolvedConfig: nextResolvedConfig }, { selectedTrackId: nextTrack?.id ?? null });
-  }, [applyEdit, resolvedConfig]);
-
-  const handleTrackPopoverChange = useCallback((trackId: string, patch: Partial<TrackDefinition>) => {
-    if (!resolvedConfig) {
+    const current = dataRef.current;
+    const gesture = current && trackPropertyGesture(current, trackId, patch);
+    if (gesture) {
+      if (!gesture.commands.length) return;
+      applyEdit({ type: 'tracks', tracks: current.config.tracks!.map((track) => track.id === trackId ? gesture.track : track) },
+        { selectedTrackId: trackId, semantic: true, editCommands: gesture.commands });
       return;
     }
 
@@ -969,20 +985,29 @@ export function useTimelineTrackManagement({
       tracks: resolvedConfig.tracks.map((track) => (track.id === trackId ? { ...track, ...patch } : track)),
     };
     applyEdit({ type: 'config', resolvedConfig: nextConfig }, { selectedTrackId: trackId });
-  }, [applyEdit, resolvedConfig]);
+  }, [applyEdit, dataRef, resolvedConfig]);
 
   const handleMoveTrack = useCallback((activeId: string, overId: string) => {
-    if (!resolvedConfig) {
+    const current = dataRef.current;
+    const tracks = current && authoredTracks(current);
+    if (!resolvedConfig || !current || !tracks) {
       return;
     }
 
-    const nextTracks = moveTrackWithinKind(resolvedConfig.tracks, activeId, overId);
-    if (nextTracks === resolvedConfig.tracks) {
+    const nextTracks = moveTrackWithinKind(tracks, activeId, overId);
+    if (nextTracks === tracks) {
       return;
     }
 
-    applyEdit({ type: 'config', resolvedConfig: { ...resolvedConfig, tracks: nextTracks } }, { selectedTrackId: activeId });
-  }, [applyEdit, resolvedConfig]);
+    if (tracks.find((track) => track.id === activeId)?.kind !== tracks.find((track) => track.id === overId)?.kind) {
+      applyEdit({ type: 'config', resolvedConfig: { ...resolvedConfig, tracks: nextTracks } }, { selectedTrackId: activeId });
+      return;
+    }
+
+    const editCommands = reorderTrackGestureCommands(current, activeId, nextTracks);
+    if (!editCommands) return;
+    applyEdit({ type: 'tracks', tracks: nextTracks }, { selectedTrackId: activeId, semantic: true, editCommands });
+  }, [applyEdit, dataRef, resolvedConfig]);
 
   const handleRemoveTrack = useCallback((trackId: string) => {
     if (!resolvedConfig) {

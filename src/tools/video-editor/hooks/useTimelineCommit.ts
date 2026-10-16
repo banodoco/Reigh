@@ -21,7 +21,7 @@ import {
 import { TimelineEventBus } from '@/tools/video-editor/hooks/useTimelineEventBus.ts';
 import { buildTrackClipOrder } from '@/tools/video-editor/lib/coordinate-utils.ts';
 import { migrateToFlatTracks } from '@/tools/video-editor/lib/migrate.ts';
-import { serializeForDisk } from '@/tools/video-editor/lib/serialize.ts';
+import { serializeForDisk, validateSerializedConfig } from '@/tools/video-editor/lib/serialize.ts';
 import { getConfigSignature } from '@/tools/video-editor/lib/config-utils.ts';
 import { buildDataFromCurrentRegistry } from '@/tools/video-editor/lib/timeline-save-utils.ts';
 import { buildAssetReferenceMap, getAssetMediaId, getAssetResolutionToken, getAssetSourceForLocalEdit } from '@/tools/video-editor/lib/asset-registry.ts';
@@ -120,6 +120,8 @@ export type TimelineEditMutation =
       resolvedConfig: TimelineData['resolvedConfig'];
       pinnedShotGroupsOverride?: TimelineData['config']['pinnedShotGroups'];
     }
+  /** Explicit authored track edits preserve opaque rows and unedited clip state. */
+  | { type: 'tracks'; tracks: TimelineData['tracks'] }
   /** Pinned shot groups only; clips and rows are left exactly as they are. */
   | {
       type: 'pinnedShotGroups';
@@ -446,6 +448,13 @@ export function useTimelineCommit({
           history: prepared.history,
         },
       });
+      return;
+    }
+
+    if (mutation.type === 'tracks') {
+      const config = { ...current.config, tracks: mutation.tracks };
+      validateSerializedConfig(config);
+      commitData(buildDataFromCurrentRegistry(config, current), options);
       return;
     }
 

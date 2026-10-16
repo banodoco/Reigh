@@ -518,12 +518,12 @@ describe('source track editing', async () => {
   }
 
   it('changes role as an ordinary config edit while preserving clips and other settings', async () => {
-    const { config, applyEdit, result } = await setup();
+    const { config, dataRef, applyEdit, result } = await setup();
     act(() => result.current.handleTrackPopoverChange('V1', { role: 'output' }));
     const mutation = applyEdit.mock.calls[0][0];
-    expect(mutation.type).toBe('config');
-    expect(mutation.resolvedConfig.tracks[0]).toEqual({ ...config.tracks[0], role: 'output' });
-    expect(mutation.resolvedConfig.clips).toBe(config.clips);
+    expect(mutation.type).toBe('tracks');
+    expect(mutation.tracks[0]).toEqual({ ...dataRef.current.config.tracks![0], role: 'output' });
+    expect(applyEdit.mock.calls[0][1].editCommands[0].op).toBe('timeline.set');
     expect(config.tracks[0].role).toBe('source');
   });
 
@@ -548,7 +548,7 @@ describe('source track editing', async () => {
   it('keeps explicit Add track on the legacy Output default', async () => {
     const { applyEdit, result } = await setup();
     act(() => result.current.handleAddTrack('visual'));
-    expect(applyEdit.mock.calls[0][0].resolvedConfig.tracks.at(-1).role ?? 'output').toBe('output');
+    expect(applyEdit.mock.calls[0][0].tracks.at(-1).role ?? 'output').toBe('output');
   });
 });
 
