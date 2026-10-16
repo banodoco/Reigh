@@ -1,4 +1,5 @@
 import fs from "fs";
+import { createAstridComponentsPlugin } from "./astridComponents";
 import { defineConfig, createLogger, type ProxyOptions } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
@@ -136,6 +137,7 @@ export default defineConfig(() => {
       proxy: { ...astridAcpBridgeProxy, ...astridBridgeProxy, ...runtimeProxy },
     },
     plugins: [
+      createAstridComponentsPlugin(astridSource.sourceRoot, process.env),
       pairedRelay,
       astridBridgeAuthPlugin,
       createRemoteFontModePlugin(disableRemoteFonts),

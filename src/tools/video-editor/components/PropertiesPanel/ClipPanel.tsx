@@ -1,3 +1,4 @@
+import { AstridComponentControls } from './AstridComponentControls.tsx';
 import { MediaVariantPicker } from '@/shared/components/MediaVariantPicker.tsx';
 import { EffectCreatorPanel } from '@/tools/video-editor/components/EffectCreatorPanel.tsx';
 import { useEffectResources } from '@/tools/video-editor/hooks/useEffectResources.ts';
@@ -29,6 +30,7 @@ export function ClipPanel(props: ClipPanelProps) {
         EffectCreator={EffectCreatorPanel}
       />
       <AstridElementParams {...props} />
+      <AstridComponentControls {...props} />
     </>
   );
 }

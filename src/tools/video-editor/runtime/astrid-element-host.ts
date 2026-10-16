@@ -1,3 +1,4 @@
+import type { AdmittedComponent } from './astrid-components.ts';
 import type { ComponentType, ReactNode } from 'react';
 import type { ModifierFinding, ModifierRegistry, RuntimeTheme } from '@banodoco/timeline-composition/theme-api';
 import type { ResolvedTimelineClip } from '@/tools/video-editor/types/index.ts';
@@ -51,6 +52,7 @@ export type AstridClipCapabilityDescriptor = {
 };
 
 export interface AstridElementHost {
+  readonly components?: readonly AdmittedComponent[];
   /** Explicit declarations for this renderer host; absent uses the shared empty registry. */
   readonly modifierRegistry?: ModifierRegistry;
   readonly onModifierFinding?: (finding: ModifierFinding) => void;

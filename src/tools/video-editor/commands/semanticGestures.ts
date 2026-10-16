@@ -778,3 +778,23 @@ export function emptyTrackGestureCommands(data: TimelineData, ids: readonly stri
   }
   return result;
 }
+
+
+/** Declaration-driven modifier edits use the same scoped OpCall/save path. */
+export function componentEditCommand(
+  data: TimelineData, clipId: string,
+  component: import('../runtime/astrid-components.ts').AdmittedComponent,
+  instanceId: string, params: Record<string, unknown>, add: boolean,
+): EditCommand {
+  const target = gestureTarget(data, clipId);
+  if (!target || !instanceId.trim()) throw new Error('Component requires an exact clip and stable instance identity');
+  component.validateParams(params);
+  const source = gestureSource(data, clipId);
+  const previous = source.modifiers?.find(row => row.id === instanceId);
+  if (add ? Boolean(previous) : (!previous || previous.element !== component.identity)) {
+    throw new Error('Component instance collision or identity mismatch');
+  }
+  const path = `modifiers[${JSON.stringify(instanceId)}]`;
+  return command(target, 'clip.set-param', {path, value: {id: instanceId, element: component.identity, params}},
+    {[path]: state(previous, Boolean(previous))});
+}

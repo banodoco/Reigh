@@ -1,3 +1,5 @@
+import { componentBindings } from 'virtual:astrid-components';
+import { configureComponentHost } from './astrid-components.ts';
 import type { ComponentType } from 'react';
 import { ASTRID_RENDERING_ELEMENTS } from '@astrid/packs/rendering/elements/catalog.ts';
 import {
@@ -99,5 +101,5 @@ const installedAstridElementHost: AstridElementHost = {
 };
 
 export const INSTALLED_ASTRID_ELEMENT_HOST: AstridElementHost = Object.freeze(
-  installedAstridElementHost,
+  configureComponentHost(installedAstridElementHost, componentBindings),
 );

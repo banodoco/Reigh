@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import { createAstridComponentsPlugin } from '../vite/astridComponents';
 import path from 'path';
 import fs from 'fs';
 import { resolveAstridSource, validateAstridToolCatalog } from '../vite/astridSource';
@@ -45,6 +46,7 @@ const resolvedTimelineCompositionThemeApiPath = fs.existsSync(timelineCompositio
 
 export default defineConfig({
   root: projectRoot,
+  plugins: astridSource ? [createAstridComponentsPlugin(astridSource.sourceRoot, process.env)] : [],
   ...(viteCacheDir ? { cacheDir: path.resolve(viteCacheDir) } : {}),
   resolve: {
     alias: {
