@@ -25,7 +25,7 @@ import { useClipEditing } from './useClipEditing.ts';
 import { useTimelineTrackManagement } from './useTimelineTrackManagement.ts';
 import { buildKeyboardTimeNudgeEdit } from '../lib/keyboard-nudge.ts';
 import { expandTinyClip } from '../lib/expand-tiny-clip.ts';
-import { gestureCommandsFor } from '../commands/semanticGestures.ts';
+import { gestureCommandsFor, tiedStartDragGesture } from '../commands/semanticGestures.ts';
 import { createTimelineCommands } from './useTimelineCommandsService.ts';
 import type { TimelineStoreApi } from './timelineStore.ts';
 import { useTimelineOps } from './useTimelineOps.ts';
@@ -1249,4 +1249,92 @@ describe('D008 source-backed track consumers', () => {
     h.unmount();
   });
 
+});
+
+
+describe('E015 source-backed plain start-tied drag', () => {
+  // D core/timeline/moments.py format_moment/format_offset and SDK Clip.nudge:
+  // frames add to the existing offset; the canonical anchor itself is unchanged.
+  const relations = [
+    ['word', '"hello" in v20a #2 +2f', 1.3, '"hello" in v20a #2 +11f'],
+    ['music', 'beat 2 after "hello" in v20a #2 +2f', 0.7, 'beat 2 after "hello" in v20a #2 -7f'],
+  ] as const;
+  function drag(h: Awaited<ReturnType<typeof setup>>, start: number) {
+    const data = h.result.current.data!;
+    const action = data.rows[0].actions.find(({ id }) => id === 'clip-1')!;
+    const session = {
+      clipId: 'clip-1', draggedClipIds: ['clip-1'], groupDragEntry: null,
+      sourceRowId: 'V1', sourceKind: 'visual', transactionId: 'E015-plain-drag',
+      clipOffsets: [{ clipId: 'clip-1', rowId: 'V1', deltaTime: 0, initialStart: action.start, initialEnd: action.end }],
+    } as InternalDragSession;
+    commitDraggingSession({ session, nextStart: start, dropPosition: null, crossTrackActive: false, liveData: data,
+      callbacks: { ...h.result.current.tracks, applyEdit: h.result.current.applyEdit, selectClip: vi.fn(), selectClips: vi.fn() } });
+  }
+  it.each(relations)('%s drag preserves its exact anchor and adjusts the signed frame offset in one commit', async (_relation, on, start, adjusted) => {
+    const h = await setup(undefined, false, await relationData({ on, opaque: { value: null } }));
+    const before = structuredClone(h.initial.config.clips[0]);
+    const commits = vi.fn(); h.eventBus.on('beforeCommit', commits);
+    const prompt = vi.spyOn(window, 'prompt');
+    act(() => drag(h, start));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.requests[0].request.change).toEqual({ commands: [{
+      op: 'clip.nudge', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'],
+      args: { frames: Math.round((start - 1) * 30) },
+      expect: { at: { state: 'present', value: 1 }, 'app.astrid.on': { state: 'present', value: on },
+        'app.astrid.until': { state: 'absent' }, '': { state: 'present', value: before } },
+    }] });
+    expect(h.result.current.data!.config.clips[0]).toEqual({ ...before, at: start,
+      app: { ...before.app, astrid: { on: adjusted, opaque: { value: null } } } });
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    expect(h.requests[0].request.source).toEqual({ via: 'app' });
+    expect(h.compatibilityRequests).toEqual([]);
+    expect(prompt).not.toHaveBeenCalled();
+    h.unmount();
+  });
+  it('retries the captured tied drag without adding the offset a second time', async () => {
+    const h = await setup(async (_request, call) => call === 1 ? 'unavailable' : undefined,
+      false, await relationData({ on: '"hello" +2f' }));
+    const commits = vi.fn(); h.eventBus.on('beforeCommit', commits);
+    act(() => drag(h, 1.3));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1), { timeout: 2500 });
+    expect(h.requests).toHaveLength(2);
+    expect(h.requests[0].bytes).toBe(h.requests[1].bytes);
+    expect(h.requests[0].headers).toEqual(h.requests[1].headers);
+    expect(h.requests[1].request.base_revision_id).toBe('parent-r1');
+    expect(h.result.current.data!.config.clips[0].app?.astrid).toEqual({ on: '"hello" +11f' });
+    expect(commits).toHaveBeenCalledTimes(1);
+    expect(h.result.current.editSeqRef.current).toBe(1);
+    h.unmount();
+  });
+  it('the resolved same-track adapter removes an offset that sums to zero', async () => {
+    const h = await setup(undefined, false, await relationData({ on: '"hello" -9f' }));
+    act(() => h.result.current.tracks.applyResolvedClipMove('clip-1', 'V1', 'V1', 1.3, false, 'E015-resolved'));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.result.current.data!.config.clips[0].app?.astrid).toEqual({ on: '"hello"' });
+    h.unmount();
+  });
+  it.each([
+    { on: 'beat 2' }, { on: 'c2' }, { on: 'parent/clip:clip-2' }, { on: '“hello” +2f' },
+    { on: '"hello"  +2f' }, { on: '"hello" +2f +3f' }, { on: '"hello"', until: null },
+    { on: '"hello"', sequence: { id: 'steps', index: 1 } }, {},
+  ])('does not claim an exact offset adaptation for unsupported intent %j', async (intent) => {
+    const data = await relationData(intent);
+    expect(tiedStartDragGesture(data, 'clip-1', 1.3, 'V1')).toBeUndefined();
+  });
+  it('does not adapt subframe deltas, cross-track moves, animated or grouped sources', async () => {
+    const data = await relationData({ on: '"hello" +2f' });
+    expect(tiedStartDragGesture(data, 'clip-1', 1.31, 'V1')).toBeUndefined();
+    expect(tiedStartDragGesture(data, 'clip-1', 1.3, 'V2')).toBeUndefined();
+    Reflect.set(data.config.clips[0], 'keyframes', {});
+    expect(tiedStartDragGesture(data, 'clip-1', 1.3, 'V1')).toBeUndefined();
+    Reflect.deleteProperty(data.config.clips[0], 'keyframes');
+    data.config.clips[0].params = { keyframes: [{ frame: 3, x: 10 }] };
+    expect(tiedStartDragGesture(data, 'clip-1', 1.3, 'V1')).toBeUndefined();
+    data.config.clips[0].params = {};
+    data.config.pinnedShotGroups = [{ shotId: 'shot', trackId: 'V1', clipIds: ['clip-1'] }];
+    expect(tiedStartDragGesture(data, 'clip-1', 1.3, 'V1')).toBeUndefined();
+  });
 });

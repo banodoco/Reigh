@@ -141,6 +141,45 @@ export function moveGestureCommands(data: TimelineData, id: string, start: numbe
   return commands;
 }
 
+/** Plain, same-track drag only. D's clip.nudge parses then formats a TimeRef;
+ * admit only the canonical word / word-relative music subset whose anchor bytes
+ * survive that round trip. This is an eligibility check, never an anchor resolver.
+ * In particular c2 means a cut in D, not a neighbouring clip.
+ */
+export function tiedStartDragGesture(data: TimelineData, id: string, start: number, track: string): {
+  commands: EditCommand[]; meta: Partial<ClipMeta>;
+} | undefined {
+  const clips = data.config.clips.filter((clip) => clip.id === id);
+  const actions = data.rows.flatMap((row) => row.actions).filter((action) => action.id === id);
+  if (clips.length !== 1 || actions.length !== 1 || !id || id.includes('/')) return undefined;
+  const clip = clips[0];
+  const intent = clip.app?.astrid as Record<string, unknown> | undefined;
+  if (!intent || typeof intent.on !== 'string' || track !== clip.track
+    || (typeof clip.hold !== 'number' && !(typeof clip.from === 'number' && typeof clip.to === 'number'))
+    || (typeof clip.hold === 'number' && (hasOwn(clip, 'from') || hasOwn(clip, 'to')))
+    || data.config.pinnedShotGroups?.some((group) => group.clipIds.includes(id))
+    || ['until', 'sequence', 'cut', 'segment', 'formulas', 'loop', 'orphan'].some((key) => hasOwn(intent, key) || hasOwn(clip.app ?? {}, key))
+    || ['keyframes', 'modifiers', 'keyframeOrigin'].some((key) => hasOwn(clip, key) || hasOwn(clip.params ?? {}, key))) return undefined;
+  // Canonical format_moment: optional beat/downbeat prefix, quoted word,
+  // optional exact line/occurrence, and one nonzero signed integer frame offset.
+  const match = /^(?<anchor>(?:(?:beat|downbeat) [1-9]\d* (?:after|before) )?(?:after )?"(?<word>[^"\n]+)"(?: in [A-Za-z0-9_-]+)?(?: #[1-9]\d*)?)(?: (?<offset>[+-][1-9]\d*)f)?$/.exec(intent.on);
+  if (!match?.groups?.word.trim()) return undefined;
+  const fps = data.output.fps;
+  const delta = (start - actions[0].start) * fps;
+  const frames = Math.round(delta);
+  const previousOffset = Number(match.groups.offset ?? 0);
+  const offset = previousOffset + frames;
+  if (!Number.isFinite(fps) || fps <= 0 || !Number.isSafeInteger(previousOffset) || !Number.isSafeInteger(frames) || !Number.isSafeInteger(offset)
+    || !frames || Math.abs(delta - frames) > 1e-6
+    || Math.abs(start * fps - Math.round(start * fps)) > 1e-6) return undefined;
+  const on = `${match.groups.anchor}${offset ? ` ${offset > 0 ? '+' : ''}${offset}f` : ''}`;
+  const commands = moveGestureCommands(data, id, start, track)!;
+  // Retrying/rebasing cannot silently acquire sequence/animation/other ownership.
+  commands[0].expect![''] = state(clip, true);
+  return { commands,
+    meta: { app: { ...clip.app, astrid: { ...intent, on } } } };
+}
+
 /** Right-edge resizing with unchanged source edges, no tied end, no overlap side effects. */
 export function rightResizeGestureCommands(data: TimelineData, id: string, duration: number, patch: Partial<ClipMeta>): EditCommand[] | undefined {
   const clip = originalClip(data, id);
