@@ -166,6 +166,7 @@ export default defineConfig(() => {
         "@banodoco/timeline-schema": fs.existsSync(timelineSchemaPath)
           ? timelineSchemaPath
           : timelineSchemaFallbackPath,
+        "@banodoco/timeline-composition/evaluation": path.resolve(__dirname, "../../vendor/timeline-composition/typescript/src/evaluation.ts"),
         "@banodoco/timeline-composition": path.resolve(__dirname, "../../node_modules/@banodoco/timeline-composition"),
         // Workspace-primitive aliases (mirrors banodoco shell webpack-alias.mjs).
         // Vendored into reigh-app/vendor/ so the Docker build context can resolve them
