@@ -4,6 +4,7 @@ import {
   resolveReturningAppEntry,
 } from '@/app/entryClassification.ts';
 import { releaseBootLayerWhenReady } from '@/app/bootLayer.ts';
+import { migrateAstridBrowserStorage } from '@/migrations/astridRenameBrowserMigration.ts';
 
 function loadInstalledAppTypography(): void {
   if (document.querySelector('[data-installed-app-fonts]')) return;
@@ -48,6 +49,7 @@ async function main(): Promise<void> {
     return;
   }
 
+  await migrateAstridBrowserStorage();
   loadInstalledAppTypography();
 
   const [
