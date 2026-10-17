@@ -1065,6 +1065,59 @@ describe('TimelineRenderer — extension clip renderer dispatch (M9 T10)', () =>
     registry: {},
   });
 
+  it.each(['#050814', 'rgba(5, 8, 20, 0.4)'])('uses the resolved shared outer background %s', (bg) => {
+    const { container } = render(<TimelineRenderer config={buildConfig({
+      theme: '2rp',
+      theme_overrides: { visual: { color: { bg } } },
+    })} />);
+
+    expect(container.querySelector('[data-testid="absolute-fill"]')).toHaveStyle({ backgroundColor: bg, overflow: 'hidden' });
+    expect(screen.getByTestId('registered-sequence')).toBeVisible();
+    expect(screen.getByTestId('registered-sequence')).toHaveAttribute('data-bg', bg);
+  });
+
+  it('uses black when the resolved theme has no background', () => {
+    const { container } = render(<TimelineRenderer config={buildConfig({
+      theme_overrides: { visual: { color: { bg: undefined } } },
+    })} />);
+
+    expect(container.querySelector('[data-testid="absolute-fill"]')).toHaveStyle({ backgroundColor: '#000000' });
+    expect(screen.getByTestId('registered-sequence')).toBeVisible();
+  });
+
+  it('keeps the resolved default background when the timeline has no theme', () => {
+    const { container } = render(<TimelineRenderer config={buildConfig()} />);
+    expect(container.querySelector('[data-testid="absolute-fill"]')).toHaveStyle({ backgroundColor: '#000000' });
+    expect(screen.getByTestId('registered-sequence')).toBeVisible();
+  });
+
+  it('preserves translucent child styling through the existing render path', () => {
+    const TranslucentRenderer: FC<ClipRendererProps> = () => (
+      <div data-testid="translucent-child" style={{
+        backgroundColor: 'rgba(255, 0, 0, 0.25)', opacity: 0.5, mixBlendMode: 'screen',
+      }}>foreground</div>
+    );
+    mockClipTypeRegistryGet.mockReturnValue(makeRegistryRecord({
+      clipTypeId: 'ext.translucent', renderer: TranslucentRenderer,
+    }));
+    mockClipTypeRegistryHas.mockReturnValue(true);
+    const config = extBuildConfig('ext.translucent');
+    config.theme_overrides = { visual: { color: { bg: 'rgba(5, 8, 20, 0.4)' } } };
+    const { container } = render(<TimelineRenderer config={config} />);
+
+    const root = container.querySelector('[data-testid="absolute-fill"]') as HTMLElement;
+    const child = screen.getByTestId('translucent-child');
+    expect(child).toBeVisible();
+    expect(child).toHaveStyle({ backgroundColor: 'rgba(255, 0, 0, 0.25)', opacity: '0.5', mixBlendMode: 'screen' });
+    expect(root).toHaveStyle({ backgroundColor: 'rgba(5, 8, 20, 0.4)' });
+    for (let ancestor = child.parentElement; ancestor && ancestor !== container; ancestor = ancestor.parentElement) {
+      expect(['', '1']).toContain(ancestor.style.opacity);
+      expect(ancestor.style.filter).toBe('');
+      expect(ancestor.style.mixBlendMode).toBe('');
+      if (ancestor !== root) expect(ancestor.style.backgroundColor).toBe('');
+    }
+  });
+
   it('renders an extension clip through the ClipTypeRegistry with host-interpolated params', () => {
     const TestRenderer: FC<ClipRendererProps> = (props) => (
       <div

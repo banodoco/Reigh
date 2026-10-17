@@ -1884,7 +1884,7 @@ const TimelineRendererBody: FC<{ config: ResolvedTimelineConfig }> = memo(({ con
 
   return (
     <AudioAnalysisProvider clips={audioClips} fps={fps} totalDurationInFrames={totalDurationInFrames}>
-      <AbsoluteFill style={{ backgroundColor: 'black', overflow: 'hidden' }}>
+      <AbsoluteFill style={{ backgroundColor: theme.visual.color.bg ?? 'black', overflow: 'hidden' }}>
         <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
           <AbsoluteFill style={{ position: 'relative', overflow: 'hidden' }}>
             <AppModifierHostProvider value={{
