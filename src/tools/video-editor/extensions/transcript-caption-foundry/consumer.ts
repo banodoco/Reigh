@@ -155,6 +155,11 @@ export interface TranscriptCaptionFoundryResult {
   readonly transactionId: string;
 }
 
+// A failed durable flush leaves the original persistence attempt in charge of
+// retry identity. Reinvoking its retained choice must not enqueue another edit
+// or create another undo entry. Both host and selection keys have weak lifetime.
+const submittedSelections = new WeakMap<object, WeakMap<ExplicitTranscriptSelection, Promise<void>>>();
+
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
 );
@@ -335,10 +340,23 @@ export async function runTranscriptCaptionFoundry(
   }
   const bind = transcriptBindCommand(selection, binding, transcript.source_receipt, captionBatch.correspondence);
   const commands = [bind, ...captionCommands];
-  await commandTimeline.submitCommandTransaction(commands, {
-    transactionId: selection.request_id,
-    semantic: true,
-  });
+  let submissions = submittedSelections.get(host);
+  if (!submissions) {
+    submissions = new WeakMap();
+    submittedSelections.set(host, submissions);
+  }
+  let submission = submissions.get(selection);
+  if (!submission) {
+    submission = Promise.resolve().then(() => commandTimeline.submitCommandTransaction!(commands, {
+      transactionId: selection.request_id,
+      semantic: true,
+    }));
+    submissions.set(selection, submission);
+    // Failure before the transaction entered the editor permits resubmission.
+    // A later flush failure deliberately retains the successful submission.
+    void submission.catch(() => submissions!.delete(selection));
+  }
+  await submission;
   await commandTimeline.flush();
   host.completeSelection?.(selection);
   return { binding, commands, transactionId: selection.request_id };

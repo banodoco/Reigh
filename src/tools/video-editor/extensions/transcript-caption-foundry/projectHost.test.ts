@@ -84,10 +84,23 @@ describe('mounted project transcript host', () => {
     try {
       await expect(mounted.invoke()).rejects.toThrow('public COMMIT refused');
       await mounted.invoke();
-      expect(mounted.submit.mock.calls[1]).toEqual(mounted.submit.mock.calls[0]);
+      expect(mounted.submit).toHaveBeenCalledOnce();
+      expect(mounted.flush).toHaveBeenCalledTimes(2);
       expect(f.choose).toHaveBeenCalledOnce();
       expect(Object.keys(f.host.documents)).toEqual(['read']);
       expect(Object.keys(f.host).sort()).toEqual(['buildCaptionCommands', 'completeSelection', 'documents', 'selectTranscript']);
+    } finally { mounted.dispose(); }
+  });
+
+  it('can resubmit after the editor rejects a transaction before its save attempt exists', async () => {
+    const f = fixture(); const mounted = mount(f.host);
+    mounted.submit.mockRejectedValueOnce(new Error('editor rejected before submission'));
+    try {
+      await expect(mounted.invoke()).rejects.toThrow('editor rejected before submission');
+      await mounted.invoke();
+      expect(mounted.submit).toHaveBeenCalledTimes(2);
+      expect(mounted.submit.mock.calls[1]).toEqual(mounted.submit.mock.calls[0]);
+      expect(mounted.flush).toHaveBeenCalledOnce();
     } finally { mounted.dispose(); }
   });
 

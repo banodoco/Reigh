@@ -282,14 +282,10 @@ describe('mounted read-only transcript consumer', () => {
         transactionId: selection.request_id,
         semantic: true,
       });
-      expect(mounted.submitCommandTransaction).toHaveBeenNthCalledWith(2, expect.any(Array), {
-        transactionId: selection.request_id,
-        semantic: true,
-      });
+      expect(mounted.submitCommandTransaction).toHaveBeenCalledOnce();
       const first = mounted.submitCommandTransaction.mock.calls[0]![0][0]!;
-      const retry = mounted.submitCommandTransaction.mock.calls[1]![0][0]!;
       expect(first.args.expect).toEqual({ binding: { state: 'present', value: prior } });
-      expect(retry.args.source_receipt).toBe(pinnedRead.source_receipt);
+      expect(first.args.source_receipt).toBe(pinnedRead.source_receipt);
       expect(project.createDocument).not.toHaveBeenCalled();
       expect(project.updateDocument).not.toHaveBeenCalled();
     } finally {
