@@ -1,3 +1,4 @@
+import { isTranscriptCaptionBatch } from '../commands/transcriptCaptions.ts';
 import type { EditCommand } from '@/integrations/runtime/generated.ts';
 import { attachGestureCommands, gestureCommandsFor } from '../commands/semanticGestures.ts';
 import { assetRegistrationCommand, isAssetRegistrationCommand } from '../commands/assetRegistration.ts';
@@ -369,7 +370,7 @@ export function useTimelineCommit({
         transactionId: options?.transactionId,
         semantic: options?.semantic,
         commandHistory: options?.commandHistory,
-        ...(options?.editCommands?.length === 1 && (isAssetRegistrationCommand(options.editCommands[0]) || isOverlapTrimCommand(options.editCommands[0]) || isTiedHoldExpansionCommand(options.editCommands[0]))
+        ...((options?.editCommands && isTranscriptCaptionBatch(options.editCommands)) || (options?.editCommands?.length === 1 && (isAssetRegistrationCommand(options.editCommands[0]) || isOverlapTrimCommand(options.editCommands[0]) || isTiedHoldExpansionCommand(options.editCommands[0])))
           ? { nativeRegistrationOwner: nextData } : {}),
       });
     }

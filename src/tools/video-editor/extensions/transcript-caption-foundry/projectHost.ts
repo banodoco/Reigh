@@ -70,6 +70,9 @@ export function createTranscriptCaptionProjectHost(options: {
     return current;
   };
   const host: TranscriptCaptionFoundryHost = {
+    completeSelection(selection) {
+      if (pending?.selection === selection) pending = undefined;
+    },
     async selectTranscript(items) {
       const before = data();
       const clipIds = [...new Set(items.map((item) => item.clipId).filter(Boolean))];
@@ -138,7 +141,15 @@ export function createTranscriptCaptionProjectHost(options: {
           throw new Error('Transcript consumer refused: read is outside the host selection.');
         }
         // Refresh only the explicit exact pin; an advanced document refuses.
-        const fresh = await options.reader.read({ document_id: selection.document.id, version: selection.document.version });
+        let fresh: PinnedTranscriptRead;
+        try {
+          fresh = await options.reader.read({ document_id: selection.document.id, version: selection.document.version });
+        } catch (error) {
+          // A source read failed before submission. A new invocation must offer
+          // an explicit choice instead of trapping the user on an invalid pin.
+          if (pending?.selection === selection) pending = undefined;
+          throw error;
+        }
         const saved = selections.get(selection)!;
         if (fresh.snapshot.object_id !== saved.transcript.snapshot.object_id) {
           throw new Error('Transcript consumer refused: selected snapshot changed.');

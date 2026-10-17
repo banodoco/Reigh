@@ -87,7 +87,32 @@ describe('mounted project transcript host', () => {
       expect(mounted.submit.mock.calls[1]).toEqual(mounted.submit.mock.calls[0]);
       expect(f.choose).toHaveBeenCalledOnce();
       expect(Object.keys(f.host.documents)).toEqual(['read']);
-      expect(Object.keys(f.host).sort()).toEqual(['buildCaptionCommands', 'documents', 'selectTranscript']);
+      expect(Object.keys(f.host).sort()).toEqual(['buildCaptionCommands', 'completeSelection', 'documents', 'selectTranscript']);
+    } finally { mounted.dispose(); }
+  });
+
+  it('requires a fresh explicit choice after a durable acknowledgement before the next canonical poll', async () => {
+    const f = fixture(); const mounted = mount(f.host);
+    try {
+      await mounted.invoke();
+      // Receipt acknowledgements advance the store version independently of this data object.
+      await mounted.invoke();
+      expect(f.choose).toHaveBeenCalledTimes(2);
+      const first = mounted.submit.mock.calls[0]!;
+      const next = mounted.submit.mock.calls[1]!;
+      expect(next[1].transactionId).not.toBe(first[1].transactionId);
+    } finally { mounted.dispose(); }
+  });
+
+  it('offers a new explicit choice after an exact source read fails before submission', async () => {
+    const f = fixture(); const mounted = mount(f.host);
+    try {
+      f.reader.read.mockResolvedValueOnce(structuredClone(pin)).mockRejectedValueOnce(new Error('selected version advanced'));
+      await expect(mounted.invoke()).rejects.toThrow('version advanced');
+      expect(mounted.submit).not.toHaveBeenCalled();
+      await mounted.invoke();
+      expect(f.choose).toHaveBeenCalledTimes(2);
+      expect(mounted.submit).toHaveBeenCalledOnce();
     } finally { mounted.dispose(); }
   });
 

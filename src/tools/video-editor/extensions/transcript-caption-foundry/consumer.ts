@@ -110,6 +110,8 @@ export interface PinnedTranscriptRead {
 }
 
 export interface TranscriptCaptionFoundryHost {
+  /** Release the retry choice only after the ordinary save barrier acknowledges it. */
+  readonly completeSelection?: (selection: ExplicitTranscriptSelection) => void;
   /** Selection and credentials are host-owned; item payloads are not authority. */
   readonly selectTranscript: (
     items: readonly DataLaneRenderItem[],
@@ -338,5 +340,6 @@ export async function runTranscriptCaptionFoundry(
     semantic: true,
   });
   await commandTimeline.flush();
+  host.completeSelection?.(selection);
   return { binding, commands, transactionId: selection.request_id };
 }

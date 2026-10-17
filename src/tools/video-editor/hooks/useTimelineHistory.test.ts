@@ -787,3 +787,38 @@ it('W09 no-change receipt removes only its native owner without blocking prior h
   act(() => eventBus.emit('nativeRegistrationAccepted', owner, null));
   expect(result.current.canUndo).toBe(true);
 });
+
+it('retains a caption transaction across canonical refresh and undoes only its accepted writes', () => {
+  const { result, dataRef, commitCalls, eventBus } = setup();
+  const owner = makeTimelineData(1);
+  const inverse = { op: 'timeline.inverse', select: null, args: { publication: 'caption-publication', writes: [
+    { id: 'parent/clip:media', path: 'app', before: { state: 'present', value: { transcript: { v: 1, binding: { occurrence_id: null } } } }, after: { state: 'absent' } },
+    { id: 'parent/clip:caption-request-0', path: '', before: { state: 'present', value: { id: 'caption-request-0', element: 'am-type' } }, after: { state: 'absent' } },
+  ] } };
+  act(() => { result.current.onBeforeCommit(dataRef.current, { semantic: true, nativeRegistrationOwner: owner }); dataRef.current = owner; });
+  expect(result.current.canUndo).toBe(false);
+  act(() => eventBus.emit('nativeRegistrationAccepted', owner, inverse));
+  expect(result.current.canUndo).toBe(true);
+  // A canonical refresh must retain publication-bound history, including other authored fields.
+  const refreshed = makeTimelineData(2);
+  act(() => { result.current.onRemoteData(owner, refreshed); dataRef.current = refreshed; });
+  expect(result.current.canUndo).toBe(true);
+  act(() => result.current.undo());
+  expect(commitCalls).toHaveLength(1);
+  expect(commitCalls[0].nextData.config).toEqual(refreshed.config);
+  expect(commitCalls[0].options).toMatchObject({ save: true, skipHistory: true, editCommands: [inverse] });
+  expect(result.current.canRedo).toBe(false);
+  const redo = structuredClone(inverse); redo.args.publication = 'caption-undo-publication';
+  act(() => eventBus.emit('nativeRegistrationAccepted', commitCalls[0].nextData, redo));
+  expect(result.current.canRedo).toBe(true);
+  act(() => result.current.redo());
+  expect(commitCalls[1].options).toMatchObject({ editCommands: [redo] });
+});
+
+it('drops ordinary snapshot history on canonical refresh without treating it as caption receipt history', () => {
+  const { result, dataRef, applyEdit } = setup();
+  applyEdit(1, { transactionId: 'ordinary' });
+  expect(result.current.canUndo).toBe(true);
+  act(() => result.current.onRemoteData(dataRef.current, makeTimelineData(2)));
+  expect(result.current.canUndo).toBe(false);
+});

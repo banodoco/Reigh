@@ -1,3 +1,4 @@
+import { transcriptCaptionInverse } from '@/tools/video-editor/commands/transcriptCaptionHistory.ts';
 import { isTranscriptCaptionBatch, transcriptBindTarget } from '@/tools/video-editor/commands/transcriptCaptions.ts';
 import { createProjectTranscriptReader } from './projectTranscriptReader.ts';
 import { isCapturedShotMetadataCommand } from '@/tools/video-editor/data/canonicalShotMetadata.ts';
@@ -906,7 +907,8 @@ export class RuntimeDataProvider implements DataProvider {
     const registryCommands = 'commands' in request.change ? request.change.commands : [];
     const registryNoChange = result.status === 'no_change' && registryCommands.length === 1
       && (isAssetRegistrationCommand(registryCommands[0]) || isAssetRegistrationInverse(registryCommands[0]));
-    const commandInverse = registryNoChange ? null : assetRegistrationInverse(registryCommands, result)
+    const captionInverse = transcriptCaptionInverse(registryCommands, result);
+    const commandInverse = registryNoChange ? null : captionInverse !== undefined ? captionInverse : assetRegistrationInverse(registryCommands, result)
       ?? overlapTrimInverse(registryCommands, result) ?? tiedHoldExpansionInverse(registryCommands, result);
     return { configVersion: version, head: this.timelineHead(timelineId, head),
       ...(commandInverse !== undefined ? { commandInverse } : {}) };

@@ -1,3 +1,5 @@
+import { isTranscriptCaptionBatch } from '../commands/transcriptCaptions.ts';
+import { isTranscriptCaptionInverse } from '../commands/transcriptCaptionHistory.ts';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import {
   createTimelineCommandRunner,
@@ -245,7 +247,7 @@ export function useTimelineHistory({
       syncHistoryState();
       return;
     }
-    if (!isAssetRegistrationInverse(inverse) && !isOverlapTrimInverse(inverse) && !isTiedHoldExpansionInverse(inverse)) return;
+    if (!isAssetRegistrationInverse(inverse) && !isOverlapTrimInverse(inverse) && !isTiedHoldExpansionInverse(inverse) && !isTranscriptCaptionInverse(inverse)) return;
     for (const entry of [...undoStackRef.current, ...redoStackRef.current]) {
       if (entry.nativeRegistration?.owner === owner) entry.nativeRegistration.inverse = structuredClone(inverse);
     }
@@ -330,7 +332,7 @@ export function useTimelineHistory({
     // Never turn an unacknowledged edit or missing receipt into a snapshot publication.
     const inverse = entry.nativeRegistration?.inverse;
     if (entry.nativeRegistration && !inverse) return false;
-    const nextData = entry.nativeRegistration && (isOverlapTrimInverse(inverse) || isTiedHoldExpansionInverse(inverse))
+    const nextData = entry.nativeRegistration && (isOverlapTrimInverse(inverse) || isTiedHoldExpansionInverse(inverse) || isTranscriptCaptionInverse(inverse))
       ? { ...current } : preserveUploadingClips(current, applyHistoryEntry(current, entry, direction));
     if (entry.nativeRegistration) entry.nativeRegistration = { owner: nextData };
     // Same protection every applyEdit path has: history snapshots never contain
@@ -445,9 +447,12 @@ export function useTimelineHistory({
     // inverses carry Runtime expectations and remain safe over a poll
     // or another head: Runtime alone accepts or refuses that inverse.
     const nativeRelation = (entry: UndoEntry) => {
-      const command = entry.nativeRegistration && gestureCommandsFor(entry.nativeRegistration.owner)?.[0];
+      const nativeCommands = entry.nativeRegistration && gestureCommandsFor(entry.nativeRegistration.owner);
+      const command = nativeCommands?.[0];
       return isOverlapTrimCommand(command) || isOverlapTrimInverse(command)
-        || isTiedHoldExpansionCommand(command) || isTiedHoldExpansionInverse(command);
+        || isTiedHoldExpansionCommand(command) || isTiedHoldExpansionInverse(command)
+        || isTranscriptCaptionBatch(nativeCommands ?? []) || isTranscriptCaptionInverse(command)
+        || isTranscriptCaptionInverse(entry.nativeRegistration?.inverse);
     };
     undoStackRef.current = undoStackRef.current.filter(nativeRelation);
     redoStackRef.current = redoStackRef.current.filter(nativeRelation);

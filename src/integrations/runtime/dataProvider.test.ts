@@ -1940,8 +1940,17 @@ describe('RuntimeDataProvider commit save routing', () => {
       commitSessionStorage: storage, commitRouting: { enabled: true } });
   }
 
-  it('routes the registered timeline-level bind and ordinary captions under one captured occurrence', async () => {
-    const fixture = commitFixture(async (body) => result(body));
+  it.each(['accepted', 'no_change'] as const)('routes the registered timeline-level bind and ordinary captions under one captured occurrence (%s protocol fixture)', async (status) => {
+    const fixture = commitFixture(async (body) => {
+      const calls = 'commands' in body.change ? body.change.commands : [];
+      return status === 'no_change' ? result(body) : { ...result(body), status,
+        accepted_revision_id: 'caption-head', accepted_publication_id: 'caption-publication',
+        change: { ...result(body).change, direct_writes: [
+          { id: 'occurrence:occ/clip:source', path: 'app', before: { state: 'absent' }, after: { state: 'present', value: { transcript: { v: 1, binding: calls[0].args.next } } } },
+          { id: calls[1].created![0], path: '', before: { state: 'absent' }, after: { state: 'present', value: { id: calls[1].args.clip_id, clipType: 'am-type' } } },
+        ] },
+      };
+    });
     const provider = nativeProvider(fixture);
     const loaded = await provider.loadTimeline(TIMELINE_ID);
     const binding = { schema_version: 1 as const,
@@ -1962,7 +1971,11 @@ describe('RuntimeDataProvider commit save routing', () => {
     const occurrence = { projectId: PROJECT_ID, parentDocumentId: TIMELINE_ID,
       headRevisionId: loaded.head!.headRevisionId!, occurrenceId: 'occ', shotId: 'shot',
       shotRevisionId: 'shot-revision', internalRevisionId: 'internal-revision' };
-    await provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!, undefined, undefined, commands, occurrence);
+    const receipt = await provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!, undefined, undefined, commands, occurrence);
+    expect(receipt.commandInverse).toEqual(status === 'no_change' ? null : { op: 'timeline.inverse', select: null, args: { publication: 'caption-publication', writes: [
+      { id: 'occurrence:occ/clip:source', path: 'app', before: { state: 'present', value: { transcript: { v: 1, binding } } }, after: { state: 'absent' } },
+      { id: commands[1].created![0], path: '', before: { state: 'present', value: { id: commands[1].args.clip_id, clipType: 'am-type' } }, after: { state: 'absent' } },
+    ] } });
     const request = JSON.parse(fixture.commits[0].bytes);
     expect(request.scope).toEqual({ target: 'occurrence:occ', content: 'this-occurrence', shot_id: 'shot',
       shot_revision_id: 'shot-revision', internal_revision_id: 'internal-revision', complete: ['clips', 'tracks'], projection_version: 1 });

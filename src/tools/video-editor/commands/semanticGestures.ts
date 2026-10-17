@@ -1,3 +1,4 @@
+import { isTranscriptCaptionInverse } from './transcriptCaptionHistory.ts';
 import { isTranscriptCaptionBatch, transcriptBindTarget } from './transcriptCaptions.ts';
 import type { EditCommand } from '@/integrations/runtime/generated.ts';
 import type { TimelineOccurrenceContext } from '../data/DataProvider.ts';
@@ -91,7 +92,7 @@ export function attachGestureCommands(data: TimelineData, commands: readonly Edi
   let context: TimelineOccurrenceContext | undefined;
   let parent = false;
   const aggregateBatch = commands.length > 0 && commands.every((command) =>
-    isShotGroupAggregateCommand(command) || isAssetRegistrationCommand(command) || isAssetRegistrationInverse(command) || isOverlapTrimInverse(command) || isTiedHoldExpansionInverse(command));
+    isShotGroupAggregateCommand(command) || isAssetRegistrationCommand(command) || isAssetRegistrationInverse(command) || isOverlapTrimInverse(command) || isTiedHoldExpansionInverse(command) || isTranscriptCaptionInverse(command));
   const captionTarget = isTranscriptCaptionBatch(commands) ? transcriptBindTarget(commands[0]) : undefined;
   // Routing reads the handler's explicit args.target. The submitted registered
   // timeline-level bind retains select:null; this local view only captures custody.

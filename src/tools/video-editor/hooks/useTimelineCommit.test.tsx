@@ -597,6 +597,31 @@ describe('W09 mounted registry assignment', () => {
     expect(JSON.stringify(gestureCommandsFor(next))).not.toContain('blob:preview-only');
   });
 
+  it('registers a parent caption batch as one receipt-owned history entry and one save', () => {
+    const initial = makeSelectionForwardingData();
+    initial.head = { projectId: 'project', timelineId: 'main', headRevisionId: 'H0' };
+    const eventBus = new TimelineEventBus(); const scheduled = vi.fn(); const history = vi.fn();
+    eventBus.on('scheduleSave', scheduled); eventBus.on('beforeCommit', history);
+    const { result } = renderHook(() => useTimelineCommit({ eventBus, lastSavedSignatureRef: { current: '' }, initialData: initial }), { wrapper });
+    const source = ['document', 'lineage', 'revision', 'parent/clip:media', 'a'.repeat(64), 'word'];
+    const moment = `source-word ${source.map((value) => JSON.stringify(value)).join(' ')}`;
+    const sid = 'parent/clip:caption-request-0';
+    const calls = [
+      { op: 'transcript.bind', select: null, args: { target: { clip_id: 'media', occurrence_id: null }, next: {
+        schema_version: 1, occurrence_id: null, document: { id: 'document' }, source: { lineage_id: 'lineage', revision_id: 'revision' },
+        snapshot: { sha256: 'a'.repeat(64) }, word_ids: ['word'],
+      } } },
+      { op: 'timeline.add', select: null, args: { element: 'am-type', track: 'type', clip_id: 'caption-request-0', at: moment, params: { text: 'Hello' } }, created: [sid] },
+      { op: 'clip.until', select: sid, resolved: [sid], args: { moment: `after ${moment}` } },
+    ];
+    act(() => result.current.applyEdit({ type: 'commands' }, { editCommands: calls, transactionId: 'caption-request', semantic: true }));
+    const next = result.current.dataRef.current!;
+    expect(history).toHaveBeenCalledOnce(); expect(scheduled).toHaveBeenCalledOnce();
+    expect(history.mock.calls[0][1]).toMatchObject({ nativeRegistrationOwner: next, transactionId: 'caption-request', semantic: true });
+    expect(gestureCommandsFor(next)).toEqual(calls);
+    expect(next.config).toEqual(initial.config);
+  });
+
   it('rejects invalid native managed identity before data, history or persistence changes', () => {
     const initial = makeSelectionForwardingData(); const eventBus = new TimelineEventBus();
     const scheduled = vi.fn(); const history = vi.fn();
