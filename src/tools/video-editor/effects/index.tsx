@@ -1,4 +1,5 @@
 import type { FC, ReactNode } from 'react';
+import { ClipAnimationPhase, normalizeAnimationRefs, resolveAnimationReferences } from '@banodoco/timeline-composition/theme-api';
 import { secondsToFrames } from '@/tools/video-editor/lib/config-utils.ts';
 import { DynamicEffectRegistry } from '@/tools/video-editor/effects/DynamicEffectRegistry.ts';
 import { EffectErrorBoundary } from '@/tools/video-editor/effects/EffectErrorBoundary.tsx';
@@ -173,6 +174,39 @@ export const wrapWithEffect = (
   );
 };
 
+const hasExplicitEasing = (reference: unknown): boolean => {
+  if (!reference || typeof reference !== 'object') return false;
+  const ref = reference as { params?: Record<string, unknown> };
+  return 'easing' in ref || !!(ref.params && Object.prototype.hasOwnProperty.call(ref.params, 'easing'));
+};
+
+// This capability belongs to the selected native builtin, never to an ID alone.
+// Both phases of canonical fade select this record; fade-out remains distinct.
+const supportsCanonicalFade = (
+  type: string,
+  component: ClipEffectComponent | null | undefined,
+  snapshot: EffectRegistrySnapshot | undefined,
+  record: ReturnType<EffectRegistrySnapshot['get']>,
+): boolean => type === 'fade' && component === FadeEntrance && (!snapshot || !!record
+  && record.effectId === 'fade'
+  && record.contributionId === 'built-in:effect:fade'
+  && record.provenance === 'built-in'
+  && record.status === 'active'
+  && record.ownerExtensionId === undefined
+  && record.code === undefined);
+
+const validateCanonicalFadeReference = (
+  reference: NonNullable<ResolvedTimelineClip['entrance']>,
+  fps: number,
+  phase: 'entrance' | 'exit',
+): void => {
+  const resolved = resolveAnimationReferences(normalizeAnimationRefs(reference, fps), phase);
+  if (resolved.length !== 1 || resolved[0].id !== 'fade' || resolved[0].kind !== 'wrapper'
+    || resolved[0].easing === undefined) {
+    throw new Error('App selected fade requires its declared explicit animation easing progress');
+  }
+};
+
 export const wrapWithClipEffects = (
   content: ReactNode,
   clip: ResolvedTimelineClip,
@@ -180,14 +214,9 @@ export const wrapWithClipEffects = (
   fps: number,
   effectRegistrySnapshot?: EffectRegistrySnapshot,
 ): ReactNode => {
-  // Native effect props have no host-progress contract. Preserve their legacy
-  // branch when absent; refuse explicit easing instead of discarding it or
-  // applying an extra component-specific curve after the shared host curve.
-  for (const reference of [clip.entrance, clip.exit, clip.continuous]) {
-    if (reference && ('easing' in reference
-      || (reference.params && Object.prototype.hasOwnProperty.call(reference.params, 'easing')))) {
-      throw new Error(`App native effects cannot consume explicit animation easing for clip ${clip.id}`);
-    }
+  // Continuous effects have no shared animation-progress declaration.
+  if (hasExplicitEasing(clip.continuous)) {
+    throw new Error(`App native effects cannot consume explicit animation easing for clip ${clip.id}`);
   }
   let wrapped = content;
   const legacyRegistry = effectRegistrySnapshot ? null : getEffectRegistry();
@@ -222,7 +251,16 @@ export const wrapWithClipEffects = (
     ? entranceRecord?.component
       ?? (legacyRegistry ? lookupEffect(entranceEffects, entranceEffect.type) : null)
     : null;
-  if (entrance) {
+  if (hasExplicitEasing(entranceEffect)) {
+    if (!entranceEffect || !supportsCanonicalFade(entranceEffect.type, entrance, effectRegistrySnapshot, entranceRecord)) {
+      throw new Error(`App selected entrance effect cannot consume explicit animation easing for clip ${clip.id}`);
+    }
+    // Validate through the shared resolver before returning a render tree. Keep
+    // the authored reference intact, including both easing spellings.
+    validateCanonicalFadeReference(entranceEffect, fps, 'entrance');
+    wrapped = <ClipAnimationPhase clip={clip} fps={fps} clipFrames={durationInFrames}
+      phase="entrance" reference={entranceEffect}>{wrapped}</ClipAnimationPhase>;
+  } else if (entrance) {
     wrapped = wrapWithEffect(wrapped, entrance, {
       effectName: entranceEffect!.type,
       durationInFrames,
@@ -241,7 +279,16 @@ export const wrapWithClipEffects = (
     ? exitRecord?.component
       ?? (legacyRegistry ? lookupEffect(exitEffects, exitEffect.type) : null)
     : null;
-  if (exit) {
+  if (hasExplicitEasing(exitEffect)) {
+    if (!exitEffect || !supportsCanonicalFade(exitEffect.type, exit, effectRegistrySnapshot, exitRecord)) {
+      throw new Error(`App selected exit effect cannot consume explicit animation easing for clip ${clip.id}`);
+    }
+    // Validate through the shared resolver before returning a render tree. Keep
+    // the authored reference intact, including both easing spellings.
+    validateCanonicalFadeReference(exitEffect, fps, 'exit');
+    wrapped = <ClipAnimationPhase clip={clip} fps={fps} clipFrames={durationInFrames}
+      phase="exit" reference={exitEffect}>{wrapped}</ClipAnimationPhase>;
+  } else if (exit) {
     wrapped = wrapWithEffect(wrapped, exit, {
       effectName: exitEffect!.type,
       durationInFrames,

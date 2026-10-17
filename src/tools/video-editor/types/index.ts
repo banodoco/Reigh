@@ -95,6 +95,7 @@ export type TrackDefinition = {
 
 export type ClipEntrance = {
   type: string;
+  easing?: string;
   duration: number;
   intensity?: number;
   params?: Record<string, unknown>;
@@ -102,6 +103,7 @@ export type ClipEntrance = {
 
 export type ClipExit = {
   type: string;
+  easing?: string;
   duration: number;
   intensity?: number;
   params?: Record<string, unknown>;

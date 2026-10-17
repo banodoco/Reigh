@@ -162,13 +162,13 @@ test('actual App row projection and sanitizer preserve modifier ids, order and p
   assert.equal(Object.prototype.hasOwnProperty.call(sanitizeTimelineClipSnapshot(ordinary.clips[0]), 'modifiers'), false);
 });
 
-test('actual native effect wrapper refuses explicit easing and preserves ordinary content and params', () => {
+test('actual native effect wrapper refuses unsupported easing and preserves ordinary content and params', () => {
   assert.strictEqual(wrapWithClipEffects(content, clip, 40, 20), content);
   for (const easing of ['linear', 'in', 'out', 'in-out', 'step', 'inOut']) {
-    assert.throws(() => wrapWithClipEffects(content, { ...clip, entrance: { type: 'fade', duration: .5, params: { easing } } }, 40, 20), /cannot consume explicit animation easing/);
+    assert.throws(() => wrapWithClipEffects(content, { ...clip, entrance: { type: 'zoom-in', duration: .5, params: { easing } } }, 40, 20), /cannot consume explicit animation easing/);
   }
   for (const phase of ['entrance', 'exit', 'continuous']) {
-    const stored = JSON.parse(JSON.stringify({ ...clip, [phase]: { type: 'fade', duration: .5, easing: 'out' } }));
+    const stored = JSON.parse(JSON.stringify({ ...clip, [phase]: { type: 'custom:fade', duration: .5, easing: 'out' } }));
     assert.throws(() => wrapWithClipEffects(content, stored, 40, 20), /cannot consume explicit animation easing/);
   }
   const ordinary = wrapWithClipEffects(content, { ...clip, entrance: { type: 'fade', duration: .5, params: { distance: 60 } } }, 40, 20);
