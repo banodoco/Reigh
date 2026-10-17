@@ -122,6 +122,7 @@ export const runtimeCapabilitySchema = z.strictObject({
   definition_digest: runtimeSha256IdSchema,
   status: z.enum(['ready', 'unavailable', 'unsupported', 'retired']),
   action_declaration_status: z.enum(['available', 'unavailable', 'unsupported']).optional(),
+  action_declaration_reason: z.string().min(1).optional(),
   required_resource_keys: z.array(z.string().min(1)).refine(
     (keys) => new Set(keys).size === keys.length,
     { message: 'required_resource_keys must contain unique values' },

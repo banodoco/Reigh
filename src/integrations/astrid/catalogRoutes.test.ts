@@ -153,6 +153,29 @@ describe('Astrid capability catalog binding', () => {
   });
 });
 
+describe('capability declaration reason codec', () => {
+  it.each(['available', 'unsupported'] as const)('accepts a nonempty reason for %s declarations', async (status) => {
+    const { routes } = catalog([{
+      items: [capability({ action_declaration_status: status, action_declaration_reason: 'Producer declaration disposition' })],
+      next_cursor: null,
+    }]);
+    expect((await routes.get('astrid.image_generation')).action_declaration_reason)
+      .toBe('Producer declaration disposition');
+  });
+
+  it.each(['', null, 1, true, {}, []])('refuses an invalid declaration reason %s', async (reason) => {
+    const invalid = { ...capability(), action_declaration_reason: reason };
+    const { routes } = catalog([{ items: [invalid as RuntimeCapability], next_cursor: null }]);
+    await expect(routes.get('astrid.image_generation')).rejects.toThrow();
+  });
+
+  it('still refuses unknown capability keys when a valid reason is present', async () => {
+    const invalid = { ...capability(), action_declaration_reason: 'Unsupported declaration', unknown_field: true };
+    const { routes } = catalog([{ items: [invalid], next_cursor: null }]);
+    await expect(routes.get('astrid.image_generation')).rejects.toThrow();
+  });
+});
+
 describe('catalog v2 exact storage contract', () => {
   const estimator = { id: 'example.plan', version: 1, implementation_digest: `sha256:${'b'.repeat(64)}` };
   const row = (storage_estimate: unknown) => {
