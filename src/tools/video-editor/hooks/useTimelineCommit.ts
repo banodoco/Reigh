@@ -428,7 +428,7 @@ export function useTimelineCommit({
         )) || (options?.editCommands?.length === 1 && (
           isAssetRegistrationCommand(options.editCommands[0])
           || isTiedHoldExpansionCommand(options.editCommands[0])
-        )))
+        ))
           ? { nativeRegistrationOwner: nextData } : {}),
       });
       if (options?.proposalBase) bindProposalSave(nextData, options.proposalBase, recordHistory);

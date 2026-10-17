@@ -6294,16 +6294,29 @@ const w27Catalog = {
   entrance: [], exit: [], continuous: [], canCreateEffect: true, canUpdateEffect: true,
 };
 w27Catalog.continuous = w27Catalog.effects as never;
-async function w27Data(prior: 'absent' | 'null' | 'object' | 'mixed' = 'object', occurrence = false) {
+async function w27Data(prior: 'absent' | 'null' | 'object' | 'mixed' = 'object', occurrence = false, sdkSafe = false) {
   const base = await initialData();
   const clips = base.config.clips.map((clip, index) => {
-    const source = { ...clip, ...(prior === 'absent' || prior === 'mixed' && index === 0 ? {} : { continuous: prior === 'null' ? null : { ...structuredClone(w27Effect), intensity: index ? 0.25 : 0.731 } }) };
+    const app = sdkSafe && index === 0
+      ? Object.fromEntries(Object.entries(clip.app ?? {}).filter(([key]) => key !== 'astrid'))
+      : clip.app;
+    const source = {
+      ...clip,
+      ...(sdkSafe && index === 0 ? { app } : {}),
+      ...(prior === 'absent' || prior === 'mixed' && index === 0 ? {} : { continuous: prior === 'null' ? null : { ...structuredClone(w27Effect), intensity: index ? 0.25 : 0.731 } }),
+    };
     return occurrence ? { ...source, id: `projected-${clip.id}`, app: { ...source.app, canonical: {
       projectId: 'gesture-project', parentDocumentId: 'gesture-timeline', headRevisionId: 'parent-r1', occurrenceId: 'occ-A',
       shotId: 'A', revisionId: 'shot-r1', internalTimelineRevisionId: 'internal-r1', sourceClipId: clip.id, outputIdentity: 'output-A', sourceClip: source,
     } } } : source;
   });
   return buildTimelineData({ ...base.config, clips } as never, base.registry, undefined, 1, undefined, base.head);
+}
+async function w27SdkData(prior: 'absent' | 'null' | 'object' | 'mixed' = 'object', occurrence = false) {
+  // The general integration seed carries an unrelated stale transcript pin on clip-1.
+  // The real D reader correctly refuses it before these continuous-effect commands run.
+  // Keep clipSentinel and all edited/opaque fields while dropping only that invalid pin.
+  return w27Data(prior, occurrence, true);
 }
 type W27Action = 'type' | 'default' | 'params' | 'remove' | 'none' | 'saved' | 'intensity' | 'bulk type' | 'bulk clear';
 async function w27Action(h: Awaited<ReturnType<typeof setup>>, action: W27Action) {
@@ -6436,7 +6449,7 @@ function w27Evidence(name: string, value: unknown) {
 }
 describe('W27 SDK actual callers native chain', () => {
   it.each(w27Actions)('%s accepts one batch, receipt acknowledgement, whole-document Undo and original batch Redo', async action => {
-    const initial = await w27Data(action === 'bulk type' ? 'mixed' : action === 'type' ? 'null' : 'object');
+    const initial = await w27SdkData(action === 'bulk type' ? 'mixed' : action === 'type' ? 'null' : 'object');
     const requests: CommitRequest[] = []; let proof!: Awaited<ReturnType<typeof w27Source>>;
     const h = await setup(async request => {
       requests.push(request); proof = await w27Source(initial, requests); w27Evidence(action, { requests, proof });
@@ -6466,7 +6479,7 @@ describe('W27 SDK actual callers native chain', () => {
     history.unmount(); h.unmount();
   }, 180_000);
   it.each(['absent', 'null', 'object'] as const)('preserves %s occurrence source values through acceptance and native history', async prior => {
-    const initial = await w27Data(prior, true); const requests: CommitRequest[] = []; let proof!: Awaited<ReturnType<typeof w27Source>>;
+    const initial = await w27SdkData(prior, true); const requests: CommitRequest[] = []; let proof!: Awaited<ReturnType<typeof w27Source>>;
     const h = await setup(async request => { requests.push(request); proof = await w27Source(initial, requests);
       w27Evidence(`occurrence-${prior}`, { requests, proof }); return { acceptedResult: proof.result, readbackConfig: fadeReadback(initial, proof) };
     }, false, initial, 1, undefined, undefined, initial.config.clips[0].id);
@@ -6486,7 +6499,7 @@ describe('W27 SDK actual callers native chain', () => {
     expect(proof.readback).toEqual(proof.results[0].canonical_document); history.unmount(); h.unmount();
   }, 180_000);
   it('qualifies a real no-change receipt without creating native history', async () => {
-    const initial = await w27Data(); let proof!: Awaited<ReturnType<typeof w27Source>>;
+    const initial = await w27SdkData(); let proof!: Awaited<ReturnType<typeof w27Source>>;
     const h = await setup(async request => { proof = await w27Source(initial, [request]); w27Evidence('no-change', {request, proof}); return { acceptedResult: proof.result }; }, false, initial);
     const history = mountFadeHistory(h);
     act(() => h.result.current.editing.handleSelectedClipChange(continuousParameterPatch(initial.config.clips[0].continuous!, { enabled: false })));
@@ -6495,7 +6508,7 @@ describe('W27 SDK actual callers native chain', () => {
     expect(proof.readback).toEqual(proof.before); expect(history.result.current.canUndo).toBe(false); history.unmount(); h.unmount();
   }, 90_000);
   it('refuses an Undo acknowledgement that reuses the forward publication', async () => {
-    const initial = await w27Data(); const requests: CommitRequest[] = []; let proof!: Awaited<ReturnType<typeof w27Source>>;
+    const initial = await w27SdkData(); const requests: CommitRequest[] = []; let proof!: Awaited<ReturnType<typeof w27Source>>;
     const h = await setup(async request => { requests.push(request); proof = await w27Source(initial, requests); const returned = structuredClone(proof.result);
       if (requests.length === 2) returned.accepted_publication_id = proof.results[0].accepted_publication_id;
       w27Evidence('wrong-publication', {requests, proof, returned}); return { acceptedResult: returned };
@@ -6507,7 +6520,7 @@ describe('W27 SDK actual callers native chain', () => {
     expect(h.savedSeqRef.current).toBe(1); expect(history.result.current.canRedo).toBe(false); history.unmount(); h.unmount();
   }, 120_000);
   it('rolls back the first bulk change when the late member has a stale full prior', async () => {
-    const initial = await w27Data(); let proof!: Awaited<ReturnType<typeof w27Source>>;
+    const initial = await w27SdkData(); let proof!: Awaited<ReturnType<typeof w27Source>>;
     const h = await setup(async request => { proof = await w27Source(initial, [request], 'stale'); w27Evidence('bulk-stale', {request, proof}); return { acceptedResult: proof.result }; }, false, initial);
     const history = mountFadeHistory(h);
     act(() => h.result.current.editing.handleUpdateClipsDeep(['clip-1', 'clip-2'], meta => ({ continuous: { ...meta.continuous!, intensity: 0.8 } })));
@@ -6518,7 +6531,7 @@ describe('W27 SDK actual callers native chain', () => {
   }, 90_000);
   it.each(['missing', 'extra', 'duplicate', 'foreign', 'malformed', 'no_change', 'no publication', 'refused'] as const)(
     '%s receipt cannot acknowledge a partial bulk edit or enable history', async kind => {
-      const initial = await w27Data(); let proof!: Awaited<ReturnType<typeof w27Source>>;
+      const initial = await w27SdkData(); let proof!: Awaited<ReturnType<typeof w27Source>>;
       const h = await setup(async request => {
         proof = await w27Source(initial, [request]); const returned = structuredClone(proof.result), writes = returned.change.direct_writes;
         if (kind === 'missing') writes.pop();
