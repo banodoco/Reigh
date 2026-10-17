@@ -709,3 +709,24 @@ describe('useTimelineCommit owned registry receipts', () => {
     expect(result.current.dataRef.current?.registry.assets['asset-own'].file).toBe('new.png');
   });
 });
+
+
+describe('placement history follows the existing save capability', () => {
+  it.each([false, true])('provider semanticCommandSaving=%s controls publication inverse ownership', async (enabled) => {
+    const initial = await buildTimelineData({ output: { resolution: '1920x1080', fps: 30, file: 'flag.mp4' },
+      tracks: [{ id: 'V1', kind: 'visual', label: 'V1' }], clips: [{ id: 'a', at: 1, hold: 2, clipType: 'hold', track: 'V1' }] }, { assets: {} });
+    const eventBus = new TimelineEventBus(); const before = vi.fn(); eventBus.on('beforeCommit', before);
+    const wrapper = ({ children }: PropsWithChildren) => createElement(VideoEditorRuntimeContext.Provider, {
+      value: { provider: { semanticCommandSaving: enabled } } as unknown as VideoEditorRuntimeContextValue, children,
+    });
+    const h = renderHook(() => useTimelineCommit({ eventBus, lastSavedSignatureRef: { current: initial.stableSignature }, initialData: initial }), { wrapper });
+    act(() => h.result.current.applyEdit({ type: 'rows', rows: initial.rows.map((row) => ({ ...row,
+      actions: row.actions.map((action) => ({ ...action, start: 1.3, end: 3.3 })) })) }, { semantic: true, editCommands: [
+      { op: 'clip.nudge', select: 'parent/clip:a', resolved: ['parent/clip:a'], args: { frames: 9 }, expect: { at: { state: 'present', value: 1 } } },
+    ] }));
+    expect(before).toHaveBeenCalledTimes(1);
+    expect(before.mock.calls[0][1].nativeRegistrationOwner).toBe(enabled ? h.result.current.data : undefined);
+    expect(h.result.current.data!.config.clips[0].at).toBe(1.3);
+    h.unmount();
+  });
+});

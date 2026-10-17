@@ -1,7 +1,10 @@
+import { isTrackHistoryBatch } from '../commands/trackHistory.ts';
+import { isSelectedMediaCreation, isClipStructureBatch } from '../commands/clipStructureHistory.ts';
+import { isClipPlacementBatch } from '../commands/clipPlacementHistory.ts';
 import { bindProposalSave } from '../lib/proposal-command-binding.ts';
 import { isTranscriptCaptionBatch } from '../commands/transcriptCaptions.ts';
 import type { EditCommand } from '@/integrations/runtime/generated.ts';
-import { attachGestureCommands, gestureCommandsFor } from '../commands/semanticGestures.ts';
+import { attachGestureCommands, gestureCommandsFor, occurrenceIdentityFor } from '../commands/semanticGestures.ts';
 import { assetRegistrationCommand, isAssetRegistrationCommand } from '../commands/assetRegistration.ts';
 import { isTiedHoldExpansionCommand } from '../commands/tiedHoldExpansionHistory.ts';
 import { isOverlapTrimBatch } from '../commands/overlapTrimHistory.ts';
@@ -361,6 +364,31 @@ export function useTimelineCommit({
   ) => {
     const shouldSave = options?.save ?? true;
     const currentData = dataRef.current;
+    if (shouldSave && options?.editCommands) {
+      attachGestureCommands(nextData, options.editCommands, currentData ?? nextData);
+      // Explicit command batches with invalid/mixed occurrence custody must not
+      // become local history or silently drop into the compatibility writer.
+      if (!gestureCommandsFor(nextData)) return;
+      if (editability) {
+        for (const command of options.editCommands) {
+          if (!isSelectedMediaCreation(command)) continue;
+          if (editability.checkTimeline && !editability.checkTimeline().allowed) return;
+          if (!editability.check({ clipId: command.created![0].slice('parent/clip:'.length), sourceTrackId: null,
+            targetTrackId: command.select!.slice('parent/track:'.length) }).allowed) return;
+        }
+      }
+      if (currentData && isClipPlacementBatch(options.editCommands) && editability) {
+        for (const command of options.editCommands) {
+          const clip = currentData.config.clips.find((clip) => {
+            if (command.select === `parent/clip:${clip.id}`) return true;
+            const identity = occurrenceIdentityFor(currentData, clip.id);
+            return identity && command.select === `occurrence:${identity.occurrenceId}/clip:${identity.sourceClipId}`;
+          });
+          if (!clip || !editability.check({ clipId: clip.id, sourceTrackId: clip.track,
+            targetTrackId: command.op === 'clip.set-track' ? String(command.args.track) : clip.track }).allowed) return;
+        }
+      }
+    }
     if (options?.skipHistory && options?.updateLastSavedSignature) registryOwnersRef.current.clear();
     for (const [assetId, receipt] of registryOwnersRef.current) {
       const owned = registryReceiptsRef.current.get(receipt);
@@ -372,7 +400,7 @@ export function useTimelineCommit({
         transactionId: options?.transactionId,
         semantic: options?.semantic,
         commandHistory: options?.commandHistory,
-        ...((options?.editCommands && (isTranscriptCaptionBatch(options.editCommands) || isOverlapTrimBatch(options.editCommands))) || (options?.editCommands?.length === 1 && (isAssetRegistrationCommand(options.editCommands[0]) || isTiedHoldExpansionCommand(options.editCommands[0])))
+        ...((options?.editCommands && (isTranscriptCaptionBatch(options.editCommands) || isOverlapTrimBatch(options.editCommands) || (semanticCommandSaving && (isClipPlacementBatch(options.editCommands) || isClipStructureBatch(options.editCommands) || isTrackHistoryBatch(options.editCommands))))) || (options?.editCommands?.length === 1 && (isAssetRegistrationCommand(options.editCommands[0]) || isTiedHoldExpansionCommand(options.editCommands[0])))
           ? { nativeRegistrationOwner: nextData } : {}),
       });
       if (options?.proposalBase) bindProposalSave(nextData, options.proposalBase, recordHistory);
@@ -421,11 +449,10 @@ export function useTimelineCommit({
     }
 
     if (shouldSave) {
-      if (options?.editCommands) attachGestureCommands(nextData, options.editCommands, currentData ?? nextData);
       editSeqRef.current += 1;
       eventBus.emit('scheduleSave', nextData);
     }
-  }, [eventBus, lastSavedSignatureRef, selectionOwner]);
+  }, [editability, eventBus, lastSavedSignatureRef, selectionOwner, semanticCommandSaving]);
 
   const applyEdit = useCallback((
     mutation: TimelineEditMutation,

@@ -1,3 +1,6 @@
+import { isTrackHistoryBatch, isTrackHistoryInverse } from '../commands/trackHistory.ts';
+import { isSelectedMediaCreation, isClipStructureBatch, isClipStructureInverse } from '../commands/clipStructureHistory.ts';
+import { isClipPlacementBatch, isClipPlacementInverse } from '../commands/clipPlacementHistory.ts';
 import { isTranscriptCaptionBatch } from '../commands/transcriptCaptions.ts';
 import { isTranscriptCaptionInverse } from '../commands/transcriptCaptionHistory.ts';
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
@@ -247,7 +250,7 @@ export function useTimelineHistory({
       syncHistoryState();
       return;
     }
-    if (!isAssetRegistrationInverse(inverse) && !isOverlapTrimInverse(inverse) && !isTiedHoldExpansionInverse(inverse) && !isTranscriptCaptionInverse(inverse)) return;
+    if (!isAssetRegistrationInverse(inverse) && !isOverlapTrimInverse(inverse) && !isTiedHoldExpansionInverse(inverse) && !isTranscriptCaptionInverse(inverse) && !isClipPlacementInverse(inverse) && !isClipStructureInverse(inverse) && !isTrackHistoryInverse(inverse)) return;
     for (const entry of [...undoStackRef.current, ...redoStackRef.current]) {
       if (entry.nativeRegistration?.owner === owner) entry.nativeRegistration.inverse = structuredClone(inverse);
     }
@@ -332,16 +335,18 @@ export function useTimelineHistory({
     // Never turn an unacknowledged edit or missing receipt into a snapshot publication.
     const inverse = entry.nativeRegistration?.inverse;
     if (entry.nativeRegistration && !inverse) return false;
-    const nextData = entry.nativeRegistration && (isOverlapTrimInverse(inverse) || isTiedHoldExpansionInverse(inverse) || isTranscriptCaptionInverse(inverse))
+    const nextData = entry.nativeRegistration && (isOverlapTrimInverse(inverse) || isTiedHoldExpansionInverse(inverse) || isTranscriptCaptionInverse(inverse) || isClipPlacementInverse(inverse) || isClipStructureInverse(inverse) || isTrackHistoryInverse(inverse))
       ? { ...current } : preserveUploadingClips(current, applyHistoryEntry(current, entry, direction));
-    if (entry.nativeRegistration) entry.nativeRegistration = { owner: nextData };
+    const mediaReplay = entry.nativeRegistration?.mediaReplay;
+    const historyCommands = direction === 'redo' && mediaReplay ? [structuredClone(mediaReplay)] : inverse ? [inverse] : undefined;
+    if (entry.nativeRegistration) entry.nativeRegistration = { owner: nextData, ...(mediaReplay ? { mediaReplay } : {}) };
     // Same protection every applyEdit path has: history snapshots never contain
     // transient `uploading-*` skeletons (rowsToConfig drops them from config),
     // so a restore during an in-flight upload would silently delete the
     // upload's placeholder. Carry it over from the live rows instead.
     commitData(
       nextData,
-      { save: true, skipHistory: true, ...(inverse ? { editCommands: [inverse] } : {}) },
+      { save: true, skipHistory: true, ...(historyCommands ? { editCommands: historyCommands } : {}) },
     );
     lastEditTimestampRef.current = Date.now();
     lastUntransactedEditAtRef.current = null;
@@ -396,12 +401,14 @@ export function useTimelineHistory({
 
     clearRedoStack();
 
+    const commands = options.nativeRegistrationOwner && gestureCommandsFor(options.nativeRegistrationOwner);
+    const mediaReplay = commands?.length === 1 && isSelectedMediaCreation(commands[0]) ? structuredClone(commands[0]) : undefined;
     const nextEntry: UndoEntry = {
       snapshot: buildSnapshot(currentData),
       timestamp: new Date(now).toISOString(),
       transactionId: options.transactionId,
       command: buildCommandHistoryEntry(options.commandHistory),
-      ...(options.nativeRegistrationOwner ? { nativeRegistration: { owner: options.nativeRegistrationOwner } } : {}),
+      ...(options.nativeRegistrationOwner ? { nativeRegistration: { owner: options.nativeRegistrationOwner, ...(mediaReplay ? { mediaReplay } : {}) } } : {}),
     };
 
     if (!options.nativeRegistrationOwner && !topUndoEntry?.nativeRegistration
@@ -449,10 +456,10 @@ export function useTimelineHistory({
     const nativeRelation = (entry: UndoEntry) => {
       const nativeCommands = entry.nativeRegistration && gestureCommandsFor(entry.nativeRegistration.owner);
       const command = nativeCommands?.[0];
-      return isOverlapTrimBatch(nativeCommands ?? []) || isOverlapTrimInverse(command)
+      return isTrackHistoryBatch(nativeCommands ?? []) || isTrackHistoryInverse(command) || isTrackHistoryInverse(entry.nativeRegistration?.inverse) || isClipStructureBatch(nativeCommands ?? []) || isClipStructureInverse(command) || isClipStructureInverse(entry.nativeRegistration?.inverse) || isClipPlacementBatch(nativeCommands ?? []) || isClipPlacementInverse(command) || isOverlapTrimBatch(nativeCommands ?? []) || isOverlapTrimInverse(command)
         || isTiedHoldExpansionCommand(command) || isTiedHoldExpansionInverse(command)
         || isTranscriptCaptionBatch(nativeCommands ?? []) || isTranscriptCaptionInverse(command)
-        || isTranscriptCaptionInverse(entry.nativeRegistration?.inverse);
+        || isTranscriptCaptionInverse(entry.nativeRegistration?.inverse) || isClipPlacementInverse(entry.nativeRegistration?.inverse);
     };
     undoStackRef.current = undoStackRef.current.filter(nativeRelation);
     redoStackRef.current = redoStackRef.current.filter(nativeRelation);

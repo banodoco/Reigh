@@ -341,6 +341,7 @@ export function useAssetManagement({
           intrinsicDurationSeconds: prepared.durationSeconds,
           existingTrackIds: current.config.tracks?.map((candidate) => candidate.id) ?? [],
           existingClipIds: current.config.clips.map((clip) => clip.id),
+          existingRegistryEntry: current.registry.assets[prepared.assetKey],
         })
       : undefined;
 

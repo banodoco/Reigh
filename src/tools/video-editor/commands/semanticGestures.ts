@@ -1,3 +1,6 @@
+import { isTrackHistoryInverse } from './trackHistory.ts';
+import { isClipStructureInverse } from './clipStructureHistory.ts';
+import { isClipPlacementInverse } from './clipPlacementHistory.ts';
 import { isTranscriptCaptionInverse } from './transcriptCaptionHistory.ts';
 import { isTranscriptCaptionBatch, transcriptBindTarget } from './transcriptCaptions.ts';
 import type { EditCommand } from '@/integrations/runtime/generated.ts';
@@ -15,7 +18,7 @@ import { isOverlapTrimInverse } from './overlapTrimHistory.ts';
 /** Intent is attached by the handler, never inferred from the resulting document. */
 const authoredCommands = new WeakMap<TimelineData, readonly EditCommand[]>();
 const authoredOccurrences = new WeakMap<TimelineData, TimelineOccurrenceContext>();
-const occurrenceOps = new Set(['clip.nudge', 'clip.set-track', 'clip.set-look', 'clip.set-param', 'clip.set-fade', 'clip.set-transition', 'clip.clear', 'transcript.bind']);
+const occurrenceOps = new Set(['clip.nudge', 'clip.set-track', 'clip.set-duration', 'clip.set-look', 'clip.set-param', 'clip.set-fade', 'clip.set-transition', 'clip.clear', 'transcript.bind']);
 const selectedMediaFields = ['asset', 'generation_id', 'variant_id', 'object_id', 'catalog_digest'];
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -92,7 +95,7 @@ export function attachGestureCommands(data: TimelineData, commands: readonly Edi
   let context: TimelineOccurrenceContext | undefined;
   let parent = false;
   const aggregateBatch = commands.length > 0 && commands.every((command) =>
-    isShotGroupAggregateCommand(command) || isAssetRegistrationCommand(command) || isAssetRegistrationInverse(command) || isOverlapTrimInverse(command) || isTiedHoldExpansionInverse(command) || isTranscriptCaptionInverse(command));
+    isShotGroupAggregateCommand(command) || isAssetRegistrationCommand(command) || isAssetRegistrationInverse(command) || isOverlapTrimInverse(command) || isTiedHoldExpansionInverse(command) || isTranscriptCaptionInverse(command) || isClipPlacementInverse(command) || isClipStructureInverse(command) || isTrackHistoryInverse(command));
   const captionTarget = isTranscriptCaptionBatch(commands) ? transcriptBindTarget(commands[0]) : undefined;
   // Routing reads the handler's explicit args.target. The submitted registered
   // timeline-level bind retains select:null; this local view only captures custody.
@@ -128,6 +131,8 @@ export function attachGestureCommands(data: TimelineData, commands: readonly Edi
       });
       if (matches.length !== 1) return;
       const next = contextFor(matches[0]);
+      if (next.projectId !== source.head?.projectId || next.parentDocumentId !== source.head?.timelineId
+        || next.headRevisionId !== source.head?.headRevisionId) return;
       if (context && JSON.stringify(context) !== JSON.stringify(next)) return;
       context = next;
     } else {
@@ -542,9 +547,12 @@ export function propertyGestureCommands(data: Pick<TimelineData, 'config'>, id: 
   return result;
 }
 export function deleteGestureCommands(data: TimelineData, ids: string[]): EditCommand[] {
-  return ids.map((id) => {
+  return ids.map((id, index) => {
     const clip = originalClip(data, id);
-    return command(id, 'clip.remove', {}, { '': state(clip, true) });
+    return command(id, 'clip.remove', {}, { '': state(clip, true),
+      clip_order: state(data.config.clips.filter(row => !ids.slice(0, index).includes(row.id)).map(row => scopedGestureClipId(row.id)), true),
+      'parent::config.pinnedShotGroups': state(data.config.pinnedShotGroups, hasOwn(data.config, 'pinnedShotGroups')),
+    });
   });
 }
 
@@ -814,7 +822,7 @@ export function fallbackDragGestureCommands(data: TimelineData, id: string, star
  * survive that round trip. This is an eligibility check, never an anchor resolver.
  * In particular c2 means a cut in D, not a neighbouring clip.
  */
-export function tiedStartDragGesture(data: TimelineData, id: string, start: number, track: string): {
+export function tiedStartDragGesture(data: TimelineData, id: string, start: number, track: string, grouped = false): {
   commands: EditCommand[]; meta: Partial<ClipMeta>;
 } | undefined {
   const clips = data.config.clips.filter((clip) => clip.id === id);
@@ -826,7 +834,7 @@ export function tiedStartDragGesture(data: TimelineData, id: string, start: numb
   if (!intent || typeof intent.on !== 'string' || track !== clip.track
     || (typeof clip.hold !== 'number' && !(typeof clip.from === 'number' && typeof clip.to === 'number'))
     || (typeof clip.hold === 'number' && (hasOwn(clip, 'from') || hasOwn(clip, 'to')))
-    || data.config.pinnedShotGroups?.some((group) => group.clipIds.includes(id))
+    || (!grouped && data.config.pinnedShotGroups?.some((group) => group.clipIds.includes(id)))
     || ['until', 'sequence', 'cut', 'segment', 'formulas', 'loop', 'orphan'].some((key) => hasOwn(intent, key) || hasOwn(clip.app ?? {}, key))
     || ['keyframes', 'modifiers', 'keyframeOrigin'].some((key) => hasOwn(clip, key) || hasOwn(clip.params ?? {}, key))) return undefined;
   // Canonical format_moment: optional beat/downbeat prefix, quoted word,
@@ -851,10 +859,12 @@ export function tiedStartDragGesture(data: TimelineData, id: string, start: numb
 
 /** Right-edge resizing with unchanged source edges, no tied end, no overlap side effects. */
 export function rightResizeGestureCommands(data: TimelineData, id: string, duration: number, patch: Partial<ClipMeta>): EditCommand[] | undefined {
-  const clip = originalClip(data, id);
+  const target = gestureTarget(data, id);
+  if (!target) return undefined;
+  const clip = gestureSource(data, id);
   const intent = clip.app?.astrid as Record<string, unknown> | undefined;
   if (intent?.until || intent?.for !== undefined) return undefined;
-  if (typeof clip.hold === 'number') return [command(id, 'clip.set-duration', { seconds: duration }, {
+  if (typeof clip.hold === 'number') return [command(target, 'clip.set-duration', { seconds: duration }, {
     hold: state(clip.hold, true),
     'app.astrid.until': state(intent?.until, false),
     'app.astrid.for': state(intent?.for, false),
@@ -868,6 +878,158 @@ export function rightResizeGestureCommands(data: TimelineData, id: string, durat
   return result;
 }
 
+/** Literal, non-overlapping left edge with no authored relation inventory.
+ * Source trim precedes the frame nudge; both expectations come from one base.
+ */
+export function leftResizeGestureCommands(
+  data: TimelineData, id: string, start: number, end: number, patch: Partial<ClipMeta>,
+): EditCommand[] | undefined {
+  if (!literalStructuralSource(data, id)) return undefined;
+  const clip = originalClip(data, id), action = data.rows.flatMap((row) => row.actions).find((action) => action.id === id);
+  const relationKeys = ['on', 'until', 'for', 'cut', 'sequence', 'segment', 'formulas', 'loop', 'orphan'];
+  if (clip.app?.canonical || data.config.pinnedShotGroups?.some((group) => group.clipIds.includes(id))
+    || data.config.clips.some((row) => relationKeys.some((key) => hasOwn(row.app ?? {}, key)
+      || hasOwn((row.app?.astrid as object | undefined) ?? {}, key)))
+    || !action || action.start !== clip.at || end !== action.end || !Number.isFinite(data.output.fps) || data.output.fps <= 0
+    || start < 0 || end <= start || [action.start, start, end].some((time) =>
+      !Number.isFinite(time) || Math.abs(time * data.output.fps - Math.round(time * data.output.fps)) > 1e-6)) return undefined;
+  const move = moveGestureCommands(data, id, start, clip.track);
+  if (!move?.length) return undefined;
+  if (typeof clip.hold === 'number') {
+    const resize = rightResizeGestureCommands(data, id, end - start, patch);
+    return resize ? [...move, ...resize] : undefined;
+  }
+  if (typeof patch.from !== 'number' || typeof patch.to !== 'number' || patch.to !== clip.to
+    || !Number.isFinite(patch.from) || patch.from < 0 || patch.from >= patch.to
+    || (patch.speed ?? 1) !== (clip.speed ?? 1)) return undefined;
+  return [command(id, 'clip.trim', { in_s: patch.from, out_s: patch.to }, { '': state(clip, true) }), ...move];
+}
+
+/** Mounted trimClip names both requested timeline edges. Its media range is
+ * computed by that handler from the captured source, never from a config diff. */
+export function toolTrimGestureCommands(
+  data: TimelineData, id: string, start: number, end: number, range: { from?: number; to?: number },
+): EditCommand[] | undefined {
+  if (!literalStructuralSource(data, id)) return undefined;
+  const clip = originalClip(data, id), action = data.rows.flatMap(row => row.actions).find(action => action.id === id), fps = data.output.fps;
+  const relations = ['on', 'until', 'for', 'cut', 'sequence', 'segment', 'formulas', 'loop', 'orphan'];
+  if (!action || action.start !== clip.at || !Number.isFinite(fps) || fps <= 0 || start < action.start || end > action.end || end <= start
+    || data.config.pinnedShotGroups?.some(group => group.clipIds.includes(id))
+    || data.config.clips.some(row => relations.some(key => hasOwn(row.app ?? {}, key) || hasOwn((row.app?.astrid as object | undefined) ?? {}, key)))
+    || [action.start, action.end, start, end].some(time => !Number.isFinite(time) || Math.abs(time * fps - Math.round(time * fps)) > 1e-6)) return undefined;
+  const move = start === action.start ? [] : moveGestureCommands(data, id, start, clip.track);
+  if (!move) return undefined;
+  if (typeof clip.hold === 'number') {
+    const resize = rightResizeGestureCommands(data, id, end - start, {});
+    return resize ? [...move, ...resize] : undefined;
+  }
+  const asset = clip.asset && data.registry.assets[clip.asset];
+  if (!asset || !['video', 'audio'].some(type => asset.type?.startsWith(type)) || typeof asset.duration !== 'number'
+    || typeof clip.to !== 'number' || typeof range.from !== 'number' || typeof range.to !== 'number'
+    || !Number.isFinite(range.from) || !Number.isFinite(range.to) || range.from < (clip.from ?? 0)
+    || range.to > clip.to || range.to > asset.duration || range.to <= range.from) return undefined;
+  return [command(id, 'clip.trim', { in_s: range.from, out_s: range.to }, { '': state(clip, true) }), ...move];
+}
+
+/** Tiny literal media expansion retains speed and extends the source out point,
+ * matching the existing row serializer rather than retiming the source. */
+export function tinyMediaExpansionGestureCommands(data: TimelineData, id: string): EditCommand[] | undefined {
+  if (!literalStructuralSource(data, id)) return undefined;
+  const clip = originalClip(data, id), action = data.rows.flatMap(row => row.actions).find(action => action.id === id);
+  const asset = clip.asset && data.registry.assets[clip.asset];
+  const start = clip.from ?? 0, speed = clip.speed ?? 1, fps = data.output.fps, out = start + 0.5 * speed;
+  const relations = ['on', 'until', 'for', 'cut', 'sequence', 'segment', 'formulas', 'loop', 'orphan'];
+  if (typeof clip.hold === 'number' || clip.clipType !== 'media' || !action || action.start !== clip.at
+    || action.end - action.start >= 0.5 || action.end <= action.start || typeof clip.to !== 'number' || out <= clip.to
+    || !asset || !['video', 'audio'].some(type => asset.type?.startsWith(type)) || typeof asset.duration !== 'number' || out > asset.duration
+    || !Number.isFinite(start) || start < 0 || !Number.isFinite(speed) || speed <= 0 || !Number.isFinite(out)
+    || !Number.isFinite(fps) || fps <= 0 || data.config.pinnedShotGroups?.some(group => group.clipIds.includes(id))
+    || data.config.clips.some(row => relations.some(key => hasOwn(row.app ?? {}, key) || hasOwn((row.app?.astrid as object | undefined) ?? {}, key)))
+    || [action.start, action.end, action.start + 0.5].some(time => !Number.isFinite(time) || Math.abs(time * fps - Math.round(time * fps)) > 1e-6)) return undefined;
+  return [command(id, 'clip.trim', { out_s: out }, { '': state(clip, true) })];
+}
+
+/** The existing media-end clamp is a source-out trim, not an asset swap. */
+export function mediaEndTrimGestureCommands(data: TimelineData, id: string, out: number): EditCommand[] | undefined {
+  if (!literalStructuralSource(data, id)) return undefined;
+  const clip = originalClip(data, id), action = data.rows.flatMap((row) => row.actions).find((action) => action.id === id);
+  const asset = clip.asset && data.registry.assets[clip.asset];
+  const relationKeys = ['on', 'until', 'for', 'cut', 'sequence', 'segment', 'formulas', 'loop', 'orphan'];
+  const start = clip.from ?? 0, speed = clip.speed ?? 1, fps = data.output.fps;
+  if (clip.app?.canonical || typeof clip.hold === 'number' || clip.clipType !== 'media' || !action || action.start !== clip.at
+    || !asset || !asset.type?.startsWith('video') || out !== asset.duration || !Number.isFinite(out)
+    || !Number.isFinite(start) || start < 0 || out <= start || !Number.isFinite(speed) || speed <= 0
+    || typeof clip.to !== 'number' || clip.to <= out || !Number.isFinite(fps) || fps <= 0
+    || data.config.pinnedShotGroups?.some((group) => group.clipIds.includes(id))
+    || data.config.clips.some((row) => relationKeys.some((key) => hasOwn(row.app ?? {}, key)
+      || hasOwn((row.app?.astrid as object | undefined) ?? {}, key)))
+    || [action.start, action.end, action.start + (out - start) / speed].some((time) =>
+      !Number.isFinite(time) || Math.abs(time * fps - Math.round(time * fps)) > 1e-6)) return undefined;
+  return [command(id, 'clip.trim', { out_s: out }, { '': state(clip, true) })];
+}
+
+/** Exact same-track soft-group moves, including the admitted canonical word
+ * tie. A plain drag adjusts its offset without a destructive-choice prompt.
+ */
+export function groupMoveGesture(
+  data: TimelineData, moves: readonly { clipId: string; targetRowId: string }[], rows: TimelineData['rows'],
+): { commands: EditCommand[]; metaUpdates: Record<string, Partial<ClipMeta>> } | undefined {
+  const ordinary = plannedMoveGestureCommands(data, moves, rows);
+  if (!ordinary) return undefined;
+  const commands: EditCommand[] = [], metaUpdates: Record<string, Partial<ClipMeta>> = {};
+  for (const move of moves) {
+    const clip = originalClip(data, move.clipId);
+    if (clip.app?.canonical || move.targetRowId !== clip.track) return undefined;
+    const action = rows.flatMap((row) => row.actions).find((action) => action.id === move.clipId)!;
+    if (literalStructuralSource(data, move.clipId)) {
+      commands.push(...ordinary.filter((call) => call.select === scopedGestureClipId(move.clipId)));
+    } else {
+      const tied = tiedStartDragGesture(data, move.clipId, action.start, move.targetRowId, true);
+      if (!tied) return undefined;
+      commands.push(...tied.commands); metaUpdates[move.clipId] = tied.meta;
+    }
+  }
+  return commands.length ? { commands, metaUpdates } : undefined;
+}
+
+/** Ordinary group right-edge resize: exact captured per-member edges only.
+ * The planner still owns geometry. No relations, overlap trims, membership or
+ * source-edge changes can be disguised as an ordinary duration/move batch.
+ */
+export function groupRightResizeGestureCommands(
+  data: TimelineData,
+  ids: readonly string[],
+  rows: TimelineData['rows'],
+  patches: Record<string, Partial<ClipMeta>>,
+): EditCommand[] | undefined {
+  const selected = new Set(ids);
+  if (selected.size !== ids.length || !ids.length || !Number.isFinite(data.output.fps) || data.output.fps <= 0) return undefined;
+  const old = new Map(data.rows.flatMap((row) => row.actions.map((action) => [action.id, { action, row: row.id }] as const)));
+  const next = new Map(rows.flatMap((row) => row.actions.map((action) => [action.id, { action, row: row.id }] as const)));
+  if (old.size !== next.size || [...old].some(([id, before]) => !selected.has(id)
+    && JSON.stringify(before) !== JSON.stringify(next.get(id)))) return undefined;
+  const result: EditCommand[] = [];
+  for (const id of ids) {
+    const before = old.get(id), after = next.get(id);
+    if (!literalStructuralSource(data, id) || !before || !after || before.row !== after.row
+      || after.action.end <= after.action.start || after.action.start < 0
+      || [before.action.start, before.action.end, after.action.start, after.action.end].some((time) =>
+        !Number.isFinite(time) || Math.abs(time * data.output.fps - Math.round(time * data.output.fps)) > 1e-6)) return undefined;
+    if (after.action.start !== before.action.start) {
+      const move = moveGestureCommands(data, id, after.action.start, after.row);
+      if (!move) return undefined;
+      result.push(...move);
+    }
+    const duration = after.action.end - after.action.start;
+    if (Math.abs(duration - (before.action.end - before.action.start)) > 1e-7) {
+      const resize = rightResizeGestureCommands(data, id, duration, patches[id] ?? {});
+      if (!resize) return undefined;
+      result.push(...resize);
+    }
+  }
+  return result.length ? result : undefined;
+}
+
 /** Map explicit planner moves; row comparison only refuses unsupported side effects. */
 export function plannedMoveGestureCommands(
   data: TimelineData,
@@ -875,6 +1037,8 @@ export function plannedMoveGestureCommands(
   rows: TimelineData['rows'],
 ): EditCommand[] | undefined {
   const moved = new Set(moves.map((move) => move.clipId));
+  const fps = data.output.fps;
+  if (!Number.isFinite(fps) || fps <= 0 || moved.size !== moves.length) return undefined;
   const oldActions = new Map(data.rows.flatMap((row) => row.actions).map((action) => [action.id, action]));
   if (rows.some((row) => row.actions.some((action) => {
     const old = oldActions.get(action.id);
@@ -886,6 +1050,9 @@ export function plannedMoveGestureCommands(
     const actual = row?.actions.find((action) => action.id === move.clipId);
     if (!old || !actual || row?.id !== move.targetRowId
       || Math.abs((actual.end - actual.start) - (old.end - old.start)) > 1e-7) return undefined;
+    const delta = (actual.start - old.start) * fps;
+    if (!Number.isFinite(actual.start) || actual.start < 0 || Math.abs(delta - Math.round(delta)) > 1e-6
+      || [old.start, actual.start].some((time) => Math.abs(time * fps - Math.round(time * fps)) > 1e-6)) return undefined;
     return moveGestureCommands(data, move.clipId, actual.start, move.targetRowId);
   });
   return groups.every((commands) => commands !== undefined) ? groups.flat() : undefined;
@@ -897,6 +1064,7 @@ export function plannedMoveGestureCommands(
 export function literalStructuralSource(data: TimelineData, id: string): boolean {
   if (!id || id.includes('/') || data.config.clips.filter((clip) => clip.id === id).length !== 1) return false;
   const clip = originalClip(data, id);
+  if (clip.app?.canonical) return false;
   const intent = { ...clip.app, ...(clip.app?.astrid as Record<string, unknown> | undefined) } as Record<string, unknown>;
   if (['on', 'until', 'for', 'cut', 'sequence', 'segment', 'formulas', 'loop', 'orphan'].some((key) => intent[key] !== undefined)
     || ['keyframes', 'modifiers', 'keyframeOrigin'].some((key) => hasOwn(clip, key))
@@ -939,7 +1107,8 @@ export function emptyTrackGestureCommands(data: TimelineData, ids: readonly stri
     if (!id || id.includes('/') || tracks.length !== 1 || data.config.clips.some((clip) => clip.track === id)
       || Object.values(beds ?? {}).some((entry) => !entry || typeof entry !== 'object'
         || (entry as { source?: { track?: string } }).source?.track === id)) return undefined;
-    result.push({ op: 'timeline.remove', select: `parent/track:${id}`, args: {}, expect: { '': state(tracks[0], true) } });
+    result.push({ op: 'timeline.remove', select: `parent/track:${id}`, args: {}, expect: { '': state(tracks[0], true),
+      track_order: state(data.config.tracks!.filter(track => !ids.slice(0, result.length).includes(track.id)).map(track => `parent/track:${track.id}`), true) } });
   }
   return result;
 }

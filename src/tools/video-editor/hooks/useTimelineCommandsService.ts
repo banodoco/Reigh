@@ -1,5 +1,7 @@
+import { buildSelectedProjectMediaAddCommand } from '../commands/selectedProjectMedia.ts';
+import { addTrackGestureCommands, authoredTracks } from '../commands/trackGestures.ts';
 import type { TimelineEditability } from '@/tools/video-editor/lib/timeline-editability.ts';
-import { duplicateGestureCommands, deleteGestureCommands, literalStructuralSource, moveGestureCommands, propertyGestureCommands, rightResizeGestureCommands } from '../commands/semanticGestures.ts';
+import { toolTrimGestureCommands, structuralChildId, splitGestureCommands, duplicateGestureCommands, deleteGestureCommands, literalStructuralSource, moveGestureCommands, propertyGestureCommands, rightResizeGestureCommands } from '../commands/semanticGestures.ts';
 import { getAssetImmediateSource } from '../lib/asset-registry.ts';
 import { canonicalJsonStringify } from '../data/typed/timelineBundle.ts';
 import { useMemo } from 'react';
@@ -320,6 +322,7 @@ const duplicateRippleCommands = (current: TimelineData, sourceId: string, edit: 
       && clip.at === action.start))) return undefined;
   const commands = duplicateGestureCommands(current, sourceId, source.end, edit.clipId);
   if (!commands) return undefined;
+  commands[0].expect = { ...commands[0].expect, [`parent/clip:${sourceId}::clip_order`]: { state: 'present', value: current.config.clips.map(clip => `parent/clip:${clip.id}`) } };
   const planned = edit.rows.find((candidate) => candidate.id === row.id);
   for (const action of affected.slice(1)) {
     const next = planned?.actions.find((candidate) => candidate.id === action.id);
@@ -561,10 +564,24 @@ export function createTimelineCommands(
         if (!detail || typeof detail.clipId !== 'string' || typeof detail.trackId !== 'string') {
           return failure('mutation_failed', 'Failed to place the prepared asset on the timeline.');
         }
+        const inserted = preview.nextData.config.clips.find(clip => clip.id === detail.clipId);
+        const track = current.config.tracks?.find(candidate => candidate.id === detail.trackId);
+        const duration = inserted && typeof inserted.hold === 'number' ? inserted.hold
+          : inserted && typeof inserted.from === 'number' && typeof inserted.to === 'number' ? inserted.to - inserted.from : null;
+        const pureInsert = !input.afterClipId && !input.removeClipId && !input.removeClipIds?.length
+          && !input.replaceClipId && input.pinnedShotGroupsOverride === undefined && !input.forceNewTrack && !input.insertAtTop;
+        const editCommand = pureInsert && input.preparedAsset.selectedMedia && inserted && track && typeof inserted.at === 'number' && duration !== null
+          ? buildSelectedProjectMediaAddCommand({ selection: input.preparedAsset.selectedMedia,
+            assetKey: input.preparedAsset.assetKey, mediaType: input.preparedAsset.mediaType,
+            trackId: track.id, trackKind: track.kind, clipId: detail.clipId, at: inserted.at, durationSeconds: duration,
+            intrinsicDurationSeconds: input.preparedAsset.durationSeconds,
+            existingTrackIds: current.config.tracks?.map(candidate => candidate.id) ?? [], existingClipIds: current.config.clips.map(clip => clip.id),
+            existingRegistryEntry: current.registry.assets[input.preparedAsset.assetKey], }) : undefined;
         state.ops.applyEdit({ type: 'prepared-media', command }, {
           selectedClipId: detail.clipId,
           selectedTrackId: detail.trackId,
           semantic: true,
+          ...(editCommand ? { editCommands: [editCommand] } : {}),
         });
         return success({ clipId: detail.clipId, trackId: detail.trackId });
       }
@@ -849,6 +866,8 @@ export function createTimelineCommands(
         return failure('invalid_argument', 'trimClip requires an end time after the start time.');
       }
 
+      if (nextStart === currentStart && nextEnd === currentEnd) return success({ clipId: input.clipId, startTime: nextStart, endTime: nextEnd });
+
       const nextConfig = updateClipInConfig(current.resolvedConfig, input.clipId, (existingClip) => {
         if (isHoldClip(existingClip)) {
           return {
@@ -883,7 +902,8 @@ export function createTimelineCommands(
           selectedTrackId: clip.track,
           semantic: true,
           editCommands: isHoldClip(clip) && nextStart === currentStart
-            ? rightResizeGestureCommands(current, input.clipId, roundTimelineValue(nextEnd - nextStart), {}) : undefined,
+            ? rightResizeGestureCommands(current, input.clipId, roundTimelineValue(nextEnd - nextStart), {})
+            : toolTrimGestureCommands(current, input.clipId, nextStart, nextEnd, nextConfig.clips.find(row => row.id === input.clipId)!),
         },
       );
     },
@@ -913,7 +933,9 @@ export function createTimelineCommands(
       const managedBlock = checkManagedClip(input.clipId);
       if (managedBlock) return managedBlock;
 
-      const splitResult = splitClipAtPlayhead(current.resolvedConfig, input.clipId, input.time);
+      const childId = structuralChildId(current, input.clipId);
+      const editCommands = splitGestureCommands(current, input.clipId, input.time, childId);
+      const splitResult = splitClipAtPlayhead(current.resolvedConfig, input.clipId, input.time, editCommands ? childId : undefined);
       if (!splitResult.nextSelectedClipId) {
         return failure('invalid_argument', 'The requested split time is outside the clip’s playable range.');
       }
@@ -930,6 +952,7 @@ export function createTimelineCommands(
           selectedClipId: splitResult.nextSelectedClipId,
           selectedTrackId: clip.track,
           semantic: true,
+          editCommands,
         },
       );
     },
@@ -997,6 +1020,11 @@ export function createTimelineCommands(
       if (!nextTrack) {
         return failure('mutation_failed', 'Failed to create the requested track.');
       }
+      const capturedTracks = authoredTracks(current);
+      const appendOnly = capturedTracks && nextConfig.tracks.length === capturedTracks.length + 1
+        && nextConfig.tracks.at(-1)?.id === nextTrack.id
+        && capturedTracks.every((track, index) => canonicalJsonStringify(track) === canonicalJsonStringify(nextConfig.tracks[index]));
+      const editCommands = appendOnly ? addTrackGestureCommands(current, nextTrack) : undefined;
 
       return applyValidatedMutation(
         store,
@@ -1008,6 +1036,7 @@ export function createTimelineCommands(
         { trackId: nextTrack.id },
         {
           selectedTrackId: nextTrack.id,
+          ...(editCommands ? { semantic: true, editCommands } : {}),
         },
       );
     },

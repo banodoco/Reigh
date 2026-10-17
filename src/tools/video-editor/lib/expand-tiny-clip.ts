@@ -1,4 +1,4 @@
-import { rightResizeGestureCommands, tiedEndResizeGesture } from '../commands/semanticGestures.ts';
+import { rightResizeGestureCommands, tiedEndResizeGesture, tinyMediaExpansionGestureCommands } from '../commands/semanticGestures.ts';
 import type { ApplyEditOptions, TimelineEditMutation } from '../hooks/useTimelineCommit.ts';
 import type { ClipMeta, TimelineData } from './timeline-data.ts';
 
@@ -37,9 +37,9 @@ export function expandTinyClip(
   const clipMeta = current.meta[clipId];
   const metaUpdates: Record<string, Partial<ClipMeta>> = {};
   if (clipMeta && typeof clipMeta.hold === 'number') metaUpdates[clipId] = { hold: 0.5 };
-  // Media changes and unsupported tied ends retain their existing fallback.
+  // Literal media extends its source out point; unsupported relations retain their existing fallback.
   const editCommands = typeof clipMeta?.hold === 'number'
-    ? rightResizeGestureCommands(current, clipId, 0.5, {}) : undefined;
+    ? rightResizeGestureCommands(current, clipId, 0.5, {}) : tinyMediaExpansionGestureCommands(current, clipId);
   applyEdit({
     type: 'rows',
     rows: current.rows.map((candidate) => candidate.id !== row.id ? candidate : {

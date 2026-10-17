@@ -608,6 +608,9 @@ export type AssetRegistryEntry = {
   url?: string;
   etag?: string;
   content_sha256?: string;
+  /** Detached SDK selected-media provenance; opaque, persisted and never edited. */
+  format?: Record<string, unknown>;
+  authoring_metadata?: { generation: Record<string, unknown>; variant: Record<string, unknown> };
   url_expires_at?: string;
   type?: string;
   duration?: number;

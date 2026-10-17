@@ -1,3 +1,4 @@
+import { trimClipToMediaEnd } from '../../lib/trim-to-media-end.ts';
 // Layer map & invariants: docs/structure_detail/tool_video_editor.md
 import { expandTinyClip } from '../../lib/expand-tiny-clip.ts';
 import { memo, useCallback, useLayoutEffect, useMemo, useState } from 'react';
@@ -33,7 +34,6 @@ import type { CanonicalShotOccurrence } from '@/tools/video-editor/data/shotComp
 import type { EditorVariantPicker, TimelineCoreHostObservations } from '@/tools/video-editor/runtime/editorHostObservations.ts';
 import { useTimelineScale } from '@/tools/video-editor/hooks/useTimelineScale.ts';
 import {
-  clampClipToMediaDuration,
   convertOverhangToHold,
   detectClipOverhang,
 } from '@/tools/video-editor/lib/overhang.ts';
@@ -646,55 +646,7 @@ function TimelineEditorCoreComponent({
   }, [applyEdit, dataRef]);
 
   const handleTrimClipToMediaEnd = useCallback((clipId: string) => {
-    const current = dataRef.current;
-    if (!current) {
-      return;
-    }
-
-    const clipMeta = current.meta[clipId];
-    const assetKey = clipMeta?.asset;
-    const assetEntry = assetKey ? current.registry.assets[assetKey] : undefined;
-    if (!clipMeta || !assetEntry?.type?.startsWith('video') || typeof assetEntry.duration !== 'number') {
-      return;
-    }
-
-    const sourceRow = current.rows.find((row) => row.actions.some((action) => action.id === clipId));
-    const sourceAction = sourceRow?.actions.find((action) => action.id === clipId);
-    if (!sourceRow || !sourceAction) {
-      return;
-    }
-
-    const clamped = clampClipToMediaDuration({
-      action: sourceAction,
-      clipMeta,
-      sourceDurationSeconds: assetEntry.duration,
-    });
-    if (!clamped) {
-      return;
-    }
-
-    applyEdit({
-      type: 'rows',
-      rows: current.rows.map((row) => {
-        if (row.id !== sourceRow.id) {
-          return row;
-        }
-
-        return {
-          ...row,
-          actions: row.actions.map((action) => (
-            action.id === clipId ? clamped.nextAction : action
-          )),
-        };
-      }),
-      metaUpdates: {
-        [clipId]: clamped.metaPatch,
-      },
-    }, {
-      selectedClipId: clipId,
-      selectedTrackId: clipMeta.track,
-      semantic: true,
-    });
+    trimClipToMediaEnd(dataRef, applyEdit, clipId);
   }, [applyEdit, dataRef]);
 
   const handleConvertClipOverhangToHold = useCallback((clipId: string) => {

@@ -15,6 +15,8 @@ export type UndoEntry = {
   nativeRegistration?: {
     owner: import('../lib/timeline-data.ts').TimelineData;
     inverse?: import('@/integrations/runtime/generated.ts').EditCommand;
+    /** Exact original selected-media add only; Redo repeats authority validation. */
+    mediaReplay?: import('@/integrations/runtime/generated.ts').EditCommand;
   };
   snapshot: UndoSnapshot;
   timestamp: string;

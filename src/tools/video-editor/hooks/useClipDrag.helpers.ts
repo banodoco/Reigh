@@ -1,4 +1,4 @@
-import { plannedMoveGestureCommands } from '../commands/semanticGestures.ts';
+import { groupMoveGesture, plannedMoveGestureCommands } from '../commands/semanticGestures.ts';
 import type { TimelineApplyEdit } from '@/tools/video-editor/hooks/timeline-state-types.ts';
 import { userSelectTimelineClip, userSelectTimelineClips } from '@/shared/state/selectionStore.ts';
 import type { DropPosition } from '@/tools/video-editor/lib/drop-position.ts';
@@ -467,15 +467,20 @@ export function commitDraggingSession({
                 nextRows,
               )
             : undefined;
+          // Cross-track group identity/order needs its own producer. The
+          // same-track slice retains the exact grouping and captures every member.
+          const group = session.groupDragEntry
+            && JSON.stringify(pinnedShotGroupsOverride) === JSON.stringify(liveData.config.pinnedShotGroups)
+            ? groupMoveGesture(liveData, moves, nextRows) : undefined;
           callbacks.applyEdit({
             type: 'rows',
             rows: nextRows,
-            metaUpdates,
+            metaUpdates: { ...metaUpdates, ...Object.fromEntries(Object.entries(group?.metaUpdates ?? {}).map(([id, patch]) => [id, { ...metaUpdates[id], ...patch }])) },
             clipOrderOverride: nextClipOrder,
             pinnedShotGroupsOverride,
           }, {
             transactionId: session.transactionId,
-            editCommands: session.groupDragEntry ? undefined : plannedMoveGestureCommands(liveData, moves, nextRows),
+            editCommands: session.groupDragEntry ? group?.commands : plannedMoveGestureCommands(liveData, moves, nextRows),
           });
         }
       }

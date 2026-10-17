@@ -1,3 +1,6 @@
+import { trackHistoryInverse } from '@/tools/video-editor/commands/trackHistory.ts';
+import { clipStructureInverse } from '@/tools/video-editor/commands/clipStructureHistory.ts';
+import { clipPlacementInverse } from '@/tools/video-editor/commands/clipPlacementHistory.ts';
 import { transcriptCaptionInverse } from '@/tools/video-editor/commands/transcriptCaptionHistory.ts';
 import { isTranscriptCaptionBatch, transcriptBindTarget } from '@/tools/video-editor/commands/transcriptCaptions.ts';
 import { createProjectTranscriptReader } from './projectTranscriptReader.ts';
@@ -909,8 +912,11 @@ export class RuntimeDataProvider implements DataProvider {
       && (isAssetRegistrationCommand(registryCommands[0]) || isAssetRegistrationInverse(registryCommands[0]));
     const captionInverse = transcriptCaptionInverse(registryCommands, result);
     const overlapInverse = overlapTrimInverse(registryCommands, result);
-    const commandInverse = registryNoChange ? null : captionInverse !== undefined ? captionInverse : assetRegistrationInverse(registryCommands, result)
-      ?? (overlapInverse !== undefined ? overlapInverse : tiedHoldExpansionInverse(registryCommands, result));
+    // null means this owner explicitly had no change; it must not fall through.
+    const commandInverse = registryNoChange ? null : [captionInverse, assetRegistrationInverse(registryCommands, result),
+      overlapInverse, tiedHoldExpansionInverse(registryCommands, result), clipPlacementInverse(registryCommands, result),
+      clipStructureInverse(registryCommands, result), trackHistoryInverse(registryCommands, result)]
+      .find(inverse => inverse !== undefined);
     return { configVersion: version, head: this.timelineHead(timelineId, head),
       ...(commandInverse !== undefined ? { commandInverse } : {}) };
   }

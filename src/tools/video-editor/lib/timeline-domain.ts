@@ -248,6 +248,8 @@ const ASSET_REGISTRY_ENTRY_FIELDS = [
   'url',
   'etag',
   'content_sha256',
+  'format',
+  'authoring_metadata',
   'url_expires_at',
   'type',
   'duration',
@@ -2561,7 +2563,9 @@ export const sanitizeAssetRegistryEntry = (entry: AssetRegistryEntry): AssetRegi
     if (value === undefined) {
       continue;
     }
-    if (field === 'metadata') {
+    if (field === 'format' || field === 'authoring_metadata') {
+      sanitizedEntries.push([field, cloneAppValue(value)]);
+    } else if (field === 'metadata') {
       const validated = validateAssetMetadata(value);
       if (validated) {
         sanitizedEntries.push([field, validated]);

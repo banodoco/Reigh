@@ -25,6 +25,10 @@ export function readSelectedProjectMediaIdentity(value: unknown): SelectedProjec
   return value as unknown as SelectedProjectMediaIdentity;
 }
 
+/** Match the admitted SDK property-path grammar without splitting asset keys. */
+export const selectedMediaRegistryExpectationPath = (asset: string): string =>
+  /^[A-Za-z_][\w-]*$/.test(asset) ? `parent::registry.assets.${asset}` : `parent::registry.assets[${JSON.stringify(asset)}]`;
+
 export function buildSelectedProjectMediaAddCommand({
   selection: selectionValue,
   assetKey,
@@ -37,6 +41,7 @@ export function buildSelectedProjectMediaAddCommand({
   intrinsicDurationSeconds,
   existingTrackIds,
   existingClipIds,
+  existingRegistryEntry,
 }: {
   selection: unknown;
   assetKey: string;
@@ -49,6 +54,7 @@ export function buildSelectedProjectMediaAddCommand({
   intrinsicDurationSeconds: number | null;
   existingTrackIds: readonly string[];
   existingClipIds: readonly string[];
+  existingRegistryEntry?: unknown;
 }): EditCommand | undefined {
   const selection = readSelectedProjectMediaIdentity(selectionValue);
   if (!selection || selection.asset !== assetKey || !assetKey
@@ -71,12 +77,15 @@ export function buildSelectedProjectMediaAddCommand({
     select: `parent/track:${trackId}`,
     args: {
       media: selection,
+      clip_id: clipId,
       at,
       duration: durationSeconds,
     },
     created: [scopedClipId],
     expect: {
       [`${scopedClipId}::`]: { state: 'absent' },
+      [selectedMediaRegistryExpectationPath(selection.asset)]: existingRegistryEntry === undefined
+        ? { state: 'absent' } : { state: 'present', value: structuredClone(existingRegistryEntry) },
     },
   };
 }

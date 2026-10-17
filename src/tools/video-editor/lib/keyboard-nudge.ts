@@ -1,5 +1,5 @@
 import type { ApplyEditOptions } from '../hooks/useTimelineCommit.ts';
-import { plannedMoveGestureCommands } from '../commands/semanticGestures.ts';
+import { groupMoveGesture, plannedMoveGestureCommands } from '../commands/semanticGestures.ts';
 import { categorizeSelection } from '@/tools/video-editor/lib/pinned-group-projection.ts';
 import {
   applyMultiDragMoves,
@@ -122,17 +122,18 @@ export function buildKeyboardTimeNudgeEdit(
   }
 
   const { nextRows, metaUpdates, nextClipOrder } = applyMultiDragMoves(currentData, moves);
+  const group = selection.groups.length ? groupMoveGesture(currentData, moves, nextRows) : undefined;
 
   return {
     mutation: {
       type: 'rows',
       rows: nextRows,
-      metaUpdates,
+      metaUpdates: { ...metaUpdates, ...Object.fromEntries(Object.entries(group?.metaUpdates ?? {}).map(([id, patch]) => [id, { ...metaUpdates[id], ...patch }])) },
       clipOrderOverride: nextClipOrder,
     },
     options: {
       semantic: true,
-      editCommands: selection.groups.length ? undefined : plannedMoveGestureCommands(currentData, moves, nextRows),
+      editCommands: selection.groups.length ? group?.commands : plannedMoveGestureCommands(currentData, moves, nextRows),
     },
   };
 }

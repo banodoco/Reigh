@@ -1,4 +1,4 @@
-import { rightResizeGestureCommands, tiedEndResizeGesture, legacyTiedEndResizeGesture, overlapTrimGesture } from '../commands/semanticGestures.ts';
+import { leftResizeGestureCommands, groupRightResizeGestureCommands, rightResizeGestureCommands, tiedEndResizeGesture, legacyTiedEndResizeGesture, overlapTrimGesture } from '../commands/semanticGestures.ts';
 import { useCallback, useContext, useRef } from 'react';
 import { VideoEditorRuntimeContext } from '../contexts/VideoEditorRuntimeContext.tsx';
 import { buildRowTrackPatches } from '@/tools/video-editor/lib/coordinate-utils.ts';
@@ -368,7 +368,11 @@ export function useClipResize({
           overlapMetaPatches,
           perClipMetaUpdates,
         ),
-      }, { transactionId });
+      }, { transactionId,
+        editCommands: session.edge === 'right' && Object.keys(overlapMetaPatches).length === 0
+          ? groupRightResizeGestureCommands(current, session.context.groupClipIds, nextRows, perClipMetaUpdates)
+          : undefined,
+      });
 
       clearResizeTracking(session.clipId);
       return;
@@ -432,6 +436,13 @@ export function useClipResize({
       return;
     }
 
+    const literalLeft = session.edge === 'left' && Object.keys(overlapPatches).length === 0
+      ? leftResizeGestureCommands(current, session.clipId, effectiveStart, effectiveEnd, primaryPatch) : undefined;
+    if (literalLeft && semanticEndChoices && (!captured || captured.config !== JSON.stringify(current.config)
+      || captured.head !== JSON.stringify(current.head) || captured.fps !== current.output.fps)) {
+      clearResizeTracking(session.clipId);
+      return;
+    }
     if (tiedEnd && 'astrid' in tiedEnd) primaryPatch.app = { ...primary.clipMeta.app, astrid: tiedEnd.astrid };
     applyEdit({
       type: 'rows',
@@ -445,7 +456,7 @@ export function useClipResize({
       ),
     }, {
       transactionId,
-      editCommands: tiedEnd?.commands ?? (session.edge === 'right' && effectiveStart === primary.origin.start
+      editCommands: tiedEnd?.commands ?? literalLeft ?? (session.edge === 'right' && effectiveStart === primary.origin.start
         && Object.keys(overlapPatches).length === 0
         ? rightResizeGestureCommands(current, session.clipId, effectiveEnd - effectiveStart, primaryPatch)
         : undefined),

@@ -1,6 +1,9 @@
+import { trimClipToMediaEnd } from '../lib/trim-to-media-end.ts';
 // @vitest-environment jsdom
 import React, { useEffect } from 'react';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { canonicalJsonStringify } from '../data/typed/timelineBundle.ts';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
@@ -264,12 +267,10 @@ async function setup(reply?: FixtureReply, media = false, providedInitial?: Time
   const query = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
   const wrapper = ({ children }: { children: React.ReactNode }) => {
     const queryChildren = React.createElement(QueryClientProvider, { client: query }, children);
-    return elementHost
-      ? React.createElement(VideoEditorRuntimeProvider, {
-        value: { astridElementHost: elementHost } as VideoEditorRuntimeContextValue,
-        children: queryChildren,
-      })
-      : queryChildren;
+    return React.createElement(VideoEditorRuntimeProvider, {
+      value: { provider: fixture.provider, timelineId: 'gesture-timeline', ...(elementHost ? { astridElementHost: elementHost } : {}) } as VideoEditorRuntimeContextValue,
+      children: queryChildren,
+    });
   };
   const selectClip = vi.fn();
   const hook = renderHook(() => {
@@ -1895,7 +1896,8 @@ describe('WRITERS mounted tool command service', () => {
     const expected = writer === 'updateClip' ? [property]
       : writer === 'setClipParams' ? [{ ...scoped, op: 'clip.set-param', args: { path: 'data', value: 'Updated' }, expect: { 'params.data': { state: 'present', value: null } } }]
       : writer === 'moveClip' ? move
-      : writer === 'deleteClip' ? [{ ...scoped, op: 'clip.remove', args: {}, expect: { '': { state: 'present', value: h.initial.config.clips[0] } } }]
+      : writer === 'deleteClip' ? [{ ...scoped, op: 'clip.remove', args: {}, expect: { '': { state: 'present', value: h.initial.config.clips[0] },
+        clip_order: { state: 'present', value: h.initial.config.clips.map(clip => `parent/clip:${clip.id}`) }, 'parent::config.pinnedShotGroups': { state: 'absent' } } }]
       : writer === 'trimClip' || writer === 'hold update' ? [{ ...scoped, op: 'clip.set-duration', args: { seconds: 1.5 }, expect: { hold: { state: 'present', value: 2 }, 'app.astrid.until': { state: 'absent' }, 'app.astrid.for': { state: 'absent' } } }]
       : [...move, property];
     expect(h.requests[0].request.change).toEqual({ commands: expected });
@@ -2004,15 +2006,16 @@ describe('D source-backed structural gesture consumers', () => {
   });
   it.each(['remove', 'clear-unused'] as const)('%s empty tracks sends exact authored rows including opaque nulls', async (mode) => {
     const base = await literalData();
-    const initial = await buildTimelineData({ ...base.config, tracks: [...base.config.tracks!,
-      { id: 'unused', kind: 'visual', label: 'Unused', app: { opaque: null } }] }, base.registry, undefined, 1, undefined, base.head);
+    const initial = await buildTimelineData({ ...base.config, tracks: [base.config.tracks![0],
+      { id: 'unused', kind: 'visual', label: 'Unused', app: { opaque: null } }, ...base.config.tracks!.slice(1)] }, base.registry, undefined, 1, undefined, base.head);
     const h = await setup(undefined, false, initial);
     act(() => mode === 'remove' ? h.result.current.tracks.handleRemoveTrack('unused') : h.result.current.tracks.handleClearUnusedTracks());
     await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
-    const ids = mode === 'remove' ? ['unused'] : ['V2', 'unused'];
+    const ids = mode === 'remove' ? ['unused'] : ['unused', 'V2'];
     expect(h.requests).toHaveLength(1);
     expect(h.requests[0].request.change).toEqual({ commands: ids.map((id) => ({ op: 'timeline.remove', select: `parent/track:${id}`, args: {},
-      expect: { '': { state: 'present', value: initial.config.tracks!.find((track) => track.id === id) } } })) });
+      expect: { '': { state: 'present', value: initial.config.tracks!.find((track) => track.id === id) },
+        track_order: { state: 'present', value: initial.config.tracks!.filter(track => !ids.slice(0, ids.indexOf(id)).includes(track.id)).map(track => `parent/track:${track.id}`) } } })) });
     expect(h.compatibilityRequests).toEqual([]);
     h.unmount();
   });
@@ -2082,7 +2085,8 @@ describe('D source-backed structural gesture consumers', () => {
     expect(h.requests[0].request.source).toEqual({ via: 'app' });
     expect(h.requests[0].request.change).toEqual({ commands: [
       { op: 'timeline.add', select: null, args: { from: 'parent/clip:clip-1', at: 3 }, created: [`parent/clip:${plan.clipId}`],
-        expect: { 'parent/clip:clip-1::': { state: 'present', value: before.clips.find((clip) => clip.id === 'clip-1') } } },
+        expect: { 'parent/clip:clip-1::': { state: 'present', value: before.clips.find((clip) => clip.id === 'clip-1') },
+          'parent/clip:clip-1::clip_order': { state: 'present', value: before.clips.map(clip => `parent/clip:${clip.id}`) } } },
       ...['clip-2', 'clip-3'].map((id) => ({ op: 'clip.nudge', select: `parent/clip:${id}`, resolved: [`parent/clip:${id}`], args: { frames: 60 },
         expect: { at: { state: 'present', value: before.clips.find((clip) => clip.id === id)!.at },
           'app.astrid.on': { state: 'absent' }, 'app.astrid.until': { state: 'absent' } } })),
@@ -2712,7 +2716,7 @@ describe('C007 selected import through the existing semantic commit retry', () =
     expect(h.requests[0].bytes).toBe(h.requests[1].bytes);
     expect(h.requests[0].headers).toEqual(h.requests[1].headers);
     expect(h.requests[0].request.change).toEqual({ commands: [expect.objectContaining({
-      op: 'timeline.add', select: 'parent/track:V1', args: { media: selection, at: 10, duration: 5 },
+      op: 'timeline.add', select: 'parent/track:V1', args: { media: selection, clip_id: expect.any(String), at: 10, duration: 5 },
       created: [expect.stringMatching(/^parent\/clip:/)],
     })] });
     expect(h.result.current.data!.config.clips.filter((clip) => clip.asset === selection.asset)).toHaveLength(1);
@@ -4383,4 +4387,857 @@ describe('REVIEW ordered proposal commands', () => {
     expect(h.result.current.editSeqRef.current).toBe(1); expect(h.history.result.current.canUndo).toBe(true);
     expect(h.compatibilityRequests).toEqual([]); panel.unmount(); h.close();
   });
+});
+
+
+// The ordinary/group move family uses the existing SDK and native receipt history.
+function commitSelectedDrag(h: Awaited<ReturnType<typeof setup>>, grouped = false, start = 1.3) {
+  const data = h.result.current.data!;
+  const actions = data.rows[0].actions;
+  const session = { clipId: actions[0].id, draggedClipIds: actions.map(({ id }) => id),
+    sourceRowId: 'V1', sourceKind: 'visual', transactionId: 'selected-drag',
+    groupDragEntry: grouped ? { groupKey: { shotId: 'shot-1', trackId: 'V1' }, originStart: actions[0].start, originTrackId: 'V1' } : null,
+    clipOffsets: actions.map((action) => ({ clipId: action.id, rowId: 'V1', deltaTime: action.start - actions[0].start, initialStart: action.start, initialEnd: action.end })),
+  } as InternalDragSession;
+  act(() => commitDraggingSession({ session, nextStart: start, crossTrackActive: false, liveData: data,
+    callbacks: { ...h.result.current.tracks, applyEdit: h.result.current.applyEdit, selectClip: vi.fn(), selectClips: vi.fn() },
+  }));
+}
+
+describe('selected move command completion', () => {
+  it('same-track pinned group sends all ordered commands in one captured transaction', async () => {
+    const base = await shotGroupData();
+    const initial = await buildTimelineData({ ...base.config, clips: base.config.clips.map((clip) => ({ ...clip, app: { opaque: null } })) }, base.registry, undefined, 1, undefined, base.head);
+    const h = await setup(undefined, false, initial);
+    commitSelectedDrag(h, true);
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests).toHaveLength(1);
+    expect(h.requests[0].request).toMatchObject({ base_revision_id: 'parent-r1', source: { via: 'app' },
+      change: { commands: initial.config.clips.map((clip) => ({ op: 'clip.nudge', select: `parent/clip:${clip.id}`, args: { frames: 9 } })) } });
+    expect(h.compatibilityRequests).toEqual([]);
+    expect(h.result.current.data!.config.pinnedShotGroups).toEqual(initial.config.pinnedShotGroups);
+    h.unmount();
+  });
+});
+
+
+function selectedMoveSource(initial: TimelineData, requests: CommitRequest[], mediaRecord?: Record<string, unknown>) {
+  const python = process.env.ASTRID_TEST_PYTHON;
+  if (!python) throw new Error('Set ASTRID_TEST_PYTHON to the qualified SDK test interpreter');
+  return JSON.parse(execFileSync(python, ['-B', '-c', `
+import copy,json,os,sys,tempfile
+from pathlib import Path
+sys.path.insert(0,os.environ['ASTRID_CHECKOUT'])
+from astrid.sdk.timeline.checkout import Checkout
+from astrid.sdk.timeline import commands
+from astrid.sdk.timeline.chapter_storage import compile_candidate as compile_authoring_candidate
+value=json.load(sys.stdin)
+fixture=json.loads((Path(os.environ['ASTRID_CHECKOUT'])/'tests/fixtures/timeline_editing/tiny_publishable.json').read_text())
+fixture['parent']={'config':value['config'],'clips':value['config']['clips'],'registry':value['registry']}
+# Display-only projection metadata is never used as authored source.
+identities=[clip.get('app',{}).get('canonical') for clip in value['config']['clips']]
+occurrence=any(identities)
+if occurrence:
+ assert all(identities)
+ internal={'tracks':value['config']['tracks'],'clips':[row['sourceClip'] for row in identities],'registry':value['registry']}
+ for shot in ['A','B']:
+  fixture['shots'][shot].update(shot_id=shot,payload={'name':shot},base_payload={'name':shot},internal_timeline=copy.deepcopy(internal),base_internal_timeline=copy.deepcopy(internal))
+ fixture['placements']=[{'shot_id':shot,'occurrence_id':'occ-'+shot,'placement':{'start_ms':offset},'duration_ms':10000} for shot,offset in [('A',0),('B',10000)]]
+ fixture['parent']['clips']=[]
+fixture['parent']['config']={k:v for k,v in fixture['parent']['config'].items() if k!='clips'}
+# IDENTITY deliberately retains monotone cut reservations on every inverse.
+# Seed the legacy fixture with the producer's own canonical reservation helper.
+from astrid.sdk.timeline.identity import retain_cut_reservations
+retain_cut_reservations(fixture)
+tl=Checkout(fixture);tl.resolve();before=copy.deepcopy(tl.document());journal_start=len(tl._journal);plans=[];documents=[];publications=[];media_reads=[]
+def read_media(selection):
+ media_reads.append(selection)
+ return copy.deepcopy(value['mediaRecord'])
+from types import SimpleNamespace
+from astrid.sdk.timeline.commit import RuntimeCommitService
+for request in value['requests']:
+ with tl.edit('App selected drag',quiet=True) as tx:
+  calls=RuntimeCommitService._capture_media(SimpleNamespace(selected_media=read_media),request,request['change']['commands']) if value.get('mediaRecord') else request['change']['commands']
+  for call in calls:commands.execute(tl,call)
+ assert not tx.plan.blocking, tx.plan.blocking
+ plans.append({'writes':tx.plan.direct_writes,'calls':[c.to_json() for c in tx.plan.calls]})
+ documents.append(copy.deepcopy(tl.document()))
+ publication=compile_authoring_candidate(copy.deepcopy(tl.document())).publication
+ publications.append(publication)
+ assert publication['parent_composition']
+ if occurrence:
+  assert tl.document()['shots']['B']==before['shots']['B']
+  assert tl.document()['parent']==before['parent']
+journal_count=len(tl._journal)-journal_start
+with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as directory:
+ saved=Path(directory)/'selection.json';tl.save(saved,quiet=True);reloaded=Checkout.load(saved)
+ assert reloaded.document()==tl.document(), ('reload mismatch',reloaded.document(),tl.document())
+if len(documents)>1:assert documents[1]==before, ('inverse mismatch',documents[1],before)
+if value.get('mediaRecord'):
+ Path(os.environ['E_SELECTED_MOVE_EVIDENCE_DIR'],'add-media-sdk-diagnostic.json').write_text(json.dumps({'before':before,'documents':documents,'plans':plans}))
+if len(documents)>2:assert documents[2]==documents[0], 'redo document mismatch; exact documents in add-media-sdk-diagnostic.json'
+print(json.dumps({'plans':plans,'before':before,'documents':documents,'publications':publications,'journal':journal_count,'reload':True,'mediaReads':media_reads}))
+`], { input: JSON.stringify({ config: initial.config, registry: initial.registry, requests, mediaRecord }), encoding: 'utf8', env: process.env })) as {
+    plans: Array<{ writes: CommitResult['change']['direct_writes']; calls: unknown[] }>;
+    before: unknown; documents: unknown[]; publications: unknown[]; journal: number; reload: boolean; mediaReads: unknown[];
+  };
+}
+
+async function selectedMoveData(grouped = false, occurrence = false) {
+  const base = grouped ? await shotGroupData() : await initialData();
+  const clips = base.config.clips.map((clip) => ({ ...clip, app: { opaque: { nullValue: null, object: { op: 'clear' } } } }));
+  return buildTimelineData({ ...base.config, clips: occurrence ? clips.map((clip, index) => ({ ...clip,
+    id: `display-${index}`, app: { canonical: { projectId: 'gesture-project', parentDocumentId: 'gesture-timeline', headRevisionId: 'parent-r1',
+      occurrenceId: 'occ-A', shotId: 'A', revisionId: 'shot-r1', internalTimelineRevisionId: 'internal-r1', outputIdentity: 'out-A', sourceClipId: clip.id, sourceClip: clip } },
+  })) : clips }, base.registry, undefined, 1, undefined, base.head);
+}
+
+describe('selected move native semantic history', () => {
+  it.each(['ordinary selection', 'pinned group', 'occurrence selection', 'tied pinned group', 'group keyboard'] as const)('%s compiles, materializes, reloads and uses actual native Undo/Redo', async (kind) => {
+    let initial = await selectedMoveData(kind.includes('pinned group') || kind === 'group keyboard', kind === 'occurrence selection');
+    if (kind === 'tied pinned group') initial = await buildTimelineData({ ...initial.config, clips: initial.config.clips.map((clip, index) => index ? clip
+      : { ...clip, at: 1.4, app: { ...clip.app, astrid: { on: '"viral" +3f' } } }) }, initial.registry, undefined, 1, undefined, initial.head);
+    const requests: CommitRequest[] = []; let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async (request) => {
+      requests.push(request); source = selectedMoveSource(initial, requests);
+      return { directWrites: source.plans.at(-1)!.writes };
+    }, false, initial);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]);
+      useEffect(() => h.eventBus.on('remoteCommit', state.onRemoteData), [state.onRemoteData]);
+      return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    const prompt = vi.spyOn(window, 'prompt');
+    if (kind === 'group keyboard') act(() => {
+      const edit = buildKeyboardTimeNudgeEdit(h.result.current.data, ['clip-1'], 0.3)!;
+      h.result.current.applyEdit(edit.mutation, edit.options);
+    });
+    else commitSelectedDrag(h, kind.includes('pinned group'), initial.rows[0].actions[0].start + 0.3);
+    expect(prompt).not.toHaveBeenCalled();
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    await waitFor(() => expect(history.result.current.canUndo).toBe(true));
+    expect(h.requests).toHaveLength(1);
+    expect(h.requests[0].request.change).toMatchObject({ commands: initial.config.clips.map((clip) => ({
+      op: 'clip.nudge', select: kind === 'occurrence selection' ? `occurrence:occ-A/clip:${(clip.app!.canonical as CanonicalClipIdentity).sourceClipId}` : `parent/clip:${clip.id}`,
+      args: { frames: 9 }, expect: { at: { state: 'present', value: clip.at }, 'app.astrid.on': kind === 'tied pinned group' && clip.id === 'clip-1' ? { state: 'present', value: '"viral" +3f' } : { state: 'absent' }, 'app.astrid.until': { state: 'absent' } },
+    })) });
+    const forwardWrites = source.plans[0].writes;
+    expect(forwardWrites.every((write) => ['at', 'intent.on', 'intent.fixed_start'].includes(write.path))).toBe(true);
+    act(() => history.result.current.undo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
+    await waitFor(() => expect(history.result.current.canRedo).toBe(true));
+    act(() => history.result.current.redo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
+    expect(h.requests.map(({ request }) => request.base_revision_id)).toEqual(['parent-r1', 'parent-r2', 'parent-r3']);
+    expect(source.documents[1]).toEqual(source.before);
+    expect(source.documents[2]).toEqual(source.documents[0]);
+    expect(source.journal).toBe(3); expect(source.reload).toBe(true);
+    expect(h.requests[1].request.change).toEqual({ commands: [{ op: 'timeline.inverse', select: null,
+      args: { publication: 'pub-parent-r2', writes: forwardWrites.map((write) => ({ ...write, before: write.after, after: write.before })) } }] });
+    if (kind === 'occurrence selection') {
+      expect(h.requests[0].request.scope).toMatchObject({ target: 'occurrence:occ-A', shot_id: 'A', shot_revision_id: 'shot-r1', internal_revision_id: 'internal-r1' });
+      // The admitted publication inverse is a parent aggregate carrying exact
+      // occurrence write IDs; it does not reuse stale source revision pins.
+      for (const { request } of h.requests.slice(1)) expect(request.scope.target).toBe('parent');
+      expect(forwardWrites.every((write) => write.id.startsWith('occurrence:occ-A/'))).toBe(true);
+    }
+    const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+    if (evidence) writeFileSync(path.join(evidence, `selected-${kind.replaceAll(' ', '-')}.json`), JSON.stringify({ requests: h.requests, source }, null, 2));
+    expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  }, 60_000);
+});
+
+
+function resizeSelectedPlacement(h: Awaited<ReturnType<typeof setup>>, grouped: boolean, cancelled = false) {
+  const data = h.result.current.data!; const row = data.rows[0]; const action = row.actions[0];
+  act(() => h.result.current.resize.onActionResizeStart({ action, row, dir: 'right' }));
+  act(() => h.result.current.resize.onClipEdgeResizeEnd({
+    session: { pointerId: 1, rowId: row.id, clipId: action.id, edge: 'right', started: true, startClientX: 0,
+      startLocalX: 0, startTime: action.end, lastStart: action.start, lastEnd: action.end + 0.5, snapTargets: [],
+      context: grouped ? { kind: 'group', clipId: action.id, groupClipIds: row.actions.map(({ id }) => id), initialStart: action.start, initialEnd: row.actions.at(-1)!.end } as never
+        : { kind: 'single', initialStart: action.start, initialEnd: action.end } as never },
+    updates: [{ clipId: action.id, start: action.start, end: action.end + 0.5 },
+      ...(grouped ? [{ clipId: row.actions[1].id, start: action.end + 0.5, end: action.end + 1.5 }] : [])], cancelled,
+  }));
+}
+
+describe('group and occurrence ordinary resize completion', () => {
+  it.each(['group media', 'group hold', 'occurrence hold'] as const)('%s uses a real ordered compile, reload and native Undo/Redo', async (kind) => {
+    let initial = await selectedMoveData(kind !== 'occurrence hold', kind === 'occurrence hold');
+    if (kind === 'group hold') initial = await buildTimelineData({ ...initial.config, clips: initial.config.clips.map(({ from, to, speed, ...clip }) => ({ ...clip, clipType: 'hold', hold: clip.id === 'clip-1' ? 2 : 1 })) }, initial.registry, undefined, 1, undefined, initial.head);
+    const requests: CommitRequest[] = []; let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async (request) => { requests.push(request); source = selectedMoveSource(initial, requests); return { directWrites: source.plans.at(-1)!.writes }; }, false, initial);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]);
+      return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    resizeSelectedPlacement(h, kind !== 'occurrence hold');
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    const forward = (h.requests[0].request.change as { commands: Array<{ op: string; select: string; args: unknown }> }).commands;
+    expect(forward.map((call) => call.op)).toEqual(kind === 'group media' ? ['clip.set-look', 'clip.nudge'] : kind === 'group hold' ? ['clip.set-duration', 'clip.nudge'] : ['clip.set-duration']);
+    expect(forward[0]).toMatchObject(kind === 'group media' ? { select: 'parent/clip:clip-1', args: { speed: 1.6 } }
+      : { select: kind === 'group hold' ? 'parent/clip:clip-1' : 'occurrence:occ-A/clip:clip-1', args: { seconds: 2.5 } });
+    await waitFor(() => expect(history.result.current.canUndo).toBe(true));
+    act(() => history.result.current.undo()); await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
+    await waitFor(() => expect(history.result.current.canRedo).toBe(true));
+    act(() => history.result.current.redo()); await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
+    expect(source.documents[1]).toEqual(source.before); expect(source.documents[2]).toEqual(source.documents[0]);
+    expect(source.reload).toBe(true); expect(source.journal).toBe(3); expect(h.requests).toHaveLength(3);
+    expect(h.requests.map(({ request }) => request.base_revision_id)).toEqual(['parent-r1', 'parent-r2', 'parent-r3']);
+    expect(h.compatibilityRequests).toEqual([]);
+    const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+    if (evidence) writeFileSync(path.join(evidence, `resize-${kind.replaceAll(' ', '-')}.json`), JSON.stringify({ requests: h.requests, source }, null, 2));
+    history.unmount(); h.unmount();
+  }, 60_000);
+
+  it.each(['group media', 'occurrence hold'] as const)('cancelled %s creates no request, local history or draft', async (kind) => {
+    const initial = await selectedMoveData(kind === 'group media', kind === 'occurrence hold'); const h = await setup(undefined, false, initial);
+    const history = vi.fn(); h.eventBus.on('beforeCommit', history); const draft = vi.spyOn(draftStorage, 'saveTimelineDraft');
+    resizeSelectedPlacement(h, kind === 'group media', true);
+    expect(h.requests).toEqual([]); expect(h.compatibilityRequests).toEqual([]); expect(history).not.toHaveBeenCalled(); expect(draft).not.toHaveBeenCalled();
+    expect(h.result.current.data).toBe(initial); expect(h.result.current.editSeqRef.current).toBe(0); h.unmount();
+  });
+});
+
+
+describe('selected placement atomic refusal', () => {
+  it.each(['mixed occurrences', 'stale head', 'read-only', 'second locked', 'no movement'])('%s writes no draft, request or history', async (kind) => {
+    const initial = await selectedMoveData(false, !['read-only', 'second locked', 'no movement'].includes(kind));
+    if (kind === 'mixed occurrences') (initial.config.clips[1].app!.canonical as CanonicalClipIdentity).occurrenceId = 'occ-B';
+    if (kind === 'stale head') for (const clip of initial.config.clips) (clip.app!.canonical as CanonicalClipIdentity).headRevisionId = 'stale-parent';
+    const h = await setup(undefined, false, initial, 1, kind === 'read-only' ? createTimelineEditability({ readOnly: true }) : kind === 'second locked' ? createTimelineEditability({ lockedClipIds: ['clip-2'] }) : undefined);
+    const before = h.result.current.data; const history = vi.fn(); h.eventBus.on('beforeCommit', history); const draft = vi.spyOn(draftStorage, 'saveTimelineDraft');
+    commitSelectedDrag(h, false, kind === 'no movement' ? 1 : 1.3);
+    expect(h.result.current.data).toBe(before); expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(h.requests).toEqual([]); expect(h.compatibilityRequests).toEqual([]); expect(history).not.toHaveBeenCalled(); expect(draft).not.toHaveBeenCalled();
+    h.unmount();
+  });
+});
+
+
+function resizeLiteralLeft(h: Awaited<ReturnType<typeof setup>>, cancelled = false, afterStart?: () => void) {
+  const data = h.result.current.data!; const row = data.rows[0]; const action = row.actions[0];
+  act(() => h.result.current.resize.onActionResizeStart({ action, row, dir: 'left' }));
+  afterStart?.();
+  act(() => h.result.current.resize.onClipEdgeResizeEnd({
+    session: { pointerId: 1, rowId: row.id, clipId: action.id, edge: 'left', started: true, startClientX: 0, startLocalX: 0,
+      startTime: action.start, lastStart: action.start + 0.5, lastEnd: action.end, snapTargets: [],
+      context: { kind: 'single', initialStart: action.start, initialEnd: action.end } as never },
+    updates: [{ clipId: action.id, start: action.start + 0.5, end: action.end }], cancelled,
+  }));
+}
+
+async function literalLeftData(media: boolean) {
+  const base = await selectedMoveData(media); const config = structuredClone(base.config); delete config.pinnedShotGroups;
+  if (media) config.clips[0].asset = 'left-source';
+  const registry = media ? { assets: { 'left-source': { file: 'fixture-left.mp4', type: 'video' as const, duration: 10 } } } : base.registry;
+  return buildTimelineData(config, registry, undefined, 1, undefined, base.head);
+}
+
+describe('literal left placement completion', () => {
+  it.each(['media', 'hold'] as const)('%s left resize uses one ordered transaction and actual native inverse/Redo', async (kind) => {
+    const initial = await literalLeftData(kind === 'media'); const requests: CommitRequest[] = []; let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async (request) => { requests.push(request); source = selectedMoveSource(initial, requests); return { directWrites: source.plans.at(-1)!.writes }; }, false, initial);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    resizeLiteralLeft(h); await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    const calls = (h.requests[0].request.change as { commands: import('@/integrations/runtime/generated.ts').EditCommand[] }).commands;
+    expect(calls.map(({ op }) => op)).toEqual(kind === 'media' ? ['clip.trim', 'clip.nudge'] : ['clip.nudge', 'clip.set-duration']);
+    if (kind === 'media') expect(calls[0]).toEqual({ op: 'clip.trim', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'],
+      args: { in_s: 3, out_s: 6 }, expect: { '': { state: 'present', value: initial.config.clips[0] } } });
+    expect(calls.find(({ op }) => op === 'clip.nudge')).toMatchObject({ select: 'parent/clip:clip-1', args: { frames: 15 }, expect: { at: { state: 'present', value: 1 } } });
+    await waitFor(() => expect(history.result.current.canUndo).toBe(true));
+    act(() => history.result.current.undo()); await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
+    await waitFor(() => expect(history.result.current.canRedo).toBe(true));
+    act(() => history.result.current.redo()); await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
+    expect(source.documents[1]).toEqual(source.before); expect(source.documents[2]).toEqual(source.documents[0]);
+    expect(source.journal).toBe(3); expect(source.reload).toBe(true); expect(h.requests).toHaveLength(3);
+    expect(h.requests.map(({ request }) => request.base_revision_id)).toEqual(['parent-r1', 'parent-r2', 'parent-r3']);
+    expect(h.compatibilityRequests).toEqual([]);
+    const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+    if (evidence) writeFileSync(path.join(evidence, `left-${kind}.json`), JSON.stringify({ requests: h.requests, source }, null, 2));
+    history.unmount(); h.unmount();
+  }, 60_000);
+
+  it.each(['cancelled', 'stale head', 'stale config', 'stale fps'])('%s emits no left-edge command or history', async (kind) => {
+    const initial = await literalLeftData(true); const h = await setup(undefined, false, initial); const history = vi.fn(); h.eventBus.on('beforeCommit', history);
+    resizeLiteralLeft(h, kind === 'cancelled', () => {
+      if (kind === 'stale head') h.result.current.dataRef.current = { ...initial, head: { ...initial.head!, headRevisionId: 'moved-head' } };
+      if (kind === 'stale config') h.result.current.dataRef.current = { ...initial, config: { ...initial.config, app: { ...initial.config.app, changed: true } } };
+      if (kind === 'stale fps') h.result.current.dataRef.current = { ...initial, output: { ...initial.output, fps: 24 } };
+    });
+    expect(h.requests).toEqual([]); expect(h.compatibilityRequests).toEqual([]); expect(h.result.current.editSeqRef.current).toBe(0); expect(history).not.toHaveBeenCalled();
+    h.unmount();
+  });
+});
+
+
+async function mediaEndRepairData() {
+  const base = await literalLeftData(true);
+  return buildTimelineData({ ...base.config, clips: base.config.clips.map((clip, index) => index ? clip : { ...clip, to: 12 }) }, base.registry, undefined, 1, undefined, base.head);
+}
+
+describe('W43 shared production media-end repair', () => {
+  it('captures one source-out trim and restores the full overhang through native Undo/Redo', async () => {
+    const initial = await mediaEndRepairData(); const requests: CommitRequest[] = []; let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async (request) => { requests.push(request); source = selectedMoveSource(initial, requests); return { directWrites: source.plans.at(-1)!.writes }; }, false, initial);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    act(() => trimClipToMediaEnd(h.result.current.dataRef, h.result.current.applyEdit, 'clip-1'));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests[0].request).toMatchObject({ base_revision_id: 'parent-r1', source: { via: 'app' }, change: { commands: [{
+      op: 'clip.trim', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], args: { out_s: 10 },
+      expect: { '': { state: 'present', value: initial.config.clips[0] } },
+    }] } });
+    expect(h.result.current.data!.config.clips[0]).toMatchObject({ at: 1, from: 2, to: 10, speed: 2 });
+    await waitFor(() => expect(history.result.current.canUndo).toBe(true)); act(() => history.result.current.undo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
+    await waitFor(() => expect(history.result.current.canRedo).toBe(true)); act(() => history.result.current.redo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
+    expect(source.documents[1]).toEqual(source.before); expect(source.documents[2]).toEqual(source.documents[0]);
+    expect(source.reload).toBe(true); expect(source.journal).toBe(3); expect(h.requests).toHaveLength(3); expect(h.compatibilityRequests).toEqual([]);
+    const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+    if (evidence) writeFileSync(path.join(evidence, 'w43-media-end.json'), JSON.stringify({ requests: h.requests, source }, null, 2));
+    history.unmount(); h.unmount();
+  }, 60_000);
+
+  it('no overhang is a no-write/no-history action', async () => {
+    const initial = await literalLeftData(true); const h = await setup(undefined, false, initial); const history = vi.fn(); h.eventBus.on('beforeCommit', history);
+    act(() => trimClipToMediaEnd(h.result.current.dataRef, h.result.current.applyEdit, 'clip-1'));
+    expect(h.result.current.data).toBe(initial); expect(h.result.current.editSeqRef.current).toBe(0); expect(h.requests).toEqual([]); expect(history).not.toHaveBeenCalled(); h.unmount();
+  });
+
+  it('Runtime refusal accepts no revision and cannot substitute a snapshot Undo', async () => {
+    const initial = await mediaEndRepairData(); const h = await setup(async () => 'refused', false, initial);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    act(() => trimClipToMediaEnd(h.result.current.dataRef, h.result.current.applyEdit, 'clip-1'));
+    await waitFor(() => expect(h.result.current.persistence.saveStatus).toBe('error'));
+    expect(h.getCurrentHead()).toBe('parent-r1'); expect(h.acceptedCount()).toBe(0); expect(h.savedSeqRef.current).toBe(0);
+    act(() => history.result.current.undo()); expect(h.requests).toHaveLength(1); expect(h.compatibilityRequests).toEqual([]); expect(history.result.current.canUndo).toBe(false);
+    history.unmount(); h.unmount();
+  });
+});
+
+// The main-editor split and empty-track callers are distinct from tool splitClip.
+describe('bounded structural writer native history', () => {
+  it.each(['split', 'bulk-split', 'remove-track', 'clear-unused', 'duplicate'] as const)('%s uses actual caller and publication Undo/Redo', async (kind) => {
+    const base = await literalLeftData(true);
+    const initial = await buildTimelineData({ ...base.config, ...(kind === 'duplicate' ? { clips: [base.config.clips[0]] } : kind === 'bulk-split' ? { clips: [base.config.clips[0], { ...base.config.clips[0], id: 'clip-2', track: 'V2' }] } : {}), tracks: [base.config.tracks![0],
+      { id: 'unused', kind: 'visual', label: 'Unused', app: { opaque: null } }, ...base.config.tracks!.slice(1)] }, base.registry, undefined, 1, undefined, base.head);
+    const requests: CommitRequest[] = []; let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async (request) => {
+      requests.push(request); source = selectedMoveSource(initial, requests);
+      const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+      if (evidence) writeFileSync(path.join(evidence, `structural-${kind}.json`), JSON.stringify({ requests: h.requests, source }, null, 2));
+      return { directWrites: source.plans.at(-1)!.writes };
+    }, false, initial, 2);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    act(() => {
+      if (kind === 'split') h.result.current.editing.handleSplitSelectedClip();
+      else if (kind === 'bulk-split') h.result.current.editing.handleSplitClipsAtPlayhead(['clip-1', 'clip-2']);
+      else if (kind === 'remove-track') h.result.current.tracks.handleRemoveTrack('unused');
+      else if (kind === 'clear-unused') h.result.current.tracks.handleClearUnusedTracks();
+      else {
+        const commands = createTimelineCommands({ getState: () => ({ data: { data: h.result.current.data, dataRef: h.result.current.dataRef },
+          ops: { applyEdit: h.result.current.applyEdit }, availability: { mounted: true } }) } as unknown as TimelineStoreApi);
+        expect(commands.addClip({ assetId: 'left-source', afterClipId: 'clip-1' }).ok).toBe(true);
+      }
+    });
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests[0].request).toMatchObject({ base_revision_id: 'parent-r1', source: { via: 'app' } });
+    const calls = 'commands' in h.requests[0].request.change ? h.requests[0].request.change.commands : [];
+    if (kind === 'split' || kind === 'bulk-split') expect(calls).toEqual((kind === 'split' ? ['clip-1'] : ['clip-1', 'clip-2']).map(id => ({
+      op: 'timeline.split', select: `parent/clip:${id}`, args: { at: 2 }, created: [`parent/clip:${id}-01`],
+      expect: { [`parent/clip:${id}::`]: { state: 'present', value: initial.config.clips.find(clip => clip.id === id) } },
+    })));
+    else if (kind === 'duplicate') expect(calls[0]).toMatchObject({ op: 'timeline.add', select: null, args: { from: 'parent/clip:clip-1' },
+      expect: { 'parent/clip:clip-1::': { state: 'present', value: initial.config.clips[0] } } });
+    else expect(calls).toEqual((kind === 'remove-track' ? ['unused'] : ['unused', 'V2']).map((id, index, ids) => ({
+      op: 'timeline.remove', select: `parent/track:${id}`, args: {}, expect: { '': { state: 'present', value: initial.config.tracks!.find(track => track.id === id) },
+        track_order: { state: 'present', value: initial.config.tracks!.filter(track => !ids.slice(0, index).includes(track.id)).map(track => `parent/track:${track.id}`) } },
+    })));
+    await waitFor(() => expect(history.result.current.canUndo).toBe(true)); act(() => history.result.current.undo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
+    await waitFor(() => expect(history.result.current.canRedo).toBe(true)); act(() => history.result.current.redo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
+    expect(h.requests).toHaveLength(3); expect('commands' in h.requests[1].request.change && h.requests[1].request.change.commands[0]).toMatchObject({ op: 'timeline.inverse', args: { publication: 'pub-parent-r2' } });
+    expect(source.documents[1]).toEqual(source.before); expect(source.documents[2]).toEqual(source.documents[0]);
+    expect(source.reload).toBe(true); expect(source.journal).toBe(3); expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  }, 60_000);
+});
+
+describe('bounded structural whole-batch refusal', () => {
+  it.each(['grouped', 'tied', 'ambiguous', 'missing'] as const)('%s bulk split leaves all source/history/wire unchanged', async kind => {
+    const base = await literalLeftData(true);
+    const second = { ...base.config.clips[0], id: 'clip-2', track: 'V2', ...(kind === 'tied' ? { app: { astrid: { on: '"hello"' } } } : {}) };
+    const initial = await buildTimelineData({ ...base.config, clips: [base.config.clips[0], second],
+      ...(kind === 'grouped' ? { pinnedShotGroups: [{ shotId: 'structural-group', trackId: 'V2', clipIds: ['clip-2'], mode: 'images' as const }] } : {}),
+    }, base.registry, undefined, 1, undefined, base.head);
+    // An ambiguous authored source cannot be manufactured by the validated codec.
+    if (kind === 'ambiguous') initial.config.clips.push(structuredClone(second));
+    const h = await setup(undefined, false, initial, 2); const before = structuredClone(initial.config); const history = vi.fn(); h.eventBus.on('beforeCommit', history);
+    act(() => h.result.current.editing.handleSplitClipsAtPlayhead(['clip-1', kind === 'missing' ? 'missing' : 'clip-2']));
+    expect(h.result.current.data!.config).toEqual(before); expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(h.requests).toEqual([]); expect(h.compatibilityRequests).toEqual([]); expect(history).not.toHaveBeenCalled(); h.unmount();
+  });
+  it.each(['refused', 'no_change'] as const)('%s structural receipt cannot create a snapshot Undo publication', async outcome => {
+    const initial = await literalLeftData(true); const h = await setup(async () => outcome, false, initial, 2);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    act(() => h.result.current.editing.handleSplitSelectedClip());
+    await waitFor(() => expect(h.result.current.persistence.saveStatus).toBe(outcome === 'refused' ? 'error' : 'saved'));
+    expect(history.result.current.canUndo).toBe(false); act(() => history.result.current.undo());
+    expect(h.requests).toHaveLength(1); expect(h.acceptedCount()).toBe(0); expect(h.getCurrentHead()).toBe('parent-r1'); expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  });
+});
+
+async function nativeTrackData() {
+  const base = await literalLeftData(true);
+  return buildTimelineData({ ...base.config, tracks: [
+    { ...base.config.tracks![0], app: { sentinel: null, object: { op: 'clear' }, removable: null } },
+    { id: 'A1', kind: 'audio', label: 'Audio', volume: 0.7, app: { audio: null } }, base.config.tracks![1],
+    { id: 'A4', kind: 'audio', label: 'Second audio', role: 'source', muted: false },
+  ] }, base.registry, undefined, 1, undefined, base.head);
+}
+
+describe('bounded authored track native history', () => {
+  it.each(['add-visual', 'add-audio', 'properties', 'mute-all'] as const)('%s uses the actual current writer and publication inverse/Redo', async kind => {
+    const initial = await nativeTrackData(); const requests: CommitRequest[] = []; let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async request => {
+      requests.push(request); source = selectedMoveSource(initial, requests);
+      const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+      if (evidence) writeFileSync(path.join(evidence, `track-${kind}.json`), JSON.stringify({ requests: h.requests, source }, null, 2));
+      return { directWrites: source.plans.at(-1)!.writes };
+    }, false, initial);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    act(() => {
+      if (kind.startsWith('add-')) h.result.current.tracks.handleAddTrack(kind === 'add-audio' ? 'audio' : 'visual');
+      else if (kind === 'reorder') h.result.current.tracks.handleMoveTrack('V1', 'V2');
+      else if (kind === 'properties') h.result.current.tracks.handleTrackPopoverChange('V1', { label: 'Renamed', role: 'source', scale: 1.5,
+        fit: 'cover', opacity: 0.4, volume: 0.3, muted: true, blendMode: 'multiply', app: { added: { nested: null }, removable: undefined } });
+      else h.result.current.ops.setAllTracksMuted(true);
+    });
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    const first = h.requests[0].request; expect(first).toMatchObject({ base_revision_id: 'parent-r1', source: { via: 'app' } });
+    const calls = 'commands' in first.change ? first.change.commands : [];
+    if (kind.startsWith('add-')) expect(calls[0]).toMatchObject({ op: 'timeline.add', select: `parent/track:${kind === 'add-audio' ? 'A5' : 'V3'}`,
+      created: [`parent/track:${kind === 'add-audio' ? 'A5' : 'V3'}`], expect: { [`parent/track:${kind === 'add-audio' ? 'A5' : 'V3'}::`]: { state: 'absent' } } });
+    else if (kind === 'reorder') expect(calls[0]).toMatchObject({ op: 'timeline.reorder',
+      args: { expected_order: initial.config.tracks!.map(track => `parent/track:${track.id}`) } });
+    else if (kind === 'properties') expect(calls[0]).toMatchObject({ op: 'timeline.set', select: 'parent/track:V1',
+      expect: { 'parent/track:V1::app.removable': { state: 'present', value: null }, 'parent/track:V1::app.added': { state: 'absent' } } });
+    else expect(calls.map(call => call.select)).toEqual(['parent/track:A1', 'parent/track:A4']);
+    await waitFor(() => expect(history.result.current.canUndo).toBe(true)); act(() => history.result.current.undo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
+    await waitFor(() => expect(history.result.current.canRedo).toBe(true)); act(() => history.result.current.redo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
+    expect(h.requests).toHaveLength(3); expect('commands' in h.requests[1].request.change && h.requests[1].request.change.commands[0])
+      .toMatchObject({ op: 'timeline.inverse', args: { publication: 'pub-parent-r2' } });
+    expect(source.documents[1]).toEqual(source.before); expect(source.documents[2]).toEqual(source.documents[0]);
+    expect(source.reload).toBe(true); expect(source.journal).toBe(3); expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  }, 60_000);
+});
+
+describe('bounded authored history no-write receipts', () => {
+  it.each(['placement', 'split', 'track-property'] as const)('%s no_change removes only its exact native owner', async kind => {
+    const initial = await nativeTrackData(); const h = await setup(async () => 'no_change', false, initial, 2);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    act(() => {
+      if (kind === 'split') h.result.current.editing.handleSplitSelectedClip();
+      else if (kind === 'track-property') h.result.current.tracks.handleTrackPopoverChange('V1', { label: 'New label' });
+      else h.result.current.tracks.moveClipToRow('clip-1', 'V1', 0.7);
+    });
+    await waitFor(() => expect(h.requests).toHaveLength(1));
+    await waitFor(() => expect(h.result.current.persistence.saveStatus).toBe('saved'));
+    expect(history.result.current.canUndo).toBe(false); act(() => history.result.current.undo());
+    expect(h.requests).toHaveLength(1); expect(h.acceptedCount()).toBe(0); expect(h.getCurrentHead()).toBe('parent-r1'); expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  });
+  it('real reorder lacks a publication direct-write receipt and retains the existing history owner', async () => {
+    const initial = await nativeTrackData(); let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async request => { source = selectedMoveSource(initial, [request]); return { directWrites: source.plans[0].writes }; }, false, initial);
+    const history = vi.fn(); h.eventBus.on('beforeCommit', history);
+    act(() => h.result.current.tracks.handleMoveTrack('V1', 'V2'));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(source.plans[0].writes).toEqual([]); expect(source.reload).toBe(true);
+    expect(source.plans[0].calls[0]).toMatchObject({ op: 'timeline.reorder', authorship: { track_order: 'direct' } });
+    expect(history).toHaveBeenCalledOnce(); expect(history.mock.calls[0][1].nativeRegistrationOwner).toBeUndefined();
+    expect(h.compatibilityRequests).toEqual([]); h.unmount();
+  }, 60_000);
+});
+
+describe('literal mounted split and deletion order native history', () => {
+  it.each(['tool-split', 'delete-main-single', 'delete-main-bulk', 'delete-tool'] as const)('%s captures exact base, identity/order and native inverse/Redo', async kind => {
+    const base = await literalLeftData(true);
+    const initial = await buildTimelineData({ ...base.config, clips: [{ id: 'keep-before', at: 0, hold: 0.5, clipType: 'hold', track: 'V1', app: { opaque: null } }, ...base.config.clips] }, base.registry, undefined, 1, undefined, base.head);
+    const requests: CommitRequest[] = []; let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async request => {
+      requests.push(request); source = selectedMoveSource(initial, requests);
+      const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+      if (evidence) writeFileSync(path.join(evidence, `${kind}.json`), JSON.stringify({ requests: h.requests, source }, null, 2));
+      return { directWrites: source.plans.at(-1)!.writes };
+    }, false, initial);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    act(() => {
+      if (kind.startsWith('delete-main')) {
+        if (kind === 'delete-main-bulk') h.result.current.editing.handleDeleteClips(['clip-1', 'clip-2']);
+        else h.result.current.editing.handleDeleteClip('clip-1');
+      } else {
+        const service = createTimelineCommands({ getState: () => ({ data: { data: h.result.current.data, dataRef: h.result.current.dataRef },
+          ops: { applyEdit: h.result.current.applyEdit }, availability: { mounted: true } }) } as unknown as TimelineStoreApi);
+        expect(kind === 'tool-split' ? service.splitClip({ clipId: 'clip-1', time: 2 }).ok : service.deleteClip({ clipId: 'clip-1' }).ok).toBe(true);
+      }
+    });
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    const first = h.requests[0].request; expect(first).toMatchObject({ base_revision_id: 'parent-r1', source: { via: 'app' } });
+    const calls = 'commands' in first.change ? first.change.commands : [];
+    if (kind === 'tool-split') expect(calls).toEqual([{ op: 'timeline.split', select: 'parent/clip:clip-1', args: { at: 2 }, created: ['parent/clip:clip-1-01'],
+      expect: { 'parent/clip:clip-1::': { state: 'present', value: initial.config.clips[1] } } }]);
+    else {
+      const deleted = kind === 'delete-main-bulk' ? ['clip-1', 'clip-2'] : ['clip-1'];
+      expect(calls.map(call => call.select)).toEqual(deleted.map(id => `parent/clip:${id}`));
+      calls.forEach((call, index) => expect(call).toMatchObject({ op: 'clip.remove', args: {}, expect: {
+        '': { state: 'present', value: initial.config.clips.find(clip => call.select === `parent/clip:${clip.id}`) },
+        clip_order: { state: 'present', value: initial.config.clips.filter(clip => !deleted.slice(0, index).includes(clip.id)).map(clip => `parent/clip:${clip.id}`) },
+      } }));
+    }
+    await waitFor(() => expect(history.result.current.canUndo).toBe(true)); act(() => history.result.current.undo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
+    await waitFor(() => expect(history.result.current.canRedo).toBe(true)); act(() => history.result.current.redo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
+    expect(h.requests).toHaveLength(3); expect(source.documents[1]).toEqual(source.before); expect(source.documents[2]).toEqual(source.documents[0]);
+    expect(source.reload).toBe(true); expect(source.journal).toBe(3); expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  }, 60_000);
+});
+
+describe('W41 W42 literal tiny expansion native history', () => {
+  it.each(['hold', 'media', 'audio'] as const)('%s shared context-menu handler preserves source and exact publication Undo/Redo', async kind => {
+    let base = await literalLeftData(kind !== 'hold');
+    if (kind === 'audio') base = await buildTimelineData({ ...base.config, tracks: [{ id: 'A1', kind: 'audio', label: 'Audio' }, ...base.config.tracks!],
+      clips: base.config.clips.map((clip, index) => index ? clip : { ...clip, track: 'A1' }) },
+      { assets: { 'left-source': { file: 'fixture-left.wav', type: 'audio', duration: 10 } } }, undefined, 1, undefined, base.head);
+    const initial = await buildTimelineData({ ...base.config, clips: base.config.clips.map((clip, index) => index ? clip : kind === 'hold'
+      ? { ...clip, hold: 0.2 } : { ...clip, to: 2.4 }) }, base.registry, undefined, 1, undefined, base.head);
+    const requests: CommitRequest[] = []; let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async request => {
+      requests.push(request); source = selectedMoveSource(initial, requests);
+      const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+      if (evidence) writeFileSync(path.join(evidence, `tiny-${kind}.json`), JSON.stringify({ requests: h.requests, source }, null, 2));
+      return { directWrites: source.plans.at(-1)!.writes };
+    }, false, initial);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    act(() => expandTinyClip(h.result.current.dataRef, h.result.current.applyEdit, 'clip-1'));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    expect(h.requests[0].request).toMatchObject({ base_revision_id: 'parent-r1', source: { via: 'app' }, change: { commands: [{
+      op: kind !== 'hold' ? 'clip.trim' : 'clip.set-duration', args: kind !== 'hold' ? { out_s: 3 } : { seconds: 0.5 },
+    }] } });
+    await waitFor(() => expect(history.result.current.canUndo).toBe(true)); act(() => history.result.current.undo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
+    await waitFor(() => expect(history.result.current.canRedo).toBe(true)); act(() => history.result.current.redo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
+    expect(source.documents[1]).toEqual(source.before); expect(source.documents[2]).toEqual(source.documents[0]);
+    expect(source.journal).toBe(3); expect(source.reload).toBe(true); expect(h.requests).toHaveLength(3); expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  }, 60_000);
+});
+
+describe('W34 W35 actual audio detach receipt gap', () => {
+  it.each(['existing-track', 'new-track'] as const)('%s materializes but lacks the created-child root in its actual receipt', async kind => {
+    const base = await literalLeftData(true);
+    const initial = await buildTimelineData({ ...base.config, tracks: [...base.config.tracks!, ...(kind === 'existing-track'
+      ? [{ id: 'A1', kind: 'audio' as const, label: 'Audio', app: { opaque: null } }] : [])] }, { assets: { 'left-source': { file: 'https://fixture.test/detach.mp4', type: 'video/mp4', duration: 10 } } }, undefined, 1, undefined, base.head);
+    const requests: CommitRequest[] = []; let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async request => {
+      requests.push(request); source = selectedMoveSource(initial, requests);
+      const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+      if (evidence) writeFileSync(path.join(evidence, `detach-${kind}.json`), JSON.stringify({ requests: h.requests, source }, null, 2));
+      return { directWrites: source.plans.at(-1)!.writes };
+    }, false, initial);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    act(() => h.result.current.editing.handleDetachAudioClip('clip-1'));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    const first = h.requests[0].request; expect(first).toMatchObject({ base_revision_id: 'parent-r1', source: { via: 'app' } });
+    const calls = 'commands' in first.change ? first.change.commands : [];
+    expect(calls.map(call => call.op)).toEqual(kind === 'new-track' ? ['timeline.add', 'clip.detach-audio'] : ['clip.detach-audio']);
+    const created = calls.at(-1)!.created![0]; expect(created).toMatch(/^parent\/clip:clip-1-\d+$/);
+    const childId = created.slice('parent/clip:'.length);
+    expect(calls.at(-1)).toMatchObject({ select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], created: [created],
+      args: { track: 'A1' }, expect: { '': { state: 'present', value: initial.config.clips[0] } } });
+    expect(h.result.current.data!.config.clips.find(clip => clip.id === childId)).toEqual({ ...initial.config.clips[0], id: childId, track: 'A1' });
+    expect(source.plans[0].calls.at(-1)).toMatchObject({ created: [created], authorship: { [`${created}::`]: 'consequence' } });
+    expect(source.plans[0].writes.some(write => write.id === created)).toBe(false);
+    expect(source.journal).toBe(1); expect(source.reload).toBe(true); expect(h.requests).toHaveLength(1); expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  }, 60_000);
+});
+
+const mountedCommandsFor = (h: Awaited<ReturnType<typeof setup>>) => createTimelineCommands({ getState: () => ({
+  data: { data: h.result.current.data, dataRef: h.result.current.dataRef }, ops: { applyEdit: h.result.current.applyEdit }, availability: { mounted: true },
+}) } as unknown as TimelineStoreApi);
+
+describe('W69 literal mounted tool trim native history', () => {
+  it.each(['media-left', 'media-right', 'media-both', 'hold-left', 'hold-both'] as const)('%s uses explicit ordered edge commands and exact native inverse/Redo', async kind => {
+    const initial = await literalLeftData(kind.startsWith('media')); const requests: CommitRequest[] = []; let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async request => {
+      requests.push(request); source = selectedMoveSource(initial, requests);
+      const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+      if (evidence) writeFileSync(path.join(evidence, `tool-trim-${kind}.json`), JSON.stringify({ requests: h.requests, source }, null, 2));
+      return { directWrites: source.plans.at(-1)!.writes };
+    }, false, initial);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    const start = kind.endsWith('right') ? 1 : 1.5, end = kind.endsWith('left') ? 3 : 2.5;
+    act(() => expect(mountedCommandsFor(h).trimClip({ clipId: 'clip-1', startTime: start, endTime: end }).ok).toBe(true));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    const first = h.requests[0].request; expect(first).toMatchObject({ base_revision_id: 'parent-r1', source: { via: 'app' } });
+    const calls = 'commands' in first.change ? first.change.commands : [];
+    if (kind.startsWith('media')) {
+      expect(calls.map(call => call.op)).toEqual(start === 1 ? ['clip.trim'] : ['clip.trim', 'clip.nudge']);
+      expect(calls[0]).toEqual({ op: 'clip.trim', select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'],
+        args: { in_s: 2 + (start - 1) * 2, out_s: 2 + (end - 1) * 2 }, expect: { '': { state: 'present', value: initial.config.clips[0] } } });
+    } else expect(calls.map(call => call.op)).toEqual(['clip.nudge', 'clip.set-duration']);
+    if (start !== 1) expect(calls.find(call => call.op === 'clip.nudge')).toMatchObject({ args: { frames: 15 }, expect: { at: { state: 'present', value: 1 } } });
+    await waitFor(() => expect(history.result.current.canUndo).toBe(true)); act(() => history.result.current.undo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
+    await waitFor(() => expect(history.result.current.canRedo).toBe(true)); act(() => history.result.current.redo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
+    expect(source.documents[1]).toEqual(source.before); expect(source.documents[2]).toEqual(source.documents[0]);
+    expect(source.journal).toBe(3); expect(source.reload).toBe(true); expect(h.requests).toHaveLength(3); expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  }, 60_000);
+  it.each([false, true])('unchanged tool trim (media=%s) creates no edit, history or wire', async media => {
+    const initial = await literalLeftData(media), h = await setup(undefined, false, initial); const history = vi.fn(); h.eventBus.on('beforeCommit', history);
+    act(() => expect(mountedCommandsFor(h).trimClip({ clipId: 'clip-1', startTime: 1, endTime: 3 }).ok).toBe(true));
+    expect(h.result.current.data).toBe(initial); expect(h.result.current.editSeqRef.current).toBe(0); expect(h.requests).toEqual([]); expect(history).not.toHaveBeenCalled(); h.unmount();
+  });
+});
+
+describe('W69 mounted appended track native history', () => {
+  it.each(['visual', 'audio'] as const)('%s exact append captures the allocated row and native inverse/Redo', async kind => {
+    const initial = await literalLeftData(true); const requests: CommitRequest[] = []; let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async request => {
+      requests.push(request); source = selectedMoveSource(initial, requests);
+      const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+      if (evidence) writeFileSync(path.join(evidence, `tool-track-${kind}.json`), JSON.stringify({ requests: h.requests, source }, null, 2));
+      return { directWrites: source.plans.at(-1)!.writes };
+    }, false, initial);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    const id = kind === 'visual' ? 'V3' : 'A1';
+    act(() => expect(mountedCommandsFor(h).addTrack({ kind })).toEqual({ ok: true, data: { trackId: id } }));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    const first = h.requests[0].request; expect(first).toMatchObject({ base_revision_id: 'parent-r1', source: { via: 'app' }, change: { commands: [{
+      op: 'timeline.add', select: `parent/track:${id}`, created: [`parent/track:${id}`],
+      args: { track: { id, kind, label: id, scale: 1, fit: kind === 'visual' ? 'manual' : 'contain', opacity: 1, blendMode: 'normal' } },
+      expect: { [`parent/track:${id}::`]: { state: 'absent' } },
+    }] } });
+    expect(h.result.current.data!.config.tracks!.slice(0, -1)).toEqual(initial.config.tracks);
+    await waitFor(() => expect(history.result.current.canUndo).toBe(true)); act(() => history.result.current.undo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
+    await waitFor(() => expect(history.result.current.canRedo).toBe(true)); act(() => history.result.current.redo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
+    expect(source.documents[1]).toEqual(source.before); expect(source.documents[2]).toEqual(source.documents[0]);
+    expect(source.journal).toBe(3); expect(source.reload).toBe(true); expect(h.requests).toHaveLength(3); expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  }, 60_000);
+});
+
+describe('W69 tool command refusal boundaries', () => {
+  it.each(['invalid trim', 'grouped trim', 'read-only trim', 'read-only add'] as const)('%s changes no source, history or wire', async kind => {
+    const base = await literalLeftData(true);
+    const initial = kind === 'grouped trim' ? await buildTimelineData({ ...base.config,
+      pinnedShotGroups: [{ shotId: 'tool-group', trackId: 'V1', clipIds: ['clip-1', 'clip-2'], mode: 'images' }] }, base.registry, undefined, 1, undefined, base.head) : base;
+    const h = await setup(undefined, false, initial); const history = vi.fn(); h.eventBus.on('beforeCommit', history);
+    const service = kind.startsWith('read-only') ? createTimelineCommands({ getState: () => ({ availability: { mounted: true } }) } as unknown as TimelineStoreApi,
+      { timelineEditability: { checkTimeline: () => ({ allowed: false, reason: 'read_only' }) } }) : mountedCommandsFor(h);
+    act(() => expect(kind === 'read-only add' ? service.addTrack({ kind: 'visual' }).ok
+      : service.trimClip({ clipId: 'clip-1', startTime: kind === 'invalid trim' ? 0 : 1.5, endTime: 2.5 }).ok).toBe(false));
+    expect(h.result.current.editSeqRef.current).toBe(0); expect(h.result.current.data).toBe(initial); expect(h.requests).toEqual([]); expect(history).not.toHaveBeenCalled(); h.unmount();
+  });
+  it('indexed track insertion retains its existing whole operation pending the order receipt', async () => {
+    const initial = await literalLeftData(true); const h = await setup(undefined, false, initial);
+    act(() => expect(mountedCommandsFor(h).addTrack({ kind: 'visual', index: 0 }).ok).toBe(true));
+    expect(h.result.current.data!.config.tracks!.map(track => track.id)).toEqual(['V3', 'V1', 'V2']);
+    expect(gestureCommandsFor(h.result.current.data!)).toBeUndefined(); expect(h.requests).toEqual([]); h.unmount();
+  });
+});
+
+
+describe('selected-media insertion native history', () => {
+  // Detached authority fixture only: capture_media validates real selection/digest/project
+  // and invokes the real compiler. This does not establish Runtime acquisition/acceptance.
+  it.each((['drop', 'service'] as const).flatMap(caller => (['image', 'video', 'audio'] as const).flatMap(kind => (['registered', 'new'] as const).map(registration => [caller, kind, registration] as const))))('%s %s %s existing-track add compiles and restores exact registry/child through native Undo/Redo', async (caller, kind, registration) => {
+    const base = await literalLeftData(true);
+    let initial = kind === 'audio' ? await buildTimelineData({ ...base.config, tracks: [...base.config.tracks!, { id: 'A1', kind: 'audio' as const, label: 'Audio' }] }, base.registry, undefined, 1, undefined, base.head) : base;
+    const duration = kind === 'image' ? 5 : 2;
+    const objectId = `sha256:${'a'.repeat(64)}`;
+    const detached = {
+      realm_id: 'realm', project_id: 'gesture-project', asset: 'selected', generation_id: 'g', variant_id: 'v', object_id: objectId,
+      generation: { type: kind, source_task_id: null, metadata: { params: {}, opaque: null } },
+      variant: { variant_type: 'original', metadata: { op: 'clear' } },
+      entry: { object_id: objectId, media_type: kind === 'image' ? 'image/png' : kind === 'video' ? 'video/mp4' : 'audio/wav', size: 4, filename: `selected.${kind}`, duration_seconds: duration },
+    };
+    const catalog_digest = `sha256:${createHash('sha256').update(canonicalJsonStringify(detached)).digest('hex')}`;
+    const selection = { asset: detached.asset, generation_id: detached.generation_id, variant_id: detached.variant_id, object_id: objectId, catalog_digest };
+    const registryEntry = {
+      media_id: objectId, content_sha256: 'a'.repeat(64), type: detached.entry.media_type, duration,
+      format: detached.entry, generationId: 'g', variantId: 'v',
+      authoring_metadata: { generation: detached.generation, variant: detached.variant },
+      file: 'https://runtime.fixture/selected',
+    };
+    if (registration === 'registered') initial = await buildTimelineData(initial.config, { assets: { ...initial.registry.assets, selected: registryEntry } }, undefined, 1, undefined, initial.head);
+    const record = { ...detached, catalog_digest }; const requests: CommitRequest[] = []; let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async request => {
+      requests.push(request); source = selectedMoveSource(initial, requests, record);
+      const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+      if (evidence) writeFileSync(path.join(evidence, `add-media-${caller}-${kind}-${registration}.json`), JSON.stringify({ requests: h.requests, source, detachedAuthorityFixture: record }, null, 2));
+      return { directWrites: source.plans.at(-1)!.writes };
+    }, false, initial);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    const runtime = { provider: h.provider, toast: { error: vi.fn() } } as unknown as VideoEditorRuntimeContextValue;
+    const trackId = kind === 'audio' ? 'A1' : 'V2';
+    const assets = renderHook(() => useAssetManagement({
+      dataRef: h.result.current.dataRef, selectedTrackId: trackId, selectedProjectId: 'gesture-project',
+      selectClip: vi.fn(), setSelectedTrackId: vi.fn(), applyEdit: h.result.current.applyEdit,
+      patchRegistry: vi.fn(), invalidateAssetRegistry: vi.fn(), resolveAssetUrl: vi.fn(),
+    }), { wrapper: ({ children }) => <VideoEditorRuntimeProvider value={runtime}>{children}</VideoEditorRuntimeProvider> });
+    const prepared = { assetKey: 'selected', mediaType: kind, durationSeconds: duration, source: 'external-media' as const, selectedMedia: selection, entry: registryEntry };
+    act(() => expect(caller === 'drop' ? assets.result.current.handleAssetDrop('selected', trackId, 1, false, false, prepared)
+      : mountedCommandsFor(h).addClip({ preparedAsset: prepared, trackId, time: 1 }).ok).toBe(true));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    const forward = h.requests[0].request;
+    expect(forward).toMatchObject({ base_revision_id: 'parent-r1', source: { via: 'app' }, change: { commands: [{
+      op: 'timeline.add', select: `parent/track:${trackId}`, args: { media: selection, at: 1, duration },
+    }] } });
+    const child = forward.change.commands[0].created![0];
+    expect(forward.change.commands[0].args.clip_id).toBe(child.split(':')[1]);
+    expect(forward.change.commands[0].expect).toEqual({ [`${child}::`]: { state: 'absent' },
+      'parent::registry.assets.selected': registration === 'registered' ? { state: 'present', value: registryEntry } : { state: 'absent' } });
+    expect(forward.change.commands[0].args).not.toHaveProperty('media_record');
+    expect(source.mediaReads).toEqual([selection]);
+    await waitFor(() => expect(history.result.current.canUndo).toBe(true)); act(() => history.result.current.undo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
+    await waitFor(() => expect(history.result.current.canRedo).toBe(true)); act(() => history.result.current.redo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
+    expect(source.documents[1]).toEqual(source.before); expect(source.documents[2]).toEqual(source.documents[0]);
+    expect(h.requests[2].request.change.commands).toEqual(forward.change.commands);
+    expect(h.requests[2].request.base_revision_id).toBe('parent-r3');
+    // This fixture's revision read carries no publication identity.
+    expect(h.requests[2].request.base_publication_id).toBeNull();
+    expect(source.mediaReads).toEqual([selection, selection]); expect(source.journal).toBe(3); expect(source.reload).toBe(true);
+    expect(h.requests).toHaveLength(3); expect(h.compatibilityRequests).toEqual([]);
+    assets.unmount(); history.unmount(); h.unmount();
+  }, 60_000);
+});
+
+
+describe('selected-media actual caller no-write boundaries', () => {
+  it.each(['drop invalid asset', 'drop read-only', 'service invalid asset', 'service read-only'] as const)('%s preserves source/history/wire', async kind => {
+    const initial = await literalLeftData(true);
+    const h = await setup(undefined, false, initial, 1, kind.endsWith('read-only') ? createTimelineEditability({ readOnly: true }) : undefined);
+    const before = h.result.current.data; const history = vi.fn(); h.eventBus.on('beforeCommit', history);
+    const prepared = { assetKey: kind.endsWith('invalid asset') ? '' : 'selected', mediaType: 'video' as const, durationSeconds: 2, source: 'external-media' as const,
+      entry: { type: 'video/mp4', duration: 2, file: 'fixture.mp4' },
+      selectedMedia: { asset: 'selected', generation_id: 'g', variant_id: 'v', object_id: `sha256:${'a'.repeat(64)}`, catalog_digest: `sha256:${'b'.repeat(64)}` } };
+    const runtime = { provider: h.provider, toast: { error: vi.fn() } } as unknown as VideoEditorRuntimeContextValue;
+    const assets = renderHook(() => useAssetManagement({ dataRef: h.result.current.dataRef, selectedTrackId: 'V2', selectedProjectId: 'gesture-project',
+      selectClip: vi.fn(), setSelectedTrackId: vi.fn(), applyEdit: h.result.current.applyEdit, patchRegistry: vi.fn(), invalidateAssetRegistry: vi.fn(), resolveAssetUrl: vi.fn(),
+    }), { wrapper: ({ children }) => <VideoEditorRuntimeProvider value={runtime}>{children}</VideoEditorRuntimeProvider> });
+    const trackId = 'V2';
+    act(() => {
+      if (kind.startsWith('drop')) assets.result.current.handleAssetDrop('selected', trackId, 1, false, false, prepared);
+      else {
+        const service = kind.endsWith('read-only') ? createTimelineCommands({ getState: () => ({ availability: { mounted: true } }) } as unknown as TimelineStoreApi,
+          { timelineEditability: { checkTimeline: () => ({ allowed: false, reason: 'timeline_read_only' }) } }) : mountedCommandsFor(h);
+        expect(service.addClip({ preparedAsset: prepared, trackId, time: 1 }).ok).toBe(false);
+      }
+    });
+    const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+    if (evidence) writeFileSync(path.join(evidence, `media-guard-${kind.replaceAll(' ', '-')}.json`), JSON.stringify({ sourceChanged: h.result.current.data !== before, editSeq: h.result.current.editSeqRef.current, historyCalls: history.mock.calls.length, requests: h.requests, compatibilityRequests: h.compatibilityRequests }, null, 2));
+    expect(h.result.current.data).toBe(before); expect(h.result.current.editSeqRef.current).toBe(0);
+    expect(history).not.toHaveBeenCalled(); expect(h.requests).toEqual([]); expect(h.compatibilityRequests).toEqual([]);
+    assets.unmount(); h.unmount();
+  });
+});
+
+
+describe('mounted existing-source literal ripple native history', () => {
+  it('binds one allocated clone and ordered follower nudges to one receipt/inverse/Redo', async () => {
+    const base = await selectedMoveData();
+    const initial = await buildTimelineData({ ...base.config, clips: [
+      { ...base.config.clips[0], asset: 'copy-source', hold: 1 },
+      { ...base.config.clips[1], at: 3 },
+      { id: 'clip-3', at: 5, hold: 1, clipType: 'hold', track: 'V1', app: { opaque: null } },
+      { id: 'other-track', at: 0, hold: 0.5, clipType: 'hold', track: 'V2' },
+    ] }, { assets: { 'copy-source': { file: 'copy.png', type: 'image/png', duration: 5 } } }, undefined, 1, undefined, base.head);
+    const requests: CommitRequest[] = []; let source!: ReturnType<typeof selectedMoveSource>;
+    const h = await setup(async request => {
+      requests.push(request); source = selectedMoveSource(initial, requests);
+      const evidence = process.env.E_SELECTED_MOVE_EVIDENCE_DIR;
+      if (evidence) writeFileSync(path.join(evidence, 'duplicate-ripple-native.json'), JSON.stringify({ requests: h.requests, source }, null, 2));
+      return { directWrites: source.plans.at(-1)!.writes };
+    }, false, initial);
+    const history = renderHook(() => {
+      const state = useTimelineHistory({ ...h.result.current, eventBus: h.eventBus, interactionStateRef: h.interactionStateRef, pendingOpsRef: { current: 0 } });
+      useEffect(() => h.eventBus.on('beforeCommit', state.onBeforeCommit), [state.onBeforeCommit]); return state;
+    }, { wrapper: overlapHistoryWrapper(h) });
+    act(() => expect(mountedCommandsFor(h).addClip({ assetId: 'copy-source', afterClipId: 'clip-1' }).ok).toBe(true));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1));
+    const forward = h.requests[0].request;
+    expect(forward).toMatchObject({ base_revision_id: 'parent-r1', source: { via: 'app' } });
+    expect(forward.change.commands.map(call => call.op)).toEqual(['timeline.add', 'clip.nudge', 'clip.nudge']);
+    expect(forward.change.commands[0]).toMatchObject({ select: null, args: { from: 'parent/clip:clip-1', at: 2 },
+      expect: { 'parent/clip:clip-1::': { state: 'present', value: initial.config.clips[0] } } });
+    expect(forward.change.commands[0].expect!['parent/clip:clip-1::clip_order']).toEqual({ state: 'present', value: initial.config.clips.map(clip => `parent/clip:${clip.id}`) });
+    expect(forward.change.commands.slice(1)).toMatchObject(['clip-2', 'clip-3'].map(id => ({ select: `parent/clip:${id}`, args: { frames: 30 },
+      expect: { at: { state: 'present', value: initial.config.clips.find(clip => clip.id === id)!.at }, 'app.astrid.on': { state: 'absent' }, 'app.astrid.until': { state: 'absent' } } })));
+    await waitFor(() => expect(history.result.current.canUndo).toBe(true)); act(() => history.result.current.undo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(2));
+    await waitFor(() => expect(history.result.current.canRedo).toBe(true)); act(() => history.result.current.redo());
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(3));
+    expect(source.documents[1]).toEqual(source.before); expect(source.documents[2]).toEqual(source.documents[0]);
+    expect(source.journal).toBe(3); expect(source.reload).toBe(true); expect(h.requests).toHaveLength(3); expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  }, 60_000);
 });
