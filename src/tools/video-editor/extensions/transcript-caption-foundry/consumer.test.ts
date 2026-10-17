@@ -34,7 +34,7 @@ const selection: ExplicitTranscriptSelection = {
   target: {
     clip_id: 'clip-1',
     occurrence_id: 'occurrence-1',
-    selector: 'parent/clip:clip-1',
+    selector: 'occurrence:occurrence-1/clip:clip-1',
   },
   word_ids: ['word-2', 'word-3'],
   prior_binding: { state: 'absent' },
@@ -178,7 +178,7 @@ describe('mounted read-only transcript consumer', () => {
       expect(transaction).toEqual({ transactionId: selection.request_id, semantic: true });
       expect(commands[0]).toMatchObject({
         op: 'transcript.bind',
-        select: selection.target.selector,
+        select: null,
         args: {
           target: { clip_id: selection.target.clip_id, occurrence_id: selection.target.occurrence_id },
           expect: { binding: { state: 'absent' } },

@@ -408,6 +408,7 @@ function InnerProvider({
     projectId: runtime.project.projectId,
     timelineId: runtime.timelineId,
     projectObjects: runtime.provider.projectObjects,
+    projectTranscripts: runtime.provider.projectTranscripts,
     catalogUserId: runtime.auth.userId,
     effectsQueryEnabled: !effectCatalog && Boolean(runtime.auth.userId),
     effectCatalog,

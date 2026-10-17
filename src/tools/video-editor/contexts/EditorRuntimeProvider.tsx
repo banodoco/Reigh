@@ -103,6 +103,7 @@ function EditorRuntimeProviderInner({
   settingsNotificationRegistryRef,
   extensionStateRepository,
   projectObjects,
+  projectTranscripts,
   timelineServices,
   effectsQueryData,
   hostServices,
@@ -120,6 +121,7 @@ function EditorRuntimeProviderInner({
   settingsNotificationRegistryRef: React.MutableRefObject<ExtensionSettingsNotificationRegistry | null>;
   extensionStateRepository: ExtensionStateRepository | null | undefined;
   projectObjects?: DataProvider['projectObjects'];
+  projectTranscripts?: DataProvider['projectTranscripts'];
   timelineServices?: TimelineHostServiceHooks;
   effectsQueryData?: Array<{ slug: string; code: string }>;
   hostServices?: VideoEditorScopedServices;
@@ -132,6 +134,7 @@ function EditorRuntimeProviderInner({
     projectId: hostServices?.scope.projectId ?? null,
     timelineId,
     projectObjects,
+    projectTranscripts,
     catalogUserId: userId,
     effectsQueryEnabled: !effectCatalog && Boolean(userId),
     effectCatalog,
@@ -547,6 +550,7 @@ function EditorRuntimeProviderInstance({
         settingsNotificationRegistryRef={settingsNotificationRegistryRef}
         extensionStateRepository={activeExtensionStateRepository}
         projectObjects={dataProvider.projectObjects}
+        projectTranscripts={dataProvider.projectTranscripts}
         hostServices={hostServices}
         onSaveStatusChange={onSaveStatusChange}
       >

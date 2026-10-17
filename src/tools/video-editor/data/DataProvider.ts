@@ -1,3 +1,4 @@
+import type { ProjectTranscriptReader } from '@/integrations/runtime/projectTranscriptReader.ts';
 import type { SelectedProjectMediaIdentity } from '@/shared/contracts/selectedProjectMedia.ts';
 import type { EditCommand } from '@/integrations/runtime/generated.ts';
 export type {
@@ -422,6 +423,7 @@ export interface DataProvider extends AssetResolver {
   loadGenerationForLightbox?(generationId: string): Promise<GenerationRow | null>;
   /** Existing Runtime-managed object plane for editable project sources. */
   projectObjects?: ProjectObjectStorage;
+  projectTranscripts?: ProjectTranscriptReader;
   persistenceEnabled?: boolean;
   /** Durable-recovery metadata captured synchronously at the first local edit. */
   getTimelineDraftRecoveryMetadata?(timelineId?: string): import('./timelineDraftIndexedDb.ts').TimelineDraftRecoveryMetadata;

@@ -1,3 +1,5 @@
+import { isTranscriptCaptionBatch, transcriptBindTarget } from '@/tools/video-editor/commands/transcriptCaptions.ts';
+import { createProjectTranscriptReader } from './projectTranscriptReader.ts';
 import { isCapturedShotMetadataCommand } from '@/tools/video-editor/data/canonicalShotMetadata.ts';
 import { RuntimeCommitSession, browserCommitSessionStorage, type CommitSessionStorage } from './commitSession.ts';
 import { assetRegistrationCommand, assetRegistrationInverse, isAssetRegistrationCommand, isAssetRegistrationInverse } from '@/tools/video-editor/commands/assetRegistration.ts';
@@ -151,6 +153,7 @@ export class RuntimeDataProvider implements DataProvider {
    */
   readonly refreshIntervalMs = 30_000;
   readonly apiBaseUrl: string;
+  readonly projectTranscripts: import('./projectTranscriptReader.ts').ProjectTranscriptReader;
   readonly projectObjects: ProjectObjectStorage = {
     ingest: async (bytes, mediaType, filename) => {
       const object = await this.client.ingestProjectObject(this.projectId, bytes, mediaType, filename);
@@ -404,6 +407,7 @@ export class RuntimeDataProvider implements DataProvider {
       ? Object.freeze({ ...options.commitRouting })
       : undefined;
     this.client = new ReighRuntimeClient({ baseUrl: options.baseUrl, token: options.token, transport: options.transport });
+    this.projectTranscripts = createProjectTranscriptReader(this.client, this.projectId);
     this.onRuntimeError = options.onRuntimeError;
     this.apiBaseUrl = this.client.baseUrl;
     // Endpoint partitioning is local context only, never realm authority. URL
@@ -750,7 +754,9 @@ export class RuntimeDataProvider implements DataProvider {
       || !save.editCommands?.length || save.editCommands.some((command) =>
         !(shotMetadata
           ? save.editCommands?.length === 1 && isCapturedShotMetadataCommand(command as EditCommand, occurrence)
-          : command.select?.startsWith(`occurrence:${occurrence.occurrenceId}/clip:`)
+          : isTranscriptCaptionBatch(save.editCommands as readonly EditCommand[])
+            ? transcriptBindTarget(save.editCommands?.[0] as EditCommand | undefined)?.occurrence_id === occurrence.occurrenceId
+            : command.select?.startsWith(`occurrence:${occurrence.occurrenceId}/clip:`)
             && command.resolved?.length === 1 && command.resolved[0] === command.select)))) {
       throw new TimelineSchemaIncompatibleError('Semantic occurrence gestures require one captured owner and exact pins.');
     }

@@ -51,7 +51,7 @@ export interface TranscriptBinding {
   readonly subject: TranscriptSubject;
   readonly source: TranscriptSourceKey;
   readonly clock: TranscriptClock;
-  readonly occurrence_id: string;
+  readonly occurrence_id: string | null;
   readonly word_ids: readonly string[];
 }
 
@@ -77,11 +77,11 @@ export interface ExplicitTranscriptSelection {
   readonly subject: TranscriptSubject;
   readonly source: TranscriptSourceKey;
   readonly clock: TranscriptClock;
-  /** The exact producer receipt is reused for an adoption retry. */
-  readonly source_receipt: unknown;
+  /** Optional legacy transport data; never grants source authority. */
+  readonly source_receipt?: unknown;
   readonly target: {
     readonly clip_id: string;
-    readonly occurrence_id: string;
+    readonly occurrence_id: string | null;
     /** The host supplies the runner selector; the consumer never invents it. */
     readonly selector: string;
   };
@@ -105,8 +105,8 @@ export interface PinnedTranscriptRead {
   readonly source: TranscriptSourceKey;
   readonly clock: TranscriptClock;
   readonly words: readonly TranscriptWord[];
-  /** Opaque reference returned by the authenticated source resolver. */
-  readonly source_receipt: unknown;
+  /** Optional legacy transport data; the public resolver supplies authority. */
+  readonly source_receipt?: unknown;
 }
 
 export interface TranscriptCaptionFoundryHost {
@@ -173,9 +173,8 @@ function validateSelection(value: ExplicitTranscriptSelection | null): ExplicitT
   requireText(value.document?.content_digest, 'selected document content digest');
   requireText(value.snapshot?.object_id, 'selected snapshot object ID');
   requireText(value.snapshot?.sha256, 'selected snapshot digest');
-  if (!Number.isSafeInteger(value.document.version) || value.document.version < 1
-    || value.source_receipt === undefined || value.source_receipt === null) {
-    throw new Error('Transcript consumer refused: selection is missing its exact document pin or source receipt.');
+  if (!Number.isSafeInteger(value.document.version) || value.document.version < 1) {
+    throw new Error('Transcript consumer refused: selection is missing its exact document pin.');
   }
   requireText(value.subject?.media_object_id, 'media object identity');
   requireText(value.subject?.media_sha256, 'media digest');
@@ -191,8 +190,12 @@ function validateSelection(value: ExplicitTranscriptSelection | null): ExplicitT
     throw new Error('Transcript consumer refused: selection is missing its exact media clock.');
   }
   requireText(value.target?.clip_id, 'target clip');
-  requireText(value.target?.occurrence_id, 'target occurrence');
+  if (value.target?.occurrence_id !== null) requireText(value.target?.occurrence_id, 'target occurrence');
   requireText(value.target?.selector, 'runner selector');
+  const scope = value.target.occurrence_id === null ? 'parent' : `occurrence:${value.target.occurrence_id}`;
+  if (value.target.selector !== `${scope}/clip:${value.target.clip_id}`) {
+    throw new Error('Transcript consumer refused: selector does not match its exact clip/occurrence target.');
+  }
   if (!Array.isArray(value.word_ids) || value.word_ids.length === 0
     || value.word_ids.some((id) => typeof id !== 'string' || id.trim() === '')
     || new Set(value.word_ids).size !== value.word_ids.length) {
@@ -215,8 +218,8 @@ function validatePinnedRead(
   requireText(value.snapshot?.object_id, 'snapshot object ID');
   requireText(value.snapshot?.sha256, 'snapshot digest');
   if (!Number.isSafeInteger(value.document.version) || value.document.version < 1
-    || !Array.isArray(value.words) || value.source_receipt === undefined || value.source_receipt === null) {
-    throw new Error('Transcript consumer refused: read did not return a complete pinned source receipt.');
+    || !Array.isArray(value.words)) {
+    throw new Error('Transcript consumer refused: read did not return a complete pinned source.');
   }
   if (value.subject.media_object_id !== selection.subject.media_object_id
     || value.subject.media_sha256 !== selection.subject.media_sha256
@@ -276,8 +279,7 @@ function transcriptBindCommand(
 ): EditCommand {
   return {
     op: 'transcript.bind',
-    select: selection.target.selector,
-    resolved: [selection.target.selector],
+    select: null,
     args: {
       target: {
         clip_id: selection.target.clip_id,
@@ -286,7 +288,7 @@ function transcriptBindCommand(
       expect: { binding: selection.prior_binding },
       next: binding,
       correspondence,
-      source_receipt: sourceReceipt,
+      ...(sourceReceipt !== undefined ? { source_receipt: sourceReceipt } : {}),
     },
   };
 }
@@ -335,5 +337,6 @@ export async function runTranscriptCaptionFoundry(
     transactionId: selection.request_id,
     semantic: true,
   });
+  await commandTimeline.flush();
   return { binding, commands, transactionId: selection.request_id };
 }

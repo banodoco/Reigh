@@ -1,3 +1,5 @@
+import { createTranscriptCaptionProjectHost } from '../extensions/transcript-caption-foundry/projectHost.ts';
+import type { ProjectTranscriptReader } from '@/integrations/runtime/projectTranscriptReader.ts';
 /**
  * Shared runtime assembly for the video editor's two host providers:
  * `VideoEditorProvider` (Reigh app shell) and `EditorRuntimeProvider`
@@ -538,6 +540,7 @@ export interface UseEditorRuntimeSyncOptions {
   timelineId: string | null;
   /** Active provider's optional project-bound immutable object port. */
   projectObjects?: ProjectObjectStorage;
+  projectTranscripts?: ProjectTranscriptReader;
   /** User the effect/sequence catalogs and legacy effects query resolve
    *  against. */
   catalogUserId: string | null;
@@ -587,6 +590,7 @@ export function useEditorRuntimeSync({
   projectId,
   timelineId,
   projectObjects,
+  projectTranscripts,
   catalogUserId,
   effectsQueryData,
   timelineServices = PUBLIC_TIMELINE_SERVICE_HOOKS,
@@ -737,6 +741,12 @@ export function useEditorRuntimeSync({
     }
   }, [agentToolRegistryRef, enableMutationServices, eagerProposalRetry, timelineReader]);
 
+  const transcriptProject = useMemo(() => projectId && projectTranscripts
+    ? createTranscriptCaptionProjectHost({ projectId, reader: projectTranscripts,
+        data: () => store.getState().data.data }) : undefined,
+  [projectId, projectTranscripts, store]);
+  useOwnedResourceDisposal(transcriptProject, (host) => host?.dispose());
+
   // Sync extensions with live creative context.
   const liveCreativeOverrides = useMemo<Partial<CreativeContext>>(() => {
     const ops = store.getState().timelineOps ?? undefined;
@@ -747,8 +757,9 @@ export function useEditorRuntimeSync({
       proposals: proposals as unknown as CreativeContext['proposals'],
       timelineView: timelineViewStoreRef.current as unknown as CreativeContext['timelineView'],
       projectObjects,
+      project: transcriptProject,
     };
-  }, [projectObjects, timelineReader, timelineViewStoreRef, store]);
+  }, [projectObjects, transcriptProject, timelineReader, timelineViewStoreRef, store]);
 
   useEffect(() => {
     const host = lifecycleHostRef.current;

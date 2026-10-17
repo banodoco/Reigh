@@ -216,7 +216,7 @@ function createExtensionTimelineOps(
             || command.op.startsWith('document.'))) {
             throw new Error('Transcript consumer may submit only transcript.bind and ordinary caption edits.');
           }
-          commandTimeline.submitCommandTransaction!(commands, options);
+          return commandTimeline.submitCommandTransaction!(commands, options);
         },
       }
     : {};
@@ -514,7 +514,10 @@ export function createExtensionContext(
         ),
       }
     : creativeOverrides;
-  const creative = createCreativeContext(scopedCreativeOverrides);
+  const creative = createCreativeContext(scopedCreativeOverrides && {
+    ...scopedCreativeOverrides,
+    ...(transcriptConsumerAdmitted ? {} : { project: undefined }),
+  });
 
   // ---- commands service (optional, wired by provider) -----------------------
   const commandsService: ExtensionCommandService = commands ?? {

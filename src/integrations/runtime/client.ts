@@ -423,6 +423,18 @@ export class ReighRuntimeClient {
   }
 
   /** Project-scoped object authority check; the local path is never exposed. */
+  async listDocuments(projectId: string, cursor?: string) {
+    return this.withSession(() => this.client.listDocuments(projectId, cursor));
+  }
+
+  async getDocument(projectId: string, documentId: string) {
+    return this.withSession(() => this.client.getDocument(projectId, documentId));
+  }
+
+  async listProjectObjects(projectId: string, cursor?: string) {
+    return this.withSession(() => this.client.listProjectObjects(projectId, cursor));
+  }
+
   async getProjectObjectLocation(projectId: string, objectId: string): Promise<ObjectLocation> {
     return this.withSession(() => this.client.getProjectObjectLocation(projectId, objectId));
   }

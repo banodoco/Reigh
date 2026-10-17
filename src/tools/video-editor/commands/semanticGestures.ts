@@ -1,3 +1,4 @@
+import { isTranscriptCaptionBatch, transcriptBindTarget } from './transcriptCaptions.ts';
 import type { EditCommand } from '@/integrations/runtime/generated.ts';
 import type { TimelineOccurrenceContext } from '../data/DataProvider.ts';
 import type { CanonicalClipIdentity } from '../data/shotCompositionProjection.ts';
@@ -91,7 +92,12 @@ export function attachGestureCommands(data: TimelineData, commands: readonly Edi
   let parent = false;
   const aggregateBatch = commands.length > 0 && commands.every((command) =>
     isShotGroupAggregateCommand(command) || isAssetRegistrationCommand(command) || isAssetRegistrationInverse(command) || isOverlapTrimInverse(command) || isTiedHoldExpansionInverse(command));
-  for (const command of commands) {
+  const captionTarget = isTranscriptCaptionBatch(commands) ? transcriptBindTarget(commands[0]) : undefined;
+  // Routing reads the handler's explicit args.target. The submitted registered
+  // timeline-level bind retains select:null; this local view only captures custody.
+  const captionSelector = captionTarget && `${captionTarget.occurrence_id === null ? 'parent' : `occurrence:${captionTarget.occurrence_id}`}/clip:${captionTarget.clip_id}`;
+  const scopedCommands = captionSelector ? [{ ...commands[0]!, select: captionSelector, resolved: [captionSelector] }] : commands;
+  for (const command of scopedCommands) {
     if (typeof command.select !== 'string') {
       if (command.select !== null || (!aggregateBatch && source.config.clips.some((clip) => clip.app?.canonical))) return;
       parent = true;
@@ -443,16 +449,17 @@ export function compositeEffectGestureCommands(
     const arg = entrance ? 'fade_in' : 'fade_out';
     const expectedType = entrance ? 'fade' : 'fade-out';
     const captured = entrance ? clip.entrance : clip.exit;
+    const fadeValue = isRecord(value) ? value as Record<string, unknown> : undefined;
     if (value === null) {
       args[arg] = null;
     } else if (value === undefined) {
       if (captured?.type !== expectedType) return { handled: false };
       (args.clear ??= []).push(arg);
-    } else if (typeof value === 'object' && value !== null && value.type === expectedType) {
-      if (typeof value.duration !== 'number' || !Number.isFinite(value.duration) || value.duration < 0) {
+    } else if (fadeValue?.type === expectedType) {
+      if (typeof fadeValue.duration !== 'number' || !Number.isFinite(fadeValue.duration) || fadeValue.duration < 0) {
         return { handled: true };
       }
-      args[arg] = value.duration;
+      args[arg] = fadeValue.duration;
     } else if (typeof value === 'object' && value !== null && (value as { type?: unknown }).type === expectedType) {
       return { handled: true };
     } else {

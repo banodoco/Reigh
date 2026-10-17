@@ -1,3 +1,4 @@
+import { buildTranscriptCaptionCommands } from '@/tools/video-editor/commands/transcriptCaptions.ts';
 import { clearTimelineDraft, loadTimelineDraft, saveTimelineDraft, timelineDraftRecoveryKey } from '@/tools/video-editor/data/timelineDraftIndexedDb.ts';
 import { RuntimeCommitSession, browserCommitSessionStorage } from './commitSession.ts';
 import { splitClipAtPlayhead } from '@/tools/video-editor/lib/editor-utils.ts';
@@ -1938,6 +1939,41 @@ describe('RuntimeDataProvider commit save routing', () => {
     return new RuntimeDataProvider({ projectId: PROJECT_ID, transport: fixture.transport,
       commitSessionStorage: storage, commitRouting: { enabled: true } });
   }
+
+  it('routes the registered timeline-level bind and ordinary captions under one captured occurrence', async () => {
+    const fixture = commitFixture(async (body) => result(body));
+    const provider = nativeProvider(fixture);
+    const loaded = await provider.loadTimeline(TIMELINE_ID);
+    const binding = { schema_version: 1 as const,
+      document: { id: 'synthetic-transcript', version: 1, content_digest: `sha256:${'a'.repeat(64)}` },
+      snapshot: { object_id: `sha256:${'a'.repeat(64)}`, sha256: 'a'.repeat(64) },
+      subject: { media_object_id: `sha256:${'b'.repeat(64)}`, media_sha256: 'b'.repeat(64) },
+      source: { producer_id: 'synthetic', source_id: 'take', lineage_id: 'line', revision_id: 'revision', producer_digest: 'c'.repeat(64) },
+      clock: { kind: 'media' as const, unit: 'seconds' as const, origin_seconds: 0 as const },
+      occurrence_id: 'occ', word_ids: ['opaque-word'] };
+    const selection = { explicit: true as const, request_id: 'caption-request', project_id: PROJECT_ID,
+      ...binding, target: { clip_id: 'source', occurrence_id: 'occ', selector: 'occurrence:occ/clip:source' },
+      prior_binding: { state: 'absent' as const } };
+    const transcript = { ...binding, words: [{ id: 'opaque-word', text: 'Hello', start_s: 0, end_s: 0.5 }] };
+    const captions = buildTranscriptCaptionCommands({ selection, transcript, binding, trackId: 'type' });
+    const commands: EditCommand[] = [{ op: 'transcript.bind', select: null,
+      args: { target: { clip_id: 'source', occurrence_id: 'occ' }, expect: { binding: { state: 'absent' } },
+        next: binding, correspondence: [] } }, ...captions.commands];
+    const occurrence = { projectId: PROJECT_ID, parentDocumentId: TIMELINE_ID,
+      headRevisionId: loaded.head!.headRevisionId!, occurrenceId: 'occ', shotId: 'shot',
+      shotRevisionId: 'shot-revision', internalRevisionId: 'internal-revision' };
+    await provider.saveTimelineAtHead(TIMELINE_ID, loaded.config, loaded.head!, undefined, undefined, commands, occurrence);
+    const request = JSON.parse(fixture.commits[0].bytes);
+    expect(request.scope).toEqual({ target: 'occurrence:occ', content: 'this-occurrence', shot_id: 'shot',
+      shot_revision_id: 'shot-revision', internal_revision_id: 'internal-revision', complete: ['clips', 'tracks'], projection_version: 1 });
+    expect(request.change.commands).toEqual(commands);
+    const priorCount = fixture.commits.length;
+    const wrongOwner = structuredClone(commands);
+    wrongOwner[1]!.created = ['occurrence:foreign/clip:caption'];
+    await expect(provider.saveTimelineAtHead(TIMELINE_ID, structuredClone(loaded.config), loaded.head!,
+      undefined, undefined, wrongOwner, occurrence)).rejects.toThrow('one captured owner');
+    expect(fixture.commits).toHaveLength(priorCount);
+  });
 
   it('W09 returns a native history inverse only after the accepted exact revision readback', async () => {
     const write = { id: 'parent', path: 'registry.assets', before: { state: 'absent' }, after: { state: 'present', value: { registered: null } } };

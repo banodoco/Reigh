@@ -43,6 +43,8 @@ export const transcriptCaptionFoundryExtension = defineExtension({
     label: 'Transcript Caption Foundry',
     description: 'Read a pinned transcript source and add editable caption clips.',
     contributions: [
+      { id: 'create-captions-command' as ContributionId, kind: 'command',
+        command: 'com.reigh.transcript-lane.create-captions', label: 'Create captions from transcript', category: 'Transcript' },
       {
         id: 'media-transcript-kind' as ContributionId,
         kind: 'dataKind',
@@ -57,6 +59,9 @@ export const transcriptCaptionFoundryExtension = defineExtension({
   },
 
   activate(context: ExtensionContext): DisposeHandle {
+    const command = context.commands.registerCommand('com.reigh.transcript-lane.create-captions', async () => {
+      await runTranscriptCaptionFoundry(context, []);
+    });
     const registration = context.dataKinds.register(
       TRANSCRIPT_CAPTION_FOUNDRY_KIND_ID,
       renderTranscriptLane,
@@ -76,6 +81,6 @@ export const transcriptCaptionFoundryExtension = defineExtension({
         ],
       },
     );
-    return { dispose: () => registration.dispose() };
+    return { dispose: () => { registration.dispose(); command.dispose(); } };
   },
 });
