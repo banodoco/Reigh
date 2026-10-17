@@ -1,6 +1,6 @@
 import Ajv from 'ajv';
 import * as themeApi from '@banodoco/timeline-composition/theme-api';
-import type { ModifierDeclaration, ModifierRegistry } from '@banodoco/timeline-composition/theme-api';
+import type { ModifierDeclaration, ModifierDefinition, ModifierRegistry } from '@banodoco/timeline-composition/theme-api';
 import type { AstridElementHost } from './astrid-element-host.ts';
 
 export type ComponentDescriptor = {
@@ -24,6 +24,20 @@ const freeze = <T,>(value: T): T => {
   return value;
 };
 
+// Contributed binders can use the React-style Component spelling. Normalize
+// it at this consumer boundary before the canonical Composition API captures
+// the component in its wrapper; retain an explicitly supplied canonical value.
+const componentThemeApi = {
+  ...themeApi,
+  declareModifier<TParams>(definition: ModifierDefinition<TParams> | (
+    Omit<ModifierDefinition<TParams>, 'component'> & {Component: ModifierDefinition<TParams>['component']}
+  )): ModifierDeclaration {
+    return themeApi.declareModifier('component' in definition
+      ? definition
+      : {...definition, component: definition.Component});
+  },
+};
+
 /** Ordinary prebundled modules only; this function cannot import code or expand trust. */
 export function configureComponentHost(base: AstridElementHost, bindings: readonly BundledComponent[], host = 'app'): AstridElementHost {
   if (host !== 'app' && host !== 'composition') throw new Error(`unsupported component host: ${host}`);
@@ -41,7 +55,7 @@ export function configureComponentHost(base: AstridElementHost, bindings: readon
     if (!d.hosts.includes(host)) throw new Error(`unsupported component host: ${host}`);
     const binder = binding.module[d.implementation.export];
     if (typeof binder !== 'function') throw new Error(`missing component export: ${d.implementation.export}`);
-    const declaration = binder(themeApi, d) as ModifierDeclaration;
+    const declaration = binder(componentThemeApi, d) as ModifierDeclaration;
     if (!declaration || declaration.element !== binding.identity) throw new Error('component identity substitution');
     if (declaration.kind !== 'modifier' || declaration.alpha !== 'preserve' || declaration.support !== 'preserve'
       || declaration.bounds !== (d.bounds ?? 'unknown') || typeof declaration.wrap !== 'function'

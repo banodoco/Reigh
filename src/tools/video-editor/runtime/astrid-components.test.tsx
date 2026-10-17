@@ -6,6 +6,7 @@ import type {AstridElementHost} from './astrid-element-host.ts';
 import {ComponentAddForm} from '../components/PropertiesPanel/AstridComponentControls.tsx';
 import {componentEditCommand} from '../commands/semanticGestures.ts';
 import type {TimelineData} from '../lib/timeline-data.ts';
+import type {ModifierContext, ModifierDefinition} from '@banodoco/timeline-composition/theme-api';
 const identity = 'timeline.component/test.shade';
 const digest = 'a'.repeat(64);
 const base: AstridElementHost = {descriptors: [], sequenceRegistry: {}, resolveComponent: () => undefined,
@@ -24,6 +25,33 @@ function binding(): BundledComponent {
         resolveParams: params => params})}};
 }
 describe('trusted bundled V3 consumer', () => {
+  it.each(['app', 'composition'])('renders the original J029 uppercase Component registration for %s', hostName => {
+    const Shade = ({children}: {children: import('react').ReactNode}) => createElement('div', {'data-testid': `shade-${hostName}`}, children);
+    const value = binding();
+    value.module = {bind: (api: {declareModifier(definition: Omit<ModifierDefinition<{strength: number}>, 'component'> & {Component: typeof Shade}): unknown}, d: BundledComponent['descriptor']) =>
+      api.declareModifier({kind: 'modifier', element: `${d.point}/${d.id}`, hosts: d.hosts,
+        bounds: d.bounds ?? 'unknown', alpha: d.alpha, support: d.support, Component: Shade,
+        resolveParams: params => ({strength: Number(params.strength)})})};
+    const host = configureComponentHost(base, [value], hostName);
+    const content = createElement('span', null, `original-child-${hostName}`);
+    const wrapped = host.modifierRegistry![identity].wrap({id: 'vignette', element: identity, params: {strength: .6}},
+      {bounds: {status: 'known', rect: {x: 0, y: 0, width: 320, height: 180}}} as ModifierContext, content);
+    expect(wrapped.type).toBe(Shade);
+    expect(wrapped.props.children).toBe(content);
+    render(wrapped);
+    expect(screen.getByTestId(`shade-${hostName}`).textContent).toBe(`original-child-${hostName}`);
+  });
+  it('keeps the canonical component when both spellings are supplied', () => {
+    const Canonical = () => createElement('div', null, 'canonical');
+    const value = binding();
+    value.module = {bind: (api: typeof import('@banodoco/timeline-composition/theme-api'), d: BundledComponent['descriptor']) =>
+      api.declareModifier({kind: 'modifier', element: `${d.point}/${d.id}`, hosts: d.hosts,
+        bounds: d.bounds ?? 'unknown', alpha: d.alpha, support: d.support, component: Canonical,
+        Component: () => createElement('div', null, 'legacy'), resolveParams: params => params} as ModifierDefinition<Record<string, unknown>>)};
+    const host = configureComponentHost(base, [value]);
+    expect(host.modifierRegistry![identity].wrap({id: 'vignette', element: identity, params: {}},
+      {} as ModifierContext, null).type).toBe(Canonical);
+  });
   it('binds the declared export using the real Composition API and keeps the descriptor', () => {
     const host = configureComponentHost(base, [binding()]);
     expect(host.modifierRegistry?.[identity].element).toBe(identity);
