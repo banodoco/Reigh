@@ -1,3 +1,4 @@
+import { isManualTextClip } from '../../commands/manualText.ts';
 import { trimClipToMediaEnd } from '../../lib/trim-to-media-end.ts';
 // Layer map & invariants: docs/structure_detail/tool_video_editor.md
 import { expandTinyClip } from '../../lib/expand-tiny-clip.ts';
@@ -189,7 +190,7 @@ export function resolveWaveformAudioSrc(
     return undefined;
   }
 
-  if (clip.clipType === 'text' || clip.clipType === 'effect-layer') {
+  if (isManualTextClip(clip) || clip.clipType === 'effect-layer') {
     return undefined;
   }
 
@@ -481,7 +482,7 @@ function TimelineEditorCoreComponent({
     }
 
     return resolvedConfig.clips.reduce<Record<string, string>>((acc, clip) => {
-      if (clip.clipType === 'text' || !clip.assetEntry) {
+      if (isManualTextClip(clip) || !clip.assetEntry) {
         return acc;
       }
 
@@ -691,7 +692,7 @@ function TimelineEditorCoreComponent({
     // short overlapping bursts (for example transcript captions). Their
     // minimum visual width can otherwise make one full-row hit target cover
     // the previous one. Keep video/audio/effect clips on the legacy geometry.
-    return data?.meta[action.id]?.clipType === 'text';
+    return isManualTextClip(data?.meta[action.id]);
   }, [data?.meta]);
 
   const getActionRender = useCallback((action: TimelineAction, _row: TimelineRow, clipWidth: number) => {

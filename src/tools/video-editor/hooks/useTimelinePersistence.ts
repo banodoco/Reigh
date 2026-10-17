@@ -1,3 +1,5 @@
+import { isManualTextBatch, isManualTextCreation, isManualTextInverse } from '../commands/manualTextHistory.ts';
+import { manualTextBefore } from '../commands/manualText.ts';
 import { proposalSaveFor, proposalCorrelationFor } from '../lib/proposal-command-binding.ts';
 import { timelineDraftRecoveryKey } from '@/tools/video-editor/data/timelineDraftIndexedDb.ts';
 import type { EditCommand } from '@/integrations/runtime/generated.ts';
@@ -863,6 +865,15 @@ export function useTimelinePersistence({
         return;
       }
 
+      if ((isTimelineVersionConflictError(persistenceError) || isTimelineSchemaIncompatibleError(error))
+        && dataRef.current === attempt.data && attempt.generation === attempt.session.generation) {
+        const before = manualTextBefore(attempt.data);
+        if (before) {
+          commitData(before.data, { save: false, skipHistory: true, selectedClipId: before.selectedClipId, selectedTrackId: before.selectedTrackId });
+          eventBus.emit('nativeRegistrationAccepted', attempt.data, null);
+        }
+      }
+
       if (isTimelineVersionConflictError(persistenceError)) {
         if (options?.attemptKind === 'transport-retry') {
           const reconciliation = await inspectLostAck(attempt);
@@ -997,8 +1008,13 @@ export function useTimelinePersistence({
     const previous = latestScheduledSaveRef.current;
     const hasUnconvertedPredecessor = previous?.session === session
       && previous.seq > savedSeqRef.current && !previous.editCommands;
-    const editCommands = provider.semanticCommandSaving && (!hasUnconvertedPredecessor || proposalSaveFor(nextData) !== undefined)
-      ? gestureCommandsFor(nextData) : undefined;
+    const capturedCommands = gestureCommandsFor(nextData);
+    const manualText = capturedCommands && (isManualTextBatch(capturedCommands) || isManualTextCreation(capturedCommands)
+      || capturedCommands.length === 1 && isManualTextInverse(capturedCommands[0]));
+    // A preceding compatibility edit cannot turn an already captured text
+    // transaction into a whole-document fallback. Keep its exact base/receipt lane.
+    const editCommands = provider.semanticCommandSaving && (!hasUnconvertedPredecessor || manualText || proposalSaveFor(nextData) !== undefined)
+      ? capturedCommands : undefined;
     if (proposalSaveFor(nextData) && !editCommands) {
       throw new Error('Bound proposal commands cannot use a compatibility writer.');
     }

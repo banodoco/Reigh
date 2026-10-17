@@ -1,3 +1,4 @@
+import { manualTextPatch, isManualTextClip } from '../commands/manualText.ts';
 import { buildSelectedProjectMediaAddCommand } from '../commands/selectedProjectMedia.ts';
 import { addTrackGestureCommands, authoredTracks } from '../commands/trackGestures.ts';
 import type { TimelineEditability } from '@/tools/video-editor/lib/timeline-editability.ts';
@@ -353,7 +354,7 @@ const duplicateRippleCommands = (current: TimelineData, sourceId: string, edit: 
 };
 
 const getClipTrackKind = (current: TimelineData, clip: TimelineData['resolvedConfig']['clips'][number]): TrackKind => {
-  if (clip.clipType === 'text' || clip.clipType === 'hold' || clip.clipType === 'effect-layer') {
+  if (isManualTextClip(clip) || clip.clipType === 'hold' || clip.clipType === 'effect-layer') {
     return 'visual';
   }
 
@@ -730,13 +731,16 @@ export function createTimelineCommands(
         }
       }
 
+      const textPatch = 'text' in input.patch ? manualTextPatch(current.config.clips.find(clip => clip.id === input.clipId)!, input.patch.text) : undefined;
+      if ('text' in input.patch && (!textPatch || Object.keys(input.patch).length !== 1)) return failure('invalid_argument', 'Unsupported manual text patch.');
       const nextConfig = updateClipInConfig(current.resolvedConfig, input.clipId, (existingClip) => ({
         ...existingClip,
-        ...input.patch,
+        ...(textPatch ?? input.patch),
         ...(typeof input.patch.at === 'number' ? { at: Math.max(0, roundTimelineValue(input.patch.at)) } : {}),
       }));
       const { at, track, hold, ...properties } = input.patch;
       const propertyCommands = propertyGestureCommands(current, input.clipId, properties);
+      if ('text' in input.patch && !propertyCommands) return failure('invalid_argument', 'Manual text target has no exact typed owner.');
       const durationCommands = Object.prototype.hasOwnProperty.call(input.patch, 'hold')
         ? typeof hold === 'number' && typeof current.config.clips.find((candidate) => candidate.id === input.clipId)?.hold === 'number'
           ? rightResizeGestureCommands(current, input.clipId, hold, {}) : undefined

@@ -1,3 +1,4 @@
+import { isManualTextClip } from '../../commands/manualText.ts';
 import type { AstridElementDescriptor } from '@/tools/video-editor/runtime/astrid-element-host.ts';
 import type { TimelineEditability } from '@/tools/video-editor/lib/timeline-editability.ts';
 import type { ResolvedTimelineClip } from '@/tools/video-editor/types/index.ts';
@@ -23,13 +24,15 @@ function hasEditableSchema(schema: object | undefined): schema is SchemaWithProp
 
 /** Resolve only the host-provided schema for a clip's exact pinned identity. */
 export function resolveAstridElementParamDescriptor(
-  clip: Pick<ResolvedTimelineClip, 'id' | 'track' | 'elementRef'> | null,
+  clip: Pick<ResolvedTimelineClip, 'id' | 'track' | 'elementRef' | 'clipType' | 'text'> | null,
   descriptors: readonly AstridElementDescriptor[],
   readOnly: boolean | undefined,
   timelineEditability: TimelineEditability | undefined,
 ): AstridElementParamDescriptor | undefined {
   const reference = clip?.elementRef;
-  if (!clip || !reference || readOnly) return undefined;
+  // The existing inline text inspector owns this carrier. Binding am-type must
+  // not introduce a second text/params authoring surface.
+  if (!clip || !reference || readOnly || isManualTextClip(clip)) return undefined;
 
   const timelinePermission = timelineEditability?.checkTimeline?.();
   const clipPermission = timelineEditability?.check({

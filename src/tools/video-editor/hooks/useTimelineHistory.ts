@@ -1,3 +1,5 @@
+import { applyManualTextWrites } from '../commands/manualText.ts';
+import { isManualTextBatch, isManualTextCreation, isManualTextInverse } from '../commands/manualTextHistory.ts';
 import { isFadeHistoryBatch, isFadeHistoryInverse } from '../commands/fadeHistory.ts';
 import { isClipLookStyleInverse } from '../commands/clipLookStyleHistory.ts';
 import { isClipParamsHistoryBatch, isClipParamsHistoryInverse } from '../commands/clipParamsHistory.ts';
@@ -254,7 +256,7 @@ export function useTimelineHistory({
       syncHistoryState();
       return;
     }
-    if (!isTransitionAssignmentInverse(inverse) && !isAssetRegistrationInverse(inverse) && !isOverlapTrimInverse(inverse) && !isTiedHoldExpansionInverse(inverse) && !isTranscriptCaptionInverse(inverse) && !isClipPlacementInverse(inverse) && !isClipStructureInverse(inverse) && !isTrackHistoryInverse(inverse) && !isFadeHistoryInverse(inverse) && !isClipLookStyleInverse(inverse) && !isClipParamsHistoryInverse(inverse)) return;
+    if (!isTransitionAssignmentInverse(inverse) && !isAssetRegistrationInverse(inverse) && !isOverlapTrimInverse(inverse) && !isTiedHoldExpansionInverse(inverse) && !isTranscriptCaptionInverse(inverse) && !isClipPlacementInverse(inverse) && !isClipStructureInverse(inverse) && !isTrackHistoryInverse(inverse) && !isFadeHistoryInverse(inverse) && !isClipLookStyleInverse(inverse) && !isClipParamsHistoryInverse(inverse) && !isManualTextInverse(inverse)) return;
     for (const entry of [...undoStackRef.current, ...redoStackRef.current]) {
       if (entry.nativeRegistration?.owner === owner) entry.nativeRegistration.inverse = structuredClone(inverse);
     }
@@ -339,7 +341,8 @@ export function useTimelineHistory({
     // Never turn an unacknowledged edit or missing receipt into a snapshot publication.
     const inverse = entry.nativeRegistration?.inverse;
     if (entry.nativeRegistration && !inverse) return false;
-    const nextData = entry.nativeRegistration && (isTransitionAssignmentInverse(inverse) || isOverlapTrimInverse(inverse) || isTiedHoldExpansionInverse(inverse) || isTranscriptCaptionInverse(inverse) || isClipPlacementInverse(inverse) || isClipStructureInverse(inverse) || isTrackHistoryInverse(inverse) || isFadeHistoryInverse(inverse) || isClipLookStyleInverse(inverse) || isClipParamsHistoryInverse(inverse))
+    const textClips = isManualTextInverse(inverse) ? applyManualTextWrites(current.config.clips, inverse.args.writes) : undefined;
+    const nextData = textClips ? buildDataFromCurrentRegistry({ ...current.config, clips: textClips }, current) : entry.nativeRegistration && (isTransitionAssignmentInverse(inverse) || isOverlapTrimInverse(inverse) || isTiedHoldExpansionInverse(inverse) || isTranscriptCaptionInverse(inverse) || isClipPlacementInverse(inverse) || isClipStructureInverse(inverse) || isTrackHistoryInverse(inverse) || isFadeHistoryInverse(inverse) || isClipLookStyleInverse(inverse) || isClipParamsHistoryInverse(inverse) || isManualTextInverse(inverse))
       ? { ...current } : preserveUploadingClips(current, applyHistoryEntry(current, entry, direction));
     const transitionReplay = entry.nativeRegistration?.transitionReplay;
     const mediaReplay = entry.nativeRegistration?.mediaReplay;
@@ -470,7 +473,7 @@ export function useTimelineHistory({
     const nativeRelation = (entry: UndoEntry) => {
       const nativeCommands = entry.nativeRegistration && gestureCommandsFor(entry.nativeRegistration.owner);
       const command = nativeCommands?.[0];
-      return isTransitionAssignmentBatch(nativeCommands ?? []) || isTransitionAssignmentInverse(command) || isTransitionAssignmentInverse(entry.nativeRegistration?.inverse) || isClipParamsHistoryBatch(nativeCommands ?? []) || isClipParamsHistoryInverse(command) || isClipParamsHistoryInverse(entry.nativeRegistration?.inverse) || isFadeHistoryBatch(nativeCommands ?? []) || isFadeHistoryInverse(command) || isFadeHistoryInverse(entry.nativeRegistration?.inverse) || isTrackHistoryBatch(nativeCommands ?? []) || isTrackHistoryInverse(command) || isTrackHistoryInverse(entry.nativeRegistration?.inverse) || isClipStructureBatch(nativeCommands ?? []) || isClipStructureInverse(command) || isClipStructureInverse(entry.nativeRegistration?.inverse) || isClipPlacementBatch(nativeCommands ?? []) || isClipPlacementInverse(command) || isOverlapTrimBatch(nativeCommands ?? []) || isOverlapTrimInverse(command)
+      return isManualTextBatch(nativeCommands ?? []) || isManualTextCreation(nativeCommands ?? []) || isManualTextInverse(command) || isManualTextInverse(entry.nativeRegistration?.inverse) || isTransitionAssignmentBatch(nativeCommands ?? []) || isTransitionAssignmentInverse(command) || isTransitionAssignmentInverse(entry.nativeRegistration?.inverse) || isClipParamsHistoryBatch(nativeCommands ?? []) || isClipParamsHistoryInverse(command) || isClipParamsHistoryInverse(entry.nativeRegistration?.inverse) || isFadeHistoryBatch(nativeCommands ?? []) || isFadeHistoryInverse(command) || isFadeHistoryInverse(entry.nativeRegistration?.inverse) || isTrackHistoryBatch(nativeCommands ?? []) || isTrackHistoryInverse(command) || isTrackHistoryInverse(entry.nativeRegistration?.inverse) || isClipStructureBatch(nativeCommands ?? []) || isClipStructureInverse(command) || isClipStructureInverse(entry.nativeRegistration?.inverse) || isClipPlacementBatch(nativeCommands ?? []) || isClipPlacementInverse(command) || isOverlapTrimBatch(nativeCommands ?? []) || isOverlapTrimInverse(command)
         || isTiedHoldExpansionCommand(command) || isTiedHoldExpansionInverse(command)
         || isTranscriptCaptionBatch(nativeCommands ?? []) || isTranscriptCaptionInverse(command)
         || isTranscriptCaptionInverse(entry.nativeRegistration?.inverse) || isClipPlacementInverse(entry.nativeRegistration?.inverse);

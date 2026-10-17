@@ -1,3 +1,4 @@
+import { isManualTextClip } from '../commands/manualText.ts';
 import { type BuiltinClipType } from '@/sdk/video/timeline/clipTypes.ts';
 import { ASTRID_EFFECT_CATALOG } from '@/tools/video-editor/runtime/astrid-element-catalog.ts';
 import { type ResolvedTimelineClip, type TimelineClip, type TrackDefinition } from '@/tools/video-editor/types/index.ts';
@@ -533,6 +534,9 @@ export const getBuiltinClipTypeDescriptor = (
 ): ClipTypeDescriptor | undefined => {
   return getBuiltinClipTypeRegistration(clipType)?.descriptor;
 };
+
+export const inlineTextUIType = (clip: Pick<TimelineClip, 'clipType' | 'text' | 'elementRef'> | null | undefined): string | undefined =>
+  isManualTextClip(clip) ? 'text' : clip?.clipType;
 
 export const getRegisteredClipTypeDescriptor = (
   clipType: string | undefined,

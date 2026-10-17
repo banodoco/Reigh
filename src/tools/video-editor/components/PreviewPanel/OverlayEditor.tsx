@@ -1,3 +1,4 @@
+import { inlineTextUIType } from '@/tools/video-editor/clip-types/runtime.ts';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { PointerEvent as ReactPointerEvent, RefObject } from 'react';
 import { Maximize2, RotateCcw } from 'lucide-react';
@@ -214,7 +215,7 @@ function OverlayEditorComponent({
         if (!clipMeta || clipMeta.track !== row.id) {
           continue;
         }
-        const descriptor = getRegisteredClipTypeDescriptor(clipMeta.clipType);
+        const descriptor = getRegisteredClipTypeDescriptor(inlineTextUIType(clipMeta));
         const behavior = getClipTypeOverlayBehavior(descriptor);
         if (behavior.excluded) {
           continue;
@@ -572,7 +573,7 @@ function OverlayEditorComponent({
   const beginTextEdit = useCallback((actionId: string) => {
     const clipMeta = meta[actionId];
     const behavior = getClipTypeOverlayBehavior(
-      getRegisteredClipTypeDescriptor(clipMeta?.clipType),
+      getRegisteredClipTypeDescriptor(inlineTextUIType(clipMeta)),
     );
     if (!behavior.supportsInlineTextEdit) {
       return;
@@ -589,7 +590,7 @@ function OverlayEditorComponent({
 
     const clipMeta = meta[editingClipId];
     const behavior = getClipTypeOverlayBehavior(
-      getRegisteredClipTypeDescriptor(clipMeta?.clipType),
+      getRegisteredClipTypeDescriptor(inlineTextUIType(clipMeta)),
     );
     if (behavior.supportsInlineTextEdit) {
       onOverlayChange(editingClipId, {

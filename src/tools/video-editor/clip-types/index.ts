@@ -39,6 +39,7 @@ export {
   getDefaultBoxForClipType,
   getExtensionClipTypeDescriptor,
   getRegisteredClipTypeDescriptor,
+  inlineTextUIType,
   getSequenceDescriptorParams,
   inferLegacyClipType,
   isClipTypeCommandAvailable,

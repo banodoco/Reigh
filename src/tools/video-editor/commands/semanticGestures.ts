@@ -1,3 +1,5 @@
+import { isManualTextCreation, isManualTextInverse } from './manualTextHistory.ts';
+import { setManualTextCommand } from './manualText.ts';
 import { isFadeHistoryInverse } from './fadeHistory.ts';
 import { isTrackHistoryInverse } from './trackHistory.ts';
 import { isClipStructureInverse } from './clipStructureHistory.ts';
@@ -19,7 +21,7 @@ import { isOverlapTrimInverse } from './overlapTrimHistory.ts';
 /** Intent is attached by the handler, never inferred from the resulting document. */
 const authoredCommands = new WeakMap<TimelineData, readonly EditCommand[]>();
 const authoredOccurrences = new WeakMap<TimelineData, TimelineOccurrenceContext>();
-const occurrenceOps = new Set(['clip.nudge', 'clip.set-track', 'clip.set-duration', 'clip.set-look', 'clip.set-param', 'clip.set-fade', 'clip.set-transition', 'clip.clear', 'transcript.bind']);
+const occurrenceOps = new Set(['clip.nudge', 'clip.set-track', 'clip.set-duration', 'clip.set-look', 'clip.set-param', 'clip.set-fade', 'clip.set-transition', 'clip.clear', 'clip.set-text', 'transcript.bind']);
 const selectedMediaFields = ['asset', 'generation_id', 'variant_id', 'object_id', 'catalog_digest'];
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -103,8 +105,8 @@ export function attachGestureCommands(data: TimelineData, commands: readonly Edi
   let context: TimelineOccurrenceContext | undefined;
   let parent = false;
   const transferBatch = isShotGroupTransferBatch(commands);
-  const aggregateBatch = commands.length > 0 && commands.every((command) =>
-    isShotGroupAggregateCommand(command) || isAssetRegistrationCommand(command) || isAssetRegistrationInverse(command) || isOverlapTrimInverse(command) || isTiedHoldExpansionInverse(command) || isTranscriptCaptionInverse(command) || isClipPlacementInverse(command) || isClipStructureInverse(command) || isTrackHistoryInverse(command) || isFadeHistoryInverse(command));
+  const aggregateBatch = isManualTextCreation(commands) || commands.length > 0 && commands.every((command) =>
+    isManualTextInverse(command) || isShotGroupAggregateCommand(command) || isAssetRegistrationCommand(command) || isAssetRegistrationInverse(command) || isOverlapTrimInverse(command) || isTiedHoldExpansionInverse(command) || isTranscriptCaptionInverse(command) || isClipPlacementInverse(command) || isClipStructureInverse(command) || isTrackHistoryInverse(command) || isFadeHistoryInverse(command));
   const captionTarget = isTranscriptCaptionBatch(commands) ? transcriptBindTarget(commands[0]) : undefined;
   // Routing reads the handler's explicit args.target. The submitted registered
   // timeline-level bind retains select:null; this local view only captures custody.
@@ -528,6 +530,13 @@ const lookFields: Record<string, string> = {
 };
 export function propertyGestureCommands(data: Pick<TimelineData, 'config'>, id: string, patch: Partial<ClipMeta>, options?: { mergeParams: boolean }): EditCommand[] | undefined {
   const entries = Object.entries(patch);
+  if (Object.prototype.hasOwnProperty.call(patch, 'text')) {
+    if (entries.length !== 1) return undefined;
+    const target = gestureTarget(data, id);
+    if (!target) return undefined;
+    const value = setManualTextCommand(gestureSource(data, id), scopedGestureClipId(target), patch.text);
+    return value ? [value] : undefined;
+  }
   if (entries.some(([key, value]) => key !== 'params' && (!lookFields[key] || value === null || (key === 'transition' && value !== undefined)))) return undefined;
   const target = gestureTarget(data, id);
   if (!target) return undefined;

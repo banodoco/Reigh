@@ -1,3 +1,4 @@
+import { isManualTextClip } from '../../commands/manualText.ts';
 // Layer map & invariants: docs/structure_detail/tool_video_editor.md
 import React, { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -492,7 +493,7 @@ function ClipActionComponent({
     ? <FolderPlus className="h-3 w-3" />
     : isEffectLayer
     ? <Layers className="h-3 w-3" />
-    : clipMeta.clipType === 'text'
+    : isManualTextClip(clipMeta)
     ? <Type className="h-3 w-3" />
     : clipMeta.track.startsWith('A')
       ? <Music2 className="h-3 w-3" />
@@ -576,7 +577,7 @@ function ClipActionComponent({
         }}
         onDoubleClick={(event) => {
           event.stopPropagation();
-          if (isEffectLayer || clipMeta.clipType === 'text') return;
+          if (isEffectLayer || isManualTextClip(clipMeta)) return;
           log('[video-editor] clip double-click', {
             clipId: action.id,
             assetKey: clipMeta.asset ?? null,

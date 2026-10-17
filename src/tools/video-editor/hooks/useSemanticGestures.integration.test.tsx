@@ -6278,3 +6278,244 @@ describe('W29 actual inspector receipt refusal boundaries', () => {
     h.unmount();
   });
 });
+
+// W30: real existing inspector/selected/bulk APIs, exact immutable D e30 source.
+async function manualTextSource(initial: TimelineData, requests: CommitRequest[], stale = false): Promise<{
+  before: { parent: { clips: Array<Record<string, unknown>> } }; results: CommitResult[]; result: CommitResult;
+  readback: unknown; accept_counts: number[]; source: string;
+}> {
+  const { execFile } = await import('node:child_process');
+  return new Promise((resolve, reject) => {
+    const child = execFile(process.env.ASTRID_TEST_PYTHON!, ['-B', path.resolve(process.cwd(), 'src/tools/video-editor/hooks/manualText.fixture.py')],
+      { env: process.env, maxBuffer: 8 * 1024 * 1024 }, (error, stdout, stderr) => {
+        if (error) reject(new Error(`${error.message}\n${stderr}`)); else { try { resolve(JSON.parse(stdout)); } catch (failure) { reject(failure); } }
+      });
+    child.stdin!.end(JSON.stringify({ config: initial.config, registry: initial.registry, requests, stale }));
+  });
+}
+async function manualTextData() {
+  const base = await selectedMoveData();
+  return buildTimelineData({ ...base.config, clips: base.config.clips.map((clip, i) => ({ ...clip, clipType: 'text',
+    x: 120, y: 120, width: 640, height: 180, opacity: 1,
+    text: { content: `Original ${i}`, fontSize: 64, color: '#ffffff', align: 'center', fontFamily: 'Georgia, serif', bold: false, italic: false,
+      opaque: { nested: [null, 7] } }, params: { opaque: { keep: [null, 9] } },
+  })) }, base.registry, undefined, 1, undefined, base.head);
+}
+async function manualTextRun(h: Awaited<ReturnType<typeof setup>>, proof: () => Awaited<ReturnType<typeof manualTextSource>>, history: ReturnType<typeof lookStyleHistory>) {
+  await act(async () => { await h.result.current.persistence.flushPendingSave(); });
+  await waitFor(() => expect(h.savedSeqRef.current).toBe(1), { timeout: 60_000 });
+  await waitFor(() => expect(history.result.current.canUndo).toBe(true));
+  const authoredForward = structuredClone(h.result.current.data!.config);
+  act(() => history.result.current.undo());
+  expect(h.result.current.data!.config).toEqual(h.initial.config);
+  await waitFor(() => expect(h.savedSeqRef.current).toBe(2), { timeout: 60_000 });
+  await waitFor(() => expect(history.result.current.canRedo).toBe(true));
+  act(() => history.result.current.redo());
+  expect(h.result.current.data!.config).toEqual(authoredForward);
+  await waitFor(() => expect(h.savedSeqRef.current).toBe(3), { timeout: 60_000 });
+  expect(h.requests).toHaveLength(3); expect(proof().accept_counts).toEqual([1, 1, 1]);
+  expect(proof().results[1].canonical_document).toEqual(proof().before);
+  expect(proof().results[2].canonical_document).toEqual(proof().results[0].canonical_document);
+  for (const i of [1, 2]) expect(h.requests[i].request.change.commands).toEqual([{ op: 'timeline.inverse', select: null, args: {
+    publication: proof().results[i - 1].accepted_publication_id,
+    writes: proof().results[i - 1].change.direct_writes.map(w => ({ ...w, before: w.after, after: w.before })),
+  } }]);
+  expect(h.requests.map(row => row.request.base_revision_id)).toEqual(['parent-r1', 'parent-r2', 'parent-r3']);
+  expect(h.compatibilityRequests).toEqual([]);
+}
+describe('W30 manual text consumer', () => {
+  it('generic deep bulk captures every style and opaque sibling in one accepted receipt Undo receipt-only Redo chain', async () => {
+    const initial = await manualTextData(); const requests: CommitRequest[] = [];
+    let proof!: Awaited<ReturnType<typeof manualTextSource>>;
+    const h = await setup(async request => { requests.push(request); proof = await manualTextSource(initial, requests);
+      if (process.env.E_W30_EVIDENCE_DIR) writeFileSync(path.join(process.env.E_W30_EVIDENCE_DIR, 'bulk-sdk-chain.json'), JSON.stringify({ requests, proof }, null, 2));
+      return { acceptedResult: proof.result };
+    }, false, initial);
+    const history = lookStyleHistory(h);
+    act(() => h.result.current.editing.handleUpdateClipsDeep(['clip-1', 'clip-2'], clip => ({ text: { ...clip.text!,
+      content: `Edited ${clip.text!.content}`, fontSize: 71, color: '#12ab34', align: 'right', fontFamily: 'Inter, system-ui, sans-serif', bold: true, italic: true } })));
+    expect(h.result.current.data!.config.clips[0].text?.content).toBe('Edited Original 0');
+    expect(gestureCommandsFor(h.result.current.data!)?.map(call => call.op)).toEqual(['clip.set-text', 'clip.set-text']);
+    expect(history.result.current.canUndo).toBe(false);
+    await manualTextRun(h, () => proof, history);
+    const forward = requests[0].change.commands;
+    expect(forward.map(call => call.op)).toEqual(['clip.set-text', 'clip.set-text']);
+    expect(forward.map(call => call.select)).toEqual(['parent/clip:clip-1', 'parent/clip:clip-2']);
+    for (const clip of (proof.results[0].canonical_document as typeof proof.before).parent.clips) {
+      const before = proof.before.parent.clips.find(row => row.id === clip.id)!;
+      expect((clip.text as Record<string, unknown>).opaque).toEqual((before.text as Record<string, unknown>).opaque);
+      expect((clip.params as Record<string, unknown>).opaque).toEqual((before.params as Record<string, unknown>).opaque);
+      expect(clip.app).toEqual(before.app); expect(clip.x).toBe(120); expect(clip.height).toBe(180);
+    }
+    history.unmount(); h.unmount();
+  }, 180_000);
+  it.each(['handleAddText', 'handleAddTextAt', 'mixed parent view'] as const)('%s retains the exact existing constructor and complete receipt history', async method => {
+    const base = await manualTextData();
+    const displaySource = { ...base.config.clips[0], id: 'a-rocket' };
+    const displayed = { ...displaySource, id: 'view-a', app: { canonical: { projectId: 'gesture-project', parentDocumentId: 'gesture-timeline',
+      headRevisionId: 'parent-r1', occurrenceId: 'occ-A', shotId: 'A', revisionId: 'shot-r1', internalTimelineRevisionId: 'internal-r1',
+      sourceClipId: displaySource.id, sourceClip: displaySource, outputIdentity: 'output-A' } } };
+    const initial = await buildTimelineData({ ...base.config, tracks: [...base.config.tracks!].reverse(),
+      clips: method === 'mixed parent view' ? [...base.config.clips, displayed] : base.config.clips }, base.registry, undefined, 1, undefined, base.head); const requests: CommitRequest[] = []; let proof!: Awaited<ReturnType<typeof manualTextSource>>;
+    const h = await setup(async request => { requests.push(request); proof = await manualTextSource(initial, requests);
+      if (process.env.E_W30_EVIDENCE_DIR) writeFileSync(path.join(process.env.E_W30_EVIDENCE_DIR, `${method}-sdk-chain.json`), JSON.stringify({ requests, proof }, null, 2));
+      return { acceptedResult: proof.result };
+    }, false, initial, 1);
+    const history = lookStyleHistory(h);
+    act(() => method === 'handleAddText' ? h.result.current.editing.handleAddText() : h.result.current.editing.handleAddTextAt('V2', 1));
+    await manualTextRun(h, () => proof, history);
+    const call = requests[0].change.commands[0];
+    expect(call.op).toBe('timeline.add'); expect(call.args).toMatchObject({ element: 'am-type', geometry: { x: 120, y: 120, width: 640, height: 180 }, opacity: 1,
+      text: { content: 'Double-click to edit', fontSize: 64, color: '#ffffff', align: 'center' }, action: { start: 1, end: 6 }, track: 'V2', expected_order: [] });
+    expect(h.selectClip).toHaveBeenCalledWith(call.args.clip_id);
+    if (method === 'mixed parent view') {
+      expect(call.expect![`${call.created![0]}::clip_order`]).toEqual({ state: 'present', value: ['parent/clip:clip-1', 'parent/clip:clip-2'] });
+      expect(h.result.current.data!.config.clips.find(clip => clip.id === 'view-a')).toEqual(displayed);
+    }
+    history.unmount(); h.unmount();
+  }, 180_000);
+  it('a conflicting last bulk member refuses the complete transaction without accepted writes', async () => {
+    const initial = await manualTextData(); let proof!: Awaited<ReturnType<typeof manualTextSource>>;
+    const h = await setup(async request => { proof = await manualTextSource(initial, [request], true);
+      if (process.env.E_W30_EVIDENCE_DIR) writeFileSync(path.join(process.env.E_W30_EVIDENCE_DIR, 'bulk-refused.json'), JSON.stringify(proof, null, 2));
+      return { acceptedResult: proof.result };
+    }, false, initial);
+    const history = lookStyleHistory(h);
+    act(() => h.result.current.editing.handleUpdateClips(['clip-1', 'clip-2'], { text: { content: 'Bulk' } }));
+    await waitFor(() => expect(proof?.result.status).toBe('refused'), { timeout: 60_000 });
+    expect(proof.readback).toEqual(proof.before); expect(proof.result.change.direct_writes).toEqual([]);
+    await waitFor(() => expect(h.result.current.data!.config).toEqual(initial.config));
+    expect(history.result.current.canUndo).toBe(false); expect(h.savedSeqRef.current).toBe(0); expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  }, 60_000);
+});
+describe('W30 manual text caller guards', () => {
+  it.each(['selected', 'overlay', 'bulk', 'deep bulk', 'command'] as const)('%s refuses malformed text before local mutation or save', async route => {
+    const initial = await manualTextData(); const h = await setup(undefined, false, initial);
+    const before = structuredClone(h.result.current.data!.config);
+    const patch = { text: { content: 'Invalid', fontSize: 0 } };
+    act(() => {
+      if (route === 'selected') h.result.current.editing.handleSelectedClipChange(patch);
+      if (route === 'overlay') h.result.current.editing.onOverlayChange('clip-1', patch);
+      if (route === 'bulk') h.result.current.editing.handleUpdateClips(['clip-1', 'clip-2'], patch);
+      if (route === 'deep bulk') h.result.current.editing.handleUpdateClipsDeep(['clip-1', 'clip-2'], () => patch);
+      if (route === 'command') expect(w64Commands(h).updateClip({ clipId: 'clip-1', patch }).ok).toBe(false);
+    });
+    expect(h.result.current.data!.config).toEqual(before); expect(h.requests).toEqual([]); expect(h.compatibilityRequests).toEqual([]); h.unmount();
+  });
+  it('refuses the whole bulk when a late target is missing or invalid', async () => {
+    const initial = await manualTextData(); const h = await setup(undefined, false, initial); const before = h.result.current.data;
+    act(() => h.result.current.editing.handleUpdateClips(['clip-1', 'missing'], { text: { content: 'New' } }));
+    expect(h.result.current.data).toBe(before);
+    act(() => h.result.current.editing.handleUpdateClipsDeep(['clip-1', 'clip-2'], meta => ({ text: { ...meta.text!, bold: meta.text!.content === 'Original 1' ? 'invalid' as never : true } })));
+    expect(h.result.current.data).toBe(before); expect(h.requests).toEqual([]); h.unmount();
+  });
+});
+
+describe('W30 mounted text inspector', () => {
+  it.each(['content', 'fontSize', 'color'] as const)('%s sends the actual ClipPanelBody value through the selected handler', async field => {
+    const initial = await manualTextData(); const h = await setup(undefined, false, initial);
+    const { ClipPanelBody } = await import('../components/PropertiesPanel/ClipPanelBody.tsx');
+    const catalog = { data: { entrance: [], exit: [], continuous: [] }, effects: [], entrance: [], exit: [], continuous: [], isLoading: false,
+      isFetching: false, error: null, refetch: async () => {}, canCreateEffect: false, canUpdateEffect: false, canDeleteEffect: false };
+    const view = render(React.createElement(ClipPanelBody, { clip: initial.resolvedConfig.clips[0], track: initial.tracks[0],
+      deviceClass: 'desktop', interactionMode: 'move', precisionEnabled: false, hasPredecessor: false,
+      onChange: h.result.current.editing.handleSelectedClipChange, onResetPosition: vi.fn(), onClose: vi.fn(), onToggleMute: vi.fn(), onSplitAtPlayhead: vi.fn(),
+      onMoveTrackUp: vi.fn(), onMoveTrackDown: vi.fn(), onSetInteractionMode: vi.fn(), onSetPrecisionEnabled: vi.fn(), compositionWidth: 1920, compositionHeight: 1080,
+      registry: {}, activeTab: 'text', setActiveTab: vi.fn(), effectResources: catalog }));
+    const value = field === 'content' ? 'Actual inspector\n✨' : field === 'fontSize' ? '73' : '#123456';
+    const input = field === 'content' ? view.container.querySelector('textarea')! : field === 'color'
+      ? view.container.querySelector('input[type="color"]')! : view.container.querySelector('input[inputmode="numeric"]') ?? view.getByDisplayValue('64');
+    fireEvent.change(input, { target: { value } }); if (field === 'fontSize') fireEvent.blur(input);
+    const calls = gestureCommandsFor(h.result.current.data!)!;
+    expect(calls).toHaveLength(1); expect(calls[0]).toMatchObject({ op: 'clip.set-text', select: 'parent/clip:clip-1', args: {
+      text: { ...initial.config.clips[0].text!, [field]: field === 'fontSize' ? 73 : value } } });
+    expect(h.result.current.data!.config.clips[0].params?.opaque).toEqual({ keep: [null, 9] });
+    expect(view.container.querySelector('textarea')).not.toBeNull();
+    view.unmount(); h.unmount();
+  });
+});
+
+describe('W30 manual text acknowledgement', () => {
+  it('an actual no-change receipt removes the pending native history owner', async () => {
+    const { manualTextPatch } = await import('../commands/manualText.ts');
+    const base = await manualTextData();
+    const initial = await buildTimelineData({ ...base.config, clips: base.config.clips.map(clip => ({ ...clip, ...manualTextPatch(clip, clip.text) })) }, base.registry, undefined, 1, undefined, base.head);
+    let proof!: Awaited<ReturnType<typeof manualTextSource>>;
+    const h = await setup(async request => { proof = await manualTextSource(initial, [request]); return { acceptedResult: proof.result }; }, false, initial);
+    const history = lookStyleHistory(h);
+    act(() => h.result.current.editing.handleSelectedClipChange({ text: initial.config.clips[0].text }));
+    await act(async () => { await h.result.current.persistence.flushPendingSave(); });
+    expect(proof.result.status).toBe('no_change'); expect(proof.result.change.direct_writes).toEqual([]);
+    expect(history.result.current.canUndo).toBe(false); expect(h.savedSeqRef.current).toBe(1); expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  }, 60_000);
+  it('lost acknowledgement retries byte-identical caller values and the original captured base', async () => {
+    const initial = await manualTextData(); const requests: CommitRequest[] = [];
+    let proof!: Awaited<ReturnType<typeof manualTextSource>>;
+    const h = await setup(async (request, count) => { requests.push(request); proof = await manualTextSource(initial, requests);
+      if (process.env.E_W30_EVIDENCE_DIR) writeFileSync(path.join(process.env.E_W30_EVIDENCE_DIR, 'retry-sdk.json'), JSON.stringify({ requests, proof }, null, 2));
+      return { acceptedResult: proof.result, loseSuccess: count === 1 };
+    }, false, initial);
+    const history = lookStyleHistory(h);
+    act(() => h.result.current.editing.handleSelectedClipChange({ text: { ...initial.config.clips[0].text!, content: 'Retry exact ✨' } }));
+    await waitFor(() => expect(h.savedSeqRef.current).toBe(1), { timeout: 60_000 });
+    expect(h.requests).toHaveLength(2); expect(h.requests[1].bytes).toBe(h.requests[0].bytes);
+    expect(h.requests[1].headers['Idempotency-Key']).toBe(h.requests[0].headers['Idempotency-Key']);
+    expect(requests[1]).toEqual(requests[0]); expect(proof.accept_counts).toEqual([1]);
+    expect(history.result.current.canUndo).toBe(true); expect(h.compatibilityRequests).toEqual([]);
+    history.unmount(); h.unmount();
+  }, 60_000);
+});
+describe('W30 generic text field callers', () => {
+  it.each([['content', 'Changed'], ['fontSize', 82], ['color', '#224466'], ['align', 'left'], ['fontFamily', 'Arial, sans-serif'], ['bold', true], ['italic', true]] as const)('selected %s preserves every sibling and uses the actual typed value', async (field, value) => {
+    const initial = await manualTextData(); const h = await setup(undefined, false, initial);
+    act(() => h.result.current.editing.handleSelectedClipChange({ text: { ...initial.config.clips[0].text!, [field]: value } }));
+    expect(gestureCommandsFor(h.result.current.data!)?.[0]).toMatchObject({ op: 'clip.set-text', select: 'parent/clip:clip-1', args: { text: { ...initial.config.clips[0].text!, [field]: value } } });
+    expect(h.result.current.data!.config.clips[0].params?.opaque).toEqual(initial.config.clips[0].params?.opaque);
+    expect(h.result.current.data!.config.clips[1]).toEqual(initial.config.clips[1]); h.unmount();
+  });
+  it('constant bulk and public updateClip retain each target text siblings', async () => {
+    const initial = await manualTextData(); const h = await setup(undefined, false, initial);
+    act(() => h.result.current.editing.handleUpdateClips(['clip-1', 'clip-2'], { text: { content: 'Same new text' } }));
+    expect(gestureCommandsFor(h.result.current.data!)?.map(call => call.args.text)).toEqual(initial.config.clips.map(clip => ({ ...clip.text, content: 'Same new text' })));
+    act(() => expect(w64Commands(h).updateClip({ clipId: 'clip-1', patch: { text: { content: 'Public API', bold: true } } }).ok).toBe(true));
+    expect(gestureCommandsFor(h.result.current.data!)?.[0]).toMatchObject({ op: 'clip.set-text', args: { text: { content: 'Public API', bold: true, fontFamily: 'Georgia, serif', opaque: { nested: [null, 7] } } } });
+    h.unmount();
+  });
+  it('late callback owner change refuses the whole bulk before any write', async () => {
+    const initial = await manualTextData(); const h = await setup(undefined, false, initial); const current = h.result.current.data;
+    act(() => h.result.current.editing.handleUpdateClipsDeep(['clip-1', 'clip-2'], meta => {
+      h.result.current.dataRef.current = { ...current!, head: { ...current!.head!, headRevisionId: 'changed-head' } };
+      return { text: { ...meta.text!, content: 'Not applied' } };
+    }));
+    expect(h.result.current.data).toBe(current); expect(h.requests).toEqual([]); h.unmount();
+  });
+});
+describe('W30 captured selection', () => {
+  it('a retained selected callback refuses after the selected identity changes', async () => {
+    const initial = await manualTextData(); const applyEdit = vi.fn(); const dataRef = { current: initial };
+    const hook = renderHook(({ selectedClipId }) => useClipEditing({ dataRef, applyEdit, selectedClipId, resolvedConfig: initial.resolvedConfig,
+      selectedTrack: initial.tracks[0], currentTime: 1, selectClip: vi.fn(), setSelectedTrackId: vi.fn() }), { initialProps: { selectedClipId: 'clip-1' } });
+    const captured = hook.result.current.handleSelectedClipChange;
+    hook.rerender({ selectedClipId: 'clip-2' });
+    act(() => captured({ text: { content: 'Stale selection' } }));
+    expect(applyEdit).not.toHaveBeenCalled(); expect(dataRef.current).toBe(initial); hook.unmount();
+  });
+});
+
+describe('W30 typed fallback custody', () => {
+  it('keeps captured text commands when a preceding unconverted draft is deferred', async () => {
+    const initial = await manualTextData(); const h = await setup(undefined, false, initial);
+    await h.provider.loadTimeline('gesture-timeline');
+    h.interactionStateRef.current.drag = true;
+    act(() => h.result.current.editing.handleSelectedClipChange({ label: 'Earlier compatibility draft' }));
+    act(() => h.result.current.editing.handleSelectedClipChange({ text: { content: 'Typed transaction remains typed' } }));
+    const key = draftStorage.timelineDraftRecoveryKey(h.provider.getTimelineDraftRecoveryMetadata('gesture-timeline'), 'gesture-timeline');
+    await waitFor(async () => {
+      const draft = await draftStorage.loadTimelineDraft(key);
+      expect(draft?.draft.editCommands).toMatchObject([{ op: 'clip.set-text', select: 'parent/clip:clip-1', args: { text: { content: 'Typed transaction remains typed' } } }]);
+    });
+    expect(h.requests).toEqual([]); expect(h.compatibilityRequests).toEqual([]); h.unmount();
+  });
+});

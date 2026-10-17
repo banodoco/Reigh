@@ -1,3 +1,5 @@
+import { canonicalJsonStringify } from '../data/typed/timelineBundle.ts';
+import { manualTextPatch } from '../commands/manualText.ts';
 import { compositeEffectGestureCommands, propertyGestureCommands, moveGestureCommands } from '../commands/semanticGestures.ts';
 import { useCallback, useLayoutEffect, useRef } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
@@ -75,6 +77,8 @@ export function useClipEditing({
   applyEdit,
 }: UseClipEditingArgs): UseClipEditingResult {
   const currentTimeRef = useRef(currentTime);
+  const liveSelectedClipId = useRef(selectedClipId);
+  liveSelectedClipId.current = selectedClipId;
   const elementHost = useOptionalVideoEditorRuntime()?.astridElementHost;
 
   const applyRowsEdit = useCallback((
@@ -140,7 +144,11 @@ export function useClipEditing({
       return;
     }
 
-    applyRowsEdit(current.rows, { [actionId]: patch }, undefined, undefined, { editCommands: propertyGestureCommands(current, actionId, patch) });
+    const textPatch = 'text' in patch ? manualTextPatch(current.config.clips.find(clip => clip.id === actionId)!, patch.text) : undefined;
+    if ('text' in patch && (!textPatch || Object.keys(patch).length !== 1)) return;
+    const editCommands = propertyGestureCommands(current, actionId, patch);
+    if ('text' in patch && !editCommands) return;
+    applyRowsEdit(current.rows, { [actionId]: textPatch ?? patch }, undefined, undefined, { editCommands });
   }, [applyRowsEdit, dataRef]);
 
   const getValidClipIds = useCallback((clipIds: string[]) => {
@@ -172,12 +180,17 @@ export function useClipEditing({
       return;
     }
 
-    const metaUpdates = Object.fromEntries(
-      validClipIds.map((clipId) => [clipId, patch]),
-    ) as Record<string, Partial<ClipMeta>>;
+    if ('text' in patch && (validClipIds.length !== new Set(clipIds).size || Object.keys(patch).length !== 1)) return;
+    const metaUpdates: Record<string, Partial<ClipMeta>> = {};
+    for (const id of validClipIds) {
+      const next = 'text' in patch ? manualTextPatch(current.config.clips.find(clip => clip.id === id)!, patch.text) : patch;
+      if (!next) return;
+      metaUpdates[id] = next;
+    }
 
     const commandGroups = validClipIds.map((id) => propertyGestureCommands(current, id, patch));
     const editCommands = commandGroups.every((commands) => commands !== undefined) ? commandGroups.flat() : undefined;
+    if ('text' in patch && !editCommands) return;
     if (!patchAffectsDuration(patch)) {
       applyRowsEdit(current.rows, metaUpdates, undefined, undefined, { editCommands });
       return;
@@ -220,6 +233,8 @@ export function useClipEditing({
       return;
     }
 
+    const capturedSignature = canonicalJsonStringify(current.config);
+    const capturedSelection = liveSelectedClipId.current;
     const metaUpdates: Record<string, Partial<ClipMeta>> = {};
 
     for (const clipId of validClipIds) {
@@ -228,14 +243,24 @@ export function useClipEditing({
         continue;
       }
 
-      metaUpdates[clipId] = patchFn(existing);
+      metaUpdates[clipId] = patchFn(structuredClone(existing));
     }
 
     if (Object.keys(metaUpdates).length === 0) {
       return;
     }
 
+    if (dataRef.current !== current || canonicalJsonStringify(current.config) !== capturedSignature || liveSelectedClipId.current !== capturedSelection) return;
     const groups = Object.entries(metaUpdates).map(([id, patch]) => propertyGestureCommands(current, id, patch));
+    if (Object.values(metaUpdates).some(patch => 'text' in patch)) {
+      if (validClipIds.length !== new Set(clipIds).size || !groups.every(group => group !== undefined)) return;
+      for (const [id, patch] of Object.entries(metaUpdates)) {
+        if (!('text' in patch)) return;
+        const next = manualTextPatch(current.config.clips.find(clip => clip.id === id)!, patch.text);
+        if (!next) return;
+        metaUpdates[id] = next;
+      }
+    }
     applyRowsEdit(current.rows, metaUpdates, undefined, undefined, {
       editCommands: groups.every((commands) => commands !== undefined) ? groups.flat() : undefined,
     });
@@ -243,7 +268,7 @@ export function useClipEditing({
 
   const handleSelectedClipChange = useCallback((patch: ClipEditorPatch) => {
     const current = dataRef.current;
-    if (!current || !selectedClipId) {
+    if (!current || !selectedClipId || liveSelectedClipId.current !== selectedClipId) {
       return;
     }
 
@@ -253,9 +278,11 @@ export function useClipEditing({
     }
 
     const { at: _at, ...metaPatch } = patch;
+    const textPatch = 'text' in metaPatch ? manualTextPatch(current.config.clips.find(clip => clip.id === selectedClipId)!, metaPatch.text) : undefined;
+    if ('text' in metaPatch && (!textPatch || Object.keys(patch).length !== 1)) return;
     const composite = compositeEffectGestureCommands(current, selectedClipId, metaPatch, { elementHost });
     if (composite.refused) return;
-    const effectivePatch = composite.commands?.length && composite.localPatch ? composite.localPatch : metaPatch;
+    const effectivePatch = composite.commands?.length && composite.localPatch ? composite.localPatch : textPatch ?? metaPatch;
     const affectsDuration = patchAffectsDuration(effectivePatch as Partial<ClipMeta>);
     const nextRows = current.rows.map((row) => {
       if (row.id !== clipRow.id || (patch.at === undefined && !affectsDuration)) {
@@ -294,6 +321,7 @@ export function useClipEditing({
     const properties = composite.handled
       ? composite.commands
       : propertyGestureCommands(current, selectedClipId, metaPatch as Partial<ClipMeta>);
+    if ('text' in metaPatch && !properties) return;
     const movement = patch.at === undefined ? [] : moveGestureCommands(current, selectedClipId, patch.at);
     applyRowsEdit(nextRows, { [selectedClipId]: effectivePatch as Partial<ClipMeta> }, undefined, undefined, {
       editCommands: properties && movement ? [...movement, ...properties] : undefined,

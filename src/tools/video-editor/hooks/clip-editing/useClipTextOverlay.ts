@@ -1,3 +1,4 @@
+import { MANUAL_TEXT_REF, manualTextParams, geometryOf, tagged } from '../../commands/manualText.ts';
 import { useCallback } from 'react';
 import { createClipMetaFromDescriptor } from '@/tools/video-editor/clip-types/runtime.ts';
 import { getVisualTracks } from '@/tools/video-editor/lib/editor-utils.ts';
@@ -55,10 +56,27 @@ export function useClipTextOverlay(ctx: ClipEditingContext) {
     if (!clipMeta) {
       return;
     }
+    const capturedAction = nextRows.flatMap(row => row.actions).find(row => row.id === clipId);
+    if (!capturedAction || Object.keys(metaPatches).some(id => id !== clipId)) return;
+    // These actions add to the parent film track. Projected occurrence rows are
+    // view members, never parent clip identities or parent ordering authority.
+    const parentClips = current.config.clips.filter(clip => !clip.app?.canonical);
+    const expectedOrder = parentClips.filter(clip => clip.track === visualTrack.id).map(clip => clip.id);
+    const params = manualTextParams(clipMeta.text, geometryOf(clipMeta));
+    if (!params || !Number.isFinite(capturedAction.start) || capturedAction.start < 0) return;
+    const select = `parent/clip:${clipId}`;
+    const command = { op: 'timeline.add', select: null, created: [select], args: {
+      element: 'am-type', elementRef: { ...MANUAL_TEXT_REF }, text: clipMeta.text!, geometry: geometryOf(clipMeta),
+      opacity: clipMeta.opacity ?? 1, action: structuredClone(capturedAction), time_domain: 'timeline-seconds',
+      clip_id: clipId, track: visualTrack.id, expected_order: expectedOrder, clip_order: [...expectedOrder, clipId],
+    }, expect: { [`${select}::`]: tagged(undefined),
+      [`${select}::clip_order`]: tagged(parentClips.map(clip => `parent/clip:${clip.id}`)),
+      [`parent/track:${visualTrack.id}::`]: tagged(current.config.tracks?.find(track => track.id === visualTrack.id)),
+    } };
     applyRowsEdit(nextRows, {
       ...metaPatches,
-      [clipId]: clipMeta,
-    }, undefined, nextClipOrder);
+      [clipId]: { ...clipMeta, clipType: 'am-type', elementRef: { ...MANUAL_TEXT_REF }, params },
+    }, undefined, nextClipOrder, { editCommands: [command] });
     selectClip(clipId);
     setSelectedTrackId(visualTrack.id);
   }, [applyRowsEdit, dataRef, selectedTrack, selectClip, setSelectedTrackId]);
@@ -102,10 +120,27 @@ export function useClipTextOverlay(ctx: ClipEditingContext) {
     if (!clipMeta) {
       return;
     }
+    const capturedAction = nextRows.flatMap(row => row.actions).find(row => row.id === clipId);
+    if (!capturedAction || Object.keys(metaPatches).some(id => id !== clipId)) return;
+    // These actions add to the parent film track. Projected occurrence rows are
+    // view members, never parent clip identities or parent ordering authority.
+    const parentClips = current.config.clips.filter(clip => !clip.app?.canonical);
+    const expectedOrder = parentClips.filter(clip => clip.track === visualTrack.id).map(clip => clip.id);
+    const params = manualTextParams(clipMeta.text, geometryOf(clipMeta));
+    if (!params || !Number.isFinite(capturedAction.start) || capturedAction.start < 0) return;
+    const select = `parent/clip:${clipId}`;
+    const command = { op: 'timeline.add', select: null, created: [select], args: {
+      element: 'am-type', elementRef: { ...MANUAL_TEXT_REF }, text: clipMeta.text!, geometry: geometryOf(clipMeta),
+      opacity: clipMeta.opacity ?? 1, action: structuredClone(capturedAction), time_domain: 'timeline-seconds',
+      clip_id: clipId, track: visualTrack.id, expected_order: expectedOrder, clip_order: [...expectedOrder, clipId],
+    }, expect: { [`${select}::`]: tagged(undefined),
+      [`${select}::clip_order`]: tagged(parentClips.map(clip => `parent/clip:${clip.id}`)),
+      [`parent/track:${visualTrack.id}::`]: tagged(current.config.tracks?.find(track => track.id === visualTrack.id)),
+    } };
     applyRowsEdit(nextRows, {
       ...metaPatches,
-      [clipId]: clipMeta,
-    }, undefined, nextClipOrder);
+      [clipId]: { ...clipMeta, clipType: 'am-type', elementRef: { ...MANUAL_TEXT_REF }, params },
+    }, undefined, nextClipOrder, { editCommands: [command] });
     selectClip(clipId);
     setSelectedTrackId(visualTrack.id);
   }, [applyRowsEdit, dataRef, selectClip, setSelectedTrackId]);

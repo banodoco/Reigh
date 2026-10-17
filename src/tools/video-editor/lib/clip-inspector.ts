@@ -1,3 +1,4 @@
+import { inlineTextUIType } from '@/tools/video-editor/clip-types/runtime.ts';
 import type { ClipTab } from '@/tools/video-editor/hooks/useEditorPreferences.ts';
 import {
   getClipTypeOverlayBehavior,
@@ -22,7 +23,7 @@ export const getVisibleClipTabs = (
   clip: ResolvedTimelineClip | null,
   track: TrackDefinition | null,
 ): ClipTab[] => {
-  const descriptor = getRegisteredClipTypeDescriptor(clip?.clipType);
+  const descriptor = getRegisteredClipTypeDescriptor(inlineTextUIType(clip));
   const overlay = getClipTypeOverlayBehavior(descriptor);
   const isSequenceClip = Boolean(descriptor && isSequenceParamsSchema(descriptor.paramsSchema));
   const isEffectLayer = descriptor?.renderCapabilities.previewRoute === 'effect-layer';

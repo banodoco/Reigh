@@ -1,3 +1,4 @@
+import { inlineTextUIType } from '@/tools/video-editor/clip-types/runtime.ts';
 import { useMemo, useState, type ComponentType } from 'react';
 import { RefreshCw, Trash2, Volume2, X } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button.tsx';
@@ -122,7 +123,7 @@ export function ClipPanelBody({
   const [editingEffect, setEditingEffect] = useState<EffectResource | null>(null);
   const visibleTabs = useMemo(() => getVisibleClipTabs(clip, track), [clip, track]);
   const clipDescriptor = clip
-    ? getRegisteredClipTypeDescriptor(clip.clipType)
+    ? getRegisteredClipTypeDescriptor(inlineTextUIType(clip))
     : undefined;
   const holdTiming = clipDescriptor?.hold;
   const clipTypeResolution = resolveAvailableClipType(clip?.clipType);
@@ -134,7 +135,7 @@ export function ClipPanelBody({
   // box the renderer draws and the gizmo shows for a position-less clip. The
   // panel used to invent its own (0,0,compW,compH) fallback and disagreed with
   // both other surfaces for text clips.
-  const defaultBox = getDefaultBoxForClipType(clip?.clipType, compositionWidth, compositionHeight);
+  const defaultBox = getDefaultBoxForClipType(inlineTextUIType(clip), compositionWidth, compositionHeight);
   const commandContext = useMemo(() => (
     clip
       ? { clip, track, selectedClipIds: [clip.id] }

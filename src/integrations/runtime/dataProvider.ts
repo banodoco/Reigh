@@ -1,3 +1,4 @@
+import { manualTextInverse } from '@/tools/video-editor/commands/manualTextHistory.ts';
 import { fadeHistoryInverse } from '@/tools/video-editor/commands/fadeHistory.ts';
 import { clipLookStyleInverse } from '@/tools/video-editor/commands/clipLookStyleHistory.ts';
 import { clipParamsHistoryInverse } from '@/tools/video-editor/commands/clipParamsHistory.ts';
@@ -1092,7 +1093,7 @@ export class RuntimeDataProvider implements DataProvider {
     const captionInverse = transcriptCaptionInverse(registryCommands, result);
     const overlapInverse = overlapTrimInverse(registryCommands, result);
     // null means this owner explicitly had no change; it must not fall through.
-    const commandInverse = registryNoChange ? null : [transitionAssignmentInverse(registryCommands, result), captionInverse, assetRegistrationInverse(registryCommands, result),
+    const commandInverse = registryNoChange ? null : [manualTextInverse(registryCommands, result), transitionAssignmentInverse(registryCommands, result), captionInverse, assetRegistrationInverse(registryCommands, result),
       overlapInverse, tiedHoldExpansionInverse(registryCommands, result), clipPlacementInverse(registryCommands, result),
       clipStructureInverse(registryCommands, result), trackHistoryInverse(registryCommands, result), fadeHistoryInverse(registryCommands, result), clipLookStyleInverse(registryCommands, result), clipParamsHistoryInverse(registryCommands, result)]
       .find(inverse => inverse !== undefined);
