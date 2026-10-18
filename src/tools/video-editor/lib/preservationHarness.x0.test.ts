@@ -1,19 +1,39 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { describe, expect, it } from 'vitest';
+import React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// @ts-expect-error The repository's local fake IndexedDB fixture is JavaScript without declarations.
+import { createFakeIndexedDB, resetFakeIndexedDB } from 'fake-indexeddb';
 import { ReighRuntimeClient } from '@/integrations/runtime/client.ts';
 import { RuntimeDataProvider } from '@/integrations/runtime/dataProvider.ts';
+import { RUNTIME_CLIENT_SCOPES } from '@/integrations/runtime/client.ts';
+import { RUNTIME_SCHEMA_DIGEST, RUNTIME_TARGETED_EXECUTION_CAPABILITY } from '@/integrations/runtime/contract-metadata.ts';
 import type { Transport } from '@/integrations/runtime/generated.ts';
+import { AstridElementOperationAdapter, createElementTimelineRoutes } from '@/tools/video-editor/runtime/element-adapter.ts';
+import { buildReighAgentElementContext } from '@/tools/video-editor/runtime/element-contract.ts';
+import { ASTRID_EFFECT_CATALOG } from '@/tools/video-editor/runtime/astrid-element-catalog.ts';
+import { useTimelineOps } from '@/tools/video-editor/hooks/useTimelineOps.ts';
+import { useTimelinePersistence } from '@/tools/video-editor/hooks/useTimelinePersistence.ts';
+import { TimelineEventBus } from '@/tools/video-editor/hooks/useTimelineEventBus.ts';
+import { createInteractionState } from '@/tools/video-editor/lib/interaction-state.ts';
+import { createTimelineReader } from '@/tools/video-editor/lib/timeline-reader.ts';
+import { createProposalRuntime } from '@/tools/video-editor/lib/proposal-runtime.ts';
+import { buildTimelineData } from '@/tools/video-editor/lib/timeline-data.ts';
 import { createShotCompositionAdapter, type PreparedShotComposition } from '@/tools/video-editor/data/shotCompositionAdapter.ts';
+import type { ShotCompositionContract } from '@/tools/video-editor/data/shotComposition.ts';
 import { projectCanonicalComposition } from '@/tools/video-editor/data/shotCompositionProjection.ts';
-import { createShotTimelineDataProvider } from '@/tools/travel-between-images/components/shotTimelineDataProvider.ts';
+import { createShotTimelineDataProvider, createShotTimelineInitialData } from '@/tools/travel-between-images/components/shotTimelineDataProvider.ts';
+import { loadTimelineDraft } from '@/tools/video-editor/data/timelineDraftIndexedDb.ts';
 import { cloneAssetRegistry } from '@/tools/video-editor/lib/timeline-domain.ts';
 import { resolveTimelineConfig } from '@/tools/video-editor/lib/config-utils.ts';
 import { createDefaultTimelineConfig } from '@/tools/video-editor/lib/defaults.ts';
 import { serializeForDisk } from '@/tools/video-editor/lib/serialize.ts';
 import type { AssetRegistry, ResolvedTimelineConfig, TimelineConfig } from '@/tools/video-editor/types/index.ts';
+import shotCompositionFixture from '@/tools/video-editor/data/shotComposition.fixture.json';
 
 /**
  * S-PRES contract (WS-SAVE): opaque and unknown fields are kept across every
@@ -457,3 +477,993 @@ it.skipIf(!popupRuntimeReady || !popupEvidenceDirectory || !fixtureRoot)(
     } });
   }, 30_000,
 );
+
+type Case910PopupHarness = Awaited<ReturnType<typeof createCase910PopupHarness>>;
+
+async function createCase910PopupHarness(options: { publicationStatus?: number } = {}) {
+  const graph = structuredClone(shotCompositionFixture) as unknown as ShotCompositionContract;
+  const projectId = String(graph.project.project_id);
+  const parentDocumentId = String(graph.primary_timeline.document_id);
+  const baseUrl = 'http://case910-runtime.fixture';
+  const wire: Array<{ method: string; path: string; url: string; bytes?: string; headers: Record<string, string>; status?: number; response?: string }> = [];
+  const json = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
+  const transport: Transport = async (method, path, headers, body) => {
+    const exchange: typeof wire[number] = { method, path, url: `${baseUrl}${path}`, headers: { ...headers } };
+    if (typeof body === 'string') exchange.bytes = body;
+    else if (body && typeof (body as Blob).text === 'function') exchange.bytes = await (body as Blob).text();
+    else if (ArrayBuffer.isView(body)) exchange.bytes = new TextDecoder().decode(body as Uint8Array);
+    if (path === '/v1/health') {
+      exchange.status = 200;
+      exchange.response = JSON.stringify({ status: 'ok', protocol: 'workspace.v1', schema_digest: RUNTIME_SCHEMA_DIGEST, runtime_epoch: 1 });
+      wire.push(exchange);
+      return { status: 200, headers: {}, body: json(JSON.parse(exchange.response)) };
+    }
+    if (path === '/v1/handshake') {
+      exchange.status = 200;
+      exchange.response = JSON.stringify({ protocol: 'workspace.v1', schema_digest: RUNTIME_SCHEMA_DIGEST,
+        session_id: 'case910-session', actor_id: 'reigh-product-connector', realm_id: 'case910-realm',
+        scopes: RUNTIME_CLIENT_SCOPES, capabilities: [RUNTIME_TARGETED_EXECUTION_CAPABILITY] });
+      wire.push(exchange);
+      return { status: 200, headers: {}, body: json(JSON.parse(exchange.response)) };
+    }
+    if (path === '/v1/realm') {
+      exchange.status = 200;
+      exchange.response = JSON.stringify({ realm_id: 'case910-realm' });
+      wire.push(exchange);
+      return { status: 200, headers: {}, body: json(JSON.parse(exchange.response)) };
+    }
+    if (method === 'POST' && path.endsWith('/inspect')) {
+      exchange.status = 200;
+      exchange.response = JSON.stringify({ project_id: projectId, timeline_id: parentDocumentId,
+        representation: 'canonical_head', authority: 'runtime_parent_composition', is_current_head: true,
+        revision_id: graph.primary_timeline.head.revision_id,
+        head_revision_id: graph.primary_timeline.head.revision_id });
+      wire.push(exchange);
+      return { status: 200, headers: {}, body: json(JSON.parse(exchange.response)) };
+    }
+    if (method === 'POST' && path.endsWith('/composition-revisions')) {
+      exchange.status = options.publicationStatus ?? 503;
+      exchange.response = JSON.stringify(exchange.status === 401
+        ? { code: 'unauthorized', message: 'Case 9 hook harness refuses before publication acceptance' }
+        : { code: 'unavailable', message: 'Case 9 harness refuses before publication acceptance' });
+      wire.push(exchange);
+      return { status: exchange.status, headers: {}, body: json(JSON.parse(exchange.response)) };
+    }
+    wire.push(exchange);
+    throw new Error(`Unexpected case 9 transport ${method} ${path}`);
+  };
+  const runtime = new RuntimeDataProvider({
+    projectId,
+    baseUrl,
+    transport,
+    commitRouting: { enabled: true },
+  });
+  const publicationRequests: unknown[] = [];
+  const publishAtRuntime = runtime.shotComposition.publish!;
+  const adapter = createShotCompositionAdapter({
+    ...runtime.shotComposition,
+    getTimelineDraftRecoveryMetadata: () => ({ recoveryKey: 'case910-popup-recovery', preservePendingCommit: true }),
+    load: async () => graph,
+    loadAtHead: async () => graph,
+    // Record the App request, then pass it through the actual provider HTTP path.
+    // The refusal transport stops before Runtime can accept a publication.
+    publish: async (request) => {
+      publicationRequests.push(structuredClone(request));
+      return publishAtRuntime(request);
+    },
+  });
+  const composition = adapter.prepare(graph);
+  const occurrence = composition.occurrences.find((item) => item.occurrenceId === 'occ-1');
+  if (!occurrence) throw new Error('Case 9 fixture setup lost occurrence occ-1');
+  const config = projectCanonicalComposition({ ...composition, occurrences: [occurrence] }, {
+    ...createDefaultTimelineConfig(), clips: [], tracks: [], registry: {},
+  }, { clampToOccurrenceDuration: false }).config;
+  const popup = createShotTimelineDataProvider(config, composition, occurrence.occurrenceId, adapter);
+  return { graph, runtime, adapter, composition, occurrence, config, popup, publicationRequests, wire };
+}
+
+function createCase10RefusalTransport(projectId: string) {
+  const baseUrl = 'http://case10-runtime.fixture';
+  const wire: Array<{ method: string; path: string; url: string; bytes?: string; headers: Record<string, string>; status?: number; response?: string }> = [];
+  const sessionValues = new Map<string, string>();
+  const commitSessionStorage = {
+    getItem: (key: string) => sessionValues.get(key) ?? null,
+    setItem: (key: string, value: string) => { sessionValues.set(key, value); },
+  };
+  const config = {
+    ...createDefaultTimelineConfig(),
+    tracks: [{ id: 'V1', kind: 'visual' as const }],
+    clips: [{ id: 'catalog-target', track: 'V1', at: 0, hold: 2 }],
+  };
+  const payload = { config, registry: { assets: {} }, clips: structuredClone(config.clips), occurrences: [] };
+  const transport: Transport = async (method, path, headers, body) => {
+    const exchange: typeof wire[number] = { method, path, url: `${baseUrl}${path}`, headers: { ...headers } };
+    if (typeof body === 'string') exchange.bytes = body;
+    else if (body && typeof (body as Blob).text === 'function') exchange.bytes = await (body as Blob).text();
+    else if (ArrayBuffer.isView(body)) exchange.bytes = new TextDecoder().decode(body as Uint8Array);
+    if (path === '/v1/health') {
+      exchange.status = 200;
+      exchange.response = JSON.stringify({ status: 'ok', protocol: 'workspace.v1', schema_digest: RUNTIME_SCHEMA_DIGEST, runtime_epoch: 1 });
+      wire.push(exchange);
+      return { status: 200, headers: {}, body: new TextEncoder().encode(exchange.response) };
+    }
+    if (path === '/v1/handshake') {
+      exchange.status = 200;
+      exchange.response = JSON.stringify({ protocol: 'workspace.v1', schema_digest: RUNTIME_SCHEMA_DIGEST,
+        session_id: 'case10-session', actor_id: 'reigh-product-connector', realm_id: 'case10-realm',
+        scopes: RUNTIME_CLIENT_SCOPES, capabilities: [RUNTIME_TARGETED_EXECUTION_CAPABILITY] });
+      wire.push(exchange);
+      return { status: 200, headers: {}, body: new TextEncoder().encode(exchange.response) };
+    }
+    if (path === '/v1/realm') {
+      exchange.status = 200;
+      exchange.response = JSON.stringify({ realm_id: 'case10-realm' });
+      wire.push(exchange);
+      return { status: 200, headers: {}, body: new TextEncoder().encode(exchange.response) };
+    }
+    if (method === 'POST' && path.endsWith('/inspect')) {
+      exchange.status = 200;
+      exchange.response = JSON.stringify({ project_id: projectId, timeline_id: 'case10-parent',
+        representation: 'canonical_head', authority: 'runtime_parent_composition', is_current_head: true,
+        revision_id: 'case10-head-0', head_revision_id: 'case10-head-0' });
+      wire.push(exchange);
+      return { status: 200, headers: {}, body: new TextEncoder().encode(exchange.response) };
+    }
+    if (method === 'GET' && path.endsWith('/composition-revisions/case10-head-0')) {
+      exchange.status = 200;
+      exchange.response = JSON.stringify({ project_id: projectId, timeline_id: 'case10-parent', revision_id: 'case10-head-0', payload });
+      wire.push(exchange);
+      return { status: 200, headers: {}, body: new TextEncoder().encode(exchange.response) };
+    }
+    if (method === 'POST' && path.endsWith('/commit')) {
+      exchange.status = 503;
+      exchange.response = JSON.stringify({ code: 'unavailable', message: 'Harness refuses before semantic acceptance' });
+      wire.push(exchange);
+      return { status: 503, headers: {}, body: new TextEncoder().encode(exchange.response) };
+    }
+    wire.push(exchange);
+    throw new Error(`Unexpected case 10 transport ${method} ${path}`);
+  };
+  return { baseUrl, wire, transport, commitSessionStorage };
+}
+
+function extendPopupClip(config: TimelineConfig, clipId: string, endSeconds: number): TimelineConfig {
+  return {
+    ...config,
+    clips: config.clips.map((clip) => {
+      if (clip.id !== clipId) return clip;
+      const { hold: _hold, duration: _duration, duration_ms: _durationMs, ...withoutDuration } = clip as typeof clip & {
+        duration?: number; duration_ms?: number;
+      };
+      return { ...withoutDuration, from: 0, to: endSeconds, speed: 1 };
+    }),
+  };
+}
+
+function writeX0HarnessEvidence(name: string, evidence: unknown): void {
+  const directory = process.env.X0_218_EVIDENCE_DIR;
+  if (!directory) return;
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, name), JSON.stringify({
+    evidence_kind: 'synthetic-test-harness-only',
+    live_runtime_capture: false,
+    acceptance_claimed: false,
+    ...asRecord(evidence),
+  }, null, 2));
+}
+
+beforeEach(() => vi.stubGlobal('indexedDB', createFakeIndexedDB()));
+afterEach(() => { resetFakeIndexedDB(); vi.unstubAllGlobals(); });
+
+describe('X0 current App provider assertions', () => {
+  it('case 9 low-level provider factory scheduleSave preserves loaded canonical media identity; import/swap is undetermined', async () => {
+    const h = await createCase910PopupHarness({ publicationStatus: 401 });
+    const session = 'case910-popup-hook-loaded-media';
+    const graphBefore = structuredClone(h.graph);
+    await h.popup.loadCanonicalTimeline!(session);
+    const loaded = await h.popup.loadTimeline(session);
+    const initial = createShotTimelineInitialData(
+      h.config as ResolvedTimelineConfig, loaded.configVersion, h.composition,
+    );
+    const visualClip = initial.resolvedConfig.clips.find((clip) => clip.track === 'video');
+    const audioClip = initial.resolvedConfig.clips.find((clip) => clip.track === 'audio');
+    if (!visualClip?.asset || !audioClip) throw new Error('Case 9 provider projection lacks fixture media clips');
+
+    const canonicalRevision = h.graph.shot_revisions.find((revision) => (
+      revision.shot_id === h.occurrence.shotId && revision.revision_id === h.occurrence.revisionId
+    ));
+    if (!canonicalRevision) throw new Error('Case 9 fixture lost the selected canonical shot revision');
+    const revisionAssets = (canonicalRevision as unknown as JsonRecord).assets;
+    const canonicalAsset = Array.isArray(revisionAssets)
+      ? revisionAssets.map((asset) => asRecord(asset)).find((asset) => asset.asset_id === visualClip.asset)
+      : undefined;
+    if (!canonicalAsset) throw new Error('Case 9 fixture lost the selected canonical media asset');
+    const canonicalObjectId = String(canonicalAsset.object_id);
+    const canonicalDigest = String(canonicalAsset.digest);
+    const loadedRegistry = await h.popup.loadAssetRegistry(session);
+    const loadedAsset = loadedRegistry.assets[visualClip.asset];
+    expect(loadedAsset).toMatchObject({
+      media_id: canonicalObjectId,
+      content_sha256: canonicalDigest,
+    });
+    expect(initial.registry.assets[visualClip.asset]).toMatchObject({
+      media_id: canonicalObjectId,
+      content_sha256: canonicalDigest,
+    });
+
+    // This is only a probe of the low-level factory instance. It cannot establish
+    // public popup, _load_revision, or shared-placement import capabilities.
+    const popupMediaProvider = h.popup as typeof h.popup & {
+      prepareMediaImport?: unknown;
+      prepareAsset?: unknown;
+      uploadAsset?: unknown;
+      supportsDirectAssetUpload?: unknown;
+    };
+    const popupMediaRoute = {
+      prepareMediaImport: typeof popupMediaProvider.prepareMediaImport,
+      prepareAsset: typeof popupMediaProvider.prepareAsset,
+      uploadAsset: typeof popupMediaProvider.uploadAsset,
+      supportsDirectAssetUpload: popupMediaProvider.supportsDirectAssetUpload,
+    };
+    expect(popupMediaRoute).toEqual({
+      prepareMediaImport: 'undefined',
+      prepareAsset: 'undefined',
+      uploadAsset: 'undefined',
+      supportsDirectAssetUpload: undefined,
+    });
+
+    const edited = structuredClone(initial);
+    edited.config = {
+      ...edited.config,
+      clips: edited.config.clips.map((clip) => clip.id === audioClip.id ? { ...clip, volume: 0.5 } : clip),
+    };
+    edited.resolvedConfig = {
+      ...edited.resolvedConfig,
+      clips: edited.resolvedConfig.clips.map((clip) => clip.id === audioClip.id ? { ...clip, volume: 0.5 } : clip),
+    };
+    h.popup.setDraftGeneration(1);
+    h.popup.setDraftState(true);
+
+    const refusals: unknown[] = [];
+    const saveTimeline = h.popup.saveTimeline!.bind(h.popup);
+    const save = vi.spyOn(h.popup, 'saveTimeline').mockImplementation(async (...args) => {
+      try {
+        return await saveTimeline(...args);
+      } catch (error) {
+        refusals.push(error);
+        throw error;
+      }
+    });
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => React.createElement(
+      QueryClientProvider, { client, children },
+    );
+    const dataRef = { current: initial };
+    const editSeqRef = { current: 1 };
+    const savedSeqRef = { current: 0 };
+    const configVersionRef = { current: initial.configVersion };
+    const headRevisionRef = { current: initial.head };
+    const lastSavedSignatureRef = { current: initial.stableSignature };
+    const selectedClipIdRef = { current: audioClip.id };
+    const selectedTrackIdRef = { current: audioClip.track };
+    const interactionStateRef = { current: createInteractionState() };
+    const hook = renderHook(() => useTimelinePersistence({
+      provider: h.popup,
+      timelineId: session,
+      eventBus: new TimelineEventBus(),
+      dataRef,
+      commitData: vi.fn(),
+      selectedClipIdRef,
+      selectedTrackIdRef,
+      editSeqRef,
+      savedSeqRef,
+      configVersionRef,
+      headRevisionRef,
+      lastSavedSignatureRef,
+      interactionStateRef,
+    }), { wrapper });
+
+    dataRef.current = edited;
+    act(() => hook.result.current.scheduleSave(edited));
+    await waitFor(() => expect(refusals).toHaveLength(1), { timeout: 3000 });
+    hook.unmount();
+
+    const recoveryMetadata = h.popup.getTimelineDraftRecoveryMetadata!();
+    const recovered = await loadTimelineDraft(recoveryMetadata.recoveryKey ?? null);
+    expect(save).toHaveBeenCalledOnce();
+    expect(refusals[0]).toMatchObject({ code: 'runtime_authentication' });
+    expect(recovered).toMatchObject({
+      baseHeadRevisionId: loaded.head?.headRevisionId,
+      draft: {
+        config: { clips: expect.arrayContaining([
+          expect.objectContaining({ id: audioClip.id, volume: 0.5 }),
+        ]) },
+        registry: { assets: { [visualClip.asset]: {
+          media_id: canonicalObjectId,
+          content_sha256: canonicalDigest,
+        } } },
+      },
+    });
+    expect(h.popup.timelineQueryIdentity).toBe(loaded.head?.headRevisionId);
+    expect(recoveryMetadata.baseHeadRevisionId).toBe(loaded.head?.headRevisionId);
+    expect(h.publicationRequests).toHaveLength(1);
+    const publication = h.wire.find((exchange) => exchange.method === 'POST'
+      && exchange.path.endsWith('/composition-revisions'));
+    expect(publication?.status).toBe(401);
+    expect(publication?.response).toContain('Case 9 hook harness refuses before publication acceptance');
+    expect(h.wire.filter((exchange) => exchange.method === 'POST'
+      && exchange.path.endsWith('/composition-revisions'))).toHaveLength(1);
+    expect(h.wire.some((exchange) => exchange.method === 'GET'
+      && exchange.path.includes('/composition-revisions/'))).toBe(false);
+    expect(h.wire.some((exchange) => exchange.path.includes('/history'))).toBe(false);
+    expect(h.wire.some((exchange) => exchange.method === 'POST' && exchange.path.endsWith('/commit'))).toBe(false);
+    expect(h.graph).toEqual(graphBefore);
+    expect(h.composition.contract).toEqual(graphBefore);
+    expect(h.composition.occurrences.filter((row) => row.shotId === h.occurrence.shotId)
+      .map((row) => [row.occurrenceId, row.shotId, row.revisionId]))
+      .toEqual([['occ-1', 'shot-alpha', 'rev-a'], ['occ-2', 'shot-alpha', 'rev-a'],
+        ['occ-3', 'shot-alpha', 'rev-b']]);
+
+    const appRequest = asRecord(h.publicationRequests[0]);
+    expect(publication?.headers['Idempotency-Key']).toBe(appRequest.idempotencyKey);
+    const requestBody = JSON.parse(publication!.bytes!) as JsonRecord;
+    writeX0HarnessEvidence('case9-hook-loaded-media-identity.json', {
+      action_order: ['load selected occurrence through the low-level factory provider',
+        'probe the low-level factory instance for media import methods (not public popup capability)',
+        'prepare a non-media edit using the actual loaded canonical asset registry',
+        'call useTimelinePersistence.scheduleSave', 'synthetic HTTP 401 refusal before acceptance'],
+      exercised_level: {
+        popup_ui_mounted: false,
+        editor_gesture_driven: false,
+        timeline_commit_apply_edit_driven: false,
+      },
+      case9_import_swap: 'undetermined_not_exercised_in_low_level_fixture',
+      import_swap_scope: 'This direct low-level factory harness bypasses public _load_revision/open_authoring_bundle ownership preparation. The method probe provides no public popup or shared-placement capability conclusion; Add+swap and full closure remain pending the scoped Sol bridge.',
+      popup_media_route_probe_scope: 'Low-level factory instance only; not public popup capability evidence.',
+      fixture: { project_id: h.graph.project.project_id, parent_document_id: h.graph.primary_timeline.document_id,
+        base_revision_id: loaded.head?.headRevisionId, occurrence_id: h.occurrence.occurrenceId,
+        shared_shot_id: h.occurrence.shotId, same_shot_occurrences: h.composition.occurrences
+          .filter((row) => row.shotId === h.occurrence.shotId)
+          .map((row) => ({ occurrence_id: row.occurrenceId, shot_id: row.shotId, revision_id: row.revisionId })) },
+      popup_media_route: popupMediaRoute,
+      media_identity_digest_control: {
+        asset_id: visualClip.asset,
+        source_canonical_object_id: canonicalObjectId,
+        source_canonical_digest: canonicalDigest,
+        loaded_provider_registry_entry: loadedAsset,
+        recovered_draft_registry_entry: recovered?.draft.registry.assets[visualClip.asset],
+      },
+      refusal: refusals.map((error) => ({
+        name: (error as Error).name,
+        message: (error as Error).message,
+        code: (error as { code?: unknown }).code,
+      })),
+      transport_response: { label: 'synthetic test transport refusal before acceptance', wire: h.wire },
+      app_publication_request: h.publicationRequests[0],
+      publication_request_body: requestBody,
+      recovered_draft: recovered,
+      no_effect: { publication_requests: h.publicationRequests.length,
+        publication_http_attempts: h.wire.filter((exchange) => exchange.method === 'POST'
+          && exchange.path.endsWith('/composition-revisions')).length,
+        head_revision_id: h.popup.timelineQueryIdentity, history_reads: 0,
+        sibling_occurrences: h.composition.occurrences.filter((row) => row.shotId === h.occurrence.shotId)
+          .map((row) => [row.occurrenceId, row.shotId, row.revisionId]) },
+    });
+  });
+
+  it('case 9 low-level provider factory scheduleSave refuses 4.001s recoverably and leaves no second publication or sibling effect', async () => {
+    const h = await createCase910PopupHarness({ publicationStatus: 401 });
+    const session = 'case910-popup-hook-boundary';
+    const graphBefore = structuredClone(h.graph);
+
+    // This uses the popup provider factory and the same persistence hook as 219.
+    // The draft values are prepared TimelineData unit inputs; no editor gesture
+    // or mounted ShotTimelinePreview is claimed.
+    await h.popup.loadCanonicalTimeline!(session);
+    const loaded = await h.popup.loadTimeline(session);
+    const initial = createShotTimelineInitialData(
+      h.config as ResolvedTimelineConfig, loaded.configVersion, h.composition,
+    );
+    const boundaryClip = initial.resolvedConfig.clips[1];
+    const visualClip = initial.resolvedConfig.clips.find((clip) => clip.track === 'video');
+    if (!boundaryClip || !visualClip?.asset) throw new Error('Case 9 popup projection needs its media and child clip');
+    expect(initial.resolvedConfig.output.fps).toBe(30);
+
+    const canonicalRevision = h.graph.shot_revisions.find((revision) => (
+      revision.shot_id === h.occurrence.shotId && revision.revision_id === h.occurrence.revisionId
+    ));
+    if (!canonicalRevision) throw new Error('Case 9 fixture lost the selected canonical shot revision');
+    const revisionAssets = (canonicalRevision as unknown as JsonRecord).assets;
+    const canonicalAsset = Array.isArray(revisionAssets)
+      ? revisionAssets.map((asset) => asRecord(asset)).find((asset) => asset.asset_id === visualClip.asset)
+      : undefined;
+    if (!canonicalAsset) throw new Error('Case 9 fixture lost the selected canonical media asset');
+    const canonicalObjectId = String(canonicalAsset.object_id);
+    const canonicalDigest = String(canonicalAsset.digest);
+    const mediaEntry = initial.registry.assets[visualClip.asset];
+    expect(mediaEntry).toMatchObject({
+      media_id: canonicalObjectId,
+      content_sha256: canonicalDigest,
+    });
+
+    const dataAt = (hold: number) => {
+      const data = structuredClone(initial);
+      data.config = { ...data.config, clips: data.config.clips.map((clip) => clip.id === boundaryClip.id
+        ? { ...clip, hold } : clip) };
+      data.resolvedConfig = {
+        ...data.resolvedConfig,
+        clips: data.resolvedConfig.clips.map((clip) => clip.id === boundaryClip.id ? { ...clip, hold } : clip),
+      };
+      return data;
+    };
+    const atBoundary = dataAt(4);
+    const pastBoundary = dataAt(4.001);
+
+    // Preserve the stale-head negative control: wrong identity refuses before publication.
+    const staleHead = { ...initial.head!, headRevisionId: 'timeline-rev-stale' };
+    await expect(h.popup.saveTimelineAtHead!(session, atBoundary.config, staleHead, atBoundary.registry))
+      .rejects.toThrow(/older canonical head/);
+    expect(h.publicationRequests).toHaveLength(0);
+
+    h.popup.setDraftGeneration(1);
+    h.popup.setDraftState(true);
+    const refusals: unknown[] = [];
+    const saveTimeline = h.popup.saveTimeline!.bind(h.popup);
+    const save = vi.spyOn(h.popup, 'saveTimeline').mockImplementation(async (...args) => {
+      try {
+        return await saveTimeline(...args);
+      } catch (error) {
+        refusals.push(error);
+        throw error;
+      }
+    });
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => React.createElement(
+      QueryClientProvider, { client, children },
+    );
+    const dataRef = { current: initial };
+    const editSeqRef = { current: 1 };
+    const savedSeqRef = { current: 0 };
+    const configVersionRef = { current: initial.configVersion };
+    const headRevisionRef = { current: initial.head };
+    const lastSavedSignatureRef = { current: initial.stableSignature };
+    const selectedClipIdRef = { current: boundaryClip.id };
+    const selectedTrackIdRef = { current: boundaryClip.track };
+    const interactionStateRef = { current: createInteractionState() };
+    const hook = renderHook(() => useTimelinePersistence({
+      provider: h.popup,
+      timelineId: session,
+      eventBus: new TimelineEventBus(),
+      dataRef,
+      commitData: vi.fn(),
+      selectedClipIdRef,
+      selectedTrackIdRef,
+      editSeqRef,
+      savedSeqRef,
+      configVersionRef,
+      headRevisionRef,
+      lastSavedSignatureRef,
+      interactionStateRef,
+    }), { wrapper });
+
+    const recoveryMetadata = h.popup.getTimelineDraftRecoveryMetadata!();
+    dataRef.current = atBoundary;
+    act(() => hook.result.current.scheduleSave(atBoundary));
+    await waitFor(() => expect(refusals).toHaveLength(1), { timeout: 3000 });
+    expect(refusals[0]).toMatchObject({ code: 'runtime_authentication' });
+    expect(h.publicationRequests).toHaveLength(1);
+    const recoveredAtBoundary = await loadTimelineDraft(recoveryMetadata.recoveryKey ?? null);
+    expect(recoveredAtBoundary?.draft.config.clips).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: boundaryClip.id, hold: 4 }),
+    ]));
+
+    editSeqRef.current = 2;
+    dataRef.current = pastBoundary;
+    h.popup.setDraftGeneration(2);
+    act(() => hook.result.current.scheduleSave(pastBoundary));
+    await waitFor(() => expect(refusals).toHaveLength(2), { timeout: 3000 });
+    hook.unmount();
+
+    const recovered = await loadTimelineDraft(recoveryMetadata.recoveryKey ?? null);
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(refusals[1]).toMatchObject({ message: 'Shot content would cross the next shot at 4s' });
+    expect(recovered).toMatchObject({
+      baseHeadRevisionId: loaded.head?.headRevisionId,
+      draft: {
+        config: { clips: expect.arrayContaining([
+          expect.objectContaining({ id: boundaryClip.id, hold: 4.001 }),
+          expect.objectContaining({ id: visualClip.id, asset: visualClip.asset }),
+        ]) },
+        registry: { assets: { [visualClip.asset]: {
+          media_id: canonicalObjectId,
+          content_sha256: canonicalDigest,
+        } } },
+      },
+    });
+    const visualIdentity = asRecord(asRecord(visualClip.app).canonical);
+    expect(visualIdentity).toMatchObject({
+      occurrenceId: 'occ-1',
+      shotId: 'shot-alpha',
+      revisionId: 'rev-a',
+      internalTimelineRevisionId: 'timeline-alpha-a',
+    });
+    expect(h.popup.timelineQueryIdentity).toBe(loaded.head?.headRevisionId);
+    expect(recoveryMetadata.baseHeadRevisionId).toBe(loaded.head?.headRevisionId);
+    expect(h.publicationRequests).toHaveLength(1);
+    const publication = h.wire.find((exchange) => exchange.method === 'POST'
+      && exchange.path.endsWith('/composition-revisions'));
+    expect(publication?.status).toBe(401);
+    expect(publication?.response).toContain('Case 9 hook harness refuses before publication acceptance');
+    expect(h.wire.filter((exchange) => exchange.method === 'POST'
+      && exchange.path.endsWith('/composition-revisions'))).toHaveLength(1);
+    expect(h.wire.some((exchange) => exchange.method === 'GET'
+      && exchange.path.includes('/composition-revisions/'))).toBe(false);
+    expect(h.wire.some((exchange) => exchange.path.includes('/history'))).toBe(false);
+    expect(h.wire.some((exchange) => exchange.method === 'POST' && exchange.path.endsWith('/commit'))).toBe(false);
+    expect(h.graph).toEqual(graphBefore);
+    expect(h.composition.contract).toEqual(graphBefore);
+    expect(h.composition.occurrences.filter((row) => row.shotId === h.occurrence.shotId)
+      .map((row) => [row.occurrenceId, row.shotId, row.revisionId]))
+      .toEqual([['occ-1', 'shot-alpha', 'rev-a'], ['occ-2', 'shot-alpha', 'rev-a'],
+        ['occ-3', 'shot-alpha', 'rev-b']]);
+
+    const appRequest = asRecord(h.publicationRequests[0]);
+    expect(publication?.headers['Idempotency-Key']).toBe(appRequest.idempotencyKey);
+    const requestBody = JSON.parse(publication!.bytes!) as JsonRecord;
+    writeX0HarnessEvidence('case9-popup-hook-boundary-correction.json', {
+      action_order: ['load canonical timeline through the low-level occurrence-scoped factory provider',
+        'prepare TimelineData with test dataAt(4)', 'call useTimelinePersistence.scheduleSave at 4s',
+        'synthetic HTTP 401 refusal before publication acceptance',
+        'prepare TimelineData with test dataAt(4.001)', 'call useTimelinePersistence.scheduleSave at 4.001s',
+        'local occurrence-boundary refusal before a second publication'],
+      exercised_level: {
+        popup_ui_mounted: false,
+        draft_authoring: 'test-prepared TimelineData via dataAt(hold)',
+        editor_gesture_driven: false,
+        timeline_commit_apply_edit_driven: false,
+        boundary_value_scope: 'scheduleSave unit assertion only; 4.001s is directly constructed and is not a 30fps public gesture value',
+        output_fps: initial.resolvedConfig.output.fps,
+      },
+      fixture: { project_id: h.graph.project.project_id, parent_document_id: h.graph.primary_timeline.document_id,
+        base_revision_id: loaded.head?.headRevisionId, occurrence_id: h.occurrence.occurrenceId,
+        shared_shot_id: h.occurrence.shotId, same_shot_occurrences: h.composition.occurrences
+          .filter((row) => row.shotId === h.occurrence.shotId)
+          .map((row) => ({ occurrence_id: row.occurrenceId, shot_id: row.shotId, revision_id: row.revisionId })),
+        boundary_clip_id: boundaryClip.id },
+      media_identity_digest_control: {
+        asset_id: visualClip.asset,
+        source_canonical_object_id: canonicalObjectId,
+        source_canonical_digest: canonicalDigest,
+        loaded_registry_entry: mediaEntry,
+        recovered_draft_registry_entry: recovered?.draft.registry.assets[visualClip.asset],
+        clip_identity: visualIdentity,
+      },
+      refusals: refusals.map((error) => ({
+        name: (error as Error).name,
+        message: (error as Error).message,
+        code: (error as { code?: unknown }).code,
+      })),
+      transport_response: { label: 'synthetic test transport refusal before acceptance', wire: h.wire },
+      app_publication_request: h.publicationRequests[0],
+      publication_request_body: requestBody,
+      recovered_at_boundary: recoveredAtBoundary,
+      recovered_draft: recovered,
+      no_effect: { publication_requests: h.publicationRequests.length,
+        publication_http_attempts: h.wire.filter((exchange) => exchange.method === 'POST'
+          && exchange.path.endsWith('/composition-revisions')).length,
+        head_revision_id: h.popup.timelineQueryIdentity, history_reads: 0,
+        sibling_occurrences: h.composition.occurrences.filter((row) => row.shotId === h.occurrence.shotId)
+          .map((row) => [row.occurrenceId, row.shotId, row.revisionId]) },
+    });
+  });
+
+  it('case 10 catalog apply binds its App entrypoint to the refused semantic COMMIT request', async () => {
+    const projectId = 'case10-catalog-project';
+    const { baseUrl, wire, transport, commitSessionStorage } = createCase10RefusalTransport(projectId);
+    const runtime = new RuntimeDataProvider({ projectId, baseUrl, transport, commitSessionStorage,
+      commitRouting: { enabled: true } });
+    const context = buildReighAgentElementContext({
+      astridEffects: ASTRID_EFFECT_CATALOG,
+      clips: [{ id: 'catalog-target', trackId: 'V1', at: 0, duration: 2 }],
+    });
+    const adapter = new AstridElementOperationAdapter(context, createElementTimelineRoutes(runtime), projectId);
+    const element = context.catalog.find((entry) => entry.id === 'text-card' && entry.packId === 'rendering');
+    if (!element) throw new Error('Case 10 catalog setup has no published element');
+
+    let actionError: unknown;
+    try {
+      await adapter.execute({ name: 'timeline.apply_element', project: projectId, timeline: 'case10-parent',
+        expected_version: 1, clip_id: 'catalog-target', placement: 'overlay',
+        element: { id: element.id, kind: element.kind, revision: element.revision, packId: element.packId } });
+    } catch (error) { actionError = error; }
+    expect(actionError).toBeDefined();
+
+    const commit = wire.find((exchange) => exchange.method === 'POST' && exchange.path.endsWith('/commit'));
+    writeX0HarnessEvidence('case10-catalog-apply-http.json', {
+      action: 'ElementsLibraryPanel.applyElement -> AstridElementOperationAdapter.execute(timeline.apply_element)',
+      fixture: { project_id: projectId, timeline_id: 'case10-parent', base_revision_id: 'case10-head-0', element },
+      wire,
+    });
+    expect(commit, `Catalog action failed before COMMIT: ${String(actionError)}; exchanges=${JSON.stringify(wire)}`).toBeDefined();
+    expect(commit?.status).toBe(503);
+    const request = JSON.parse(commit!.bytes!) as Record<string, unknown>;
+    expect(request).toMatchObject({ project_id: projectId, timeline_id: 'case10-parent',
+      base_revision_id: 'case10-head-0', source: { via: 'app' } });
+    expect(asRecord(request.change).commands).toEqual(expect.arrayContaining([expect.objectContaining({ op: expect.any(String) })]));
+    expect(commit?.headers['Idempotency-Key']).toBe(request.request_id);
+    expect(request.session_id).toEqual(expect.any(String));
+    expect(request.session_sequence).toEqual(expect.any(Number));
+    expect(wire.filter((exchange) => exchange.method === 'POST' && exchange.path.endsWith('/commit'))).toHaveLength(1);
+    const revisionReads = wire.filter((exchange) => exchange.method === 'GET'
+      && exchange.path.includes('/composition-revisions/'));
+    expect(revisionReads.length).toBeGreaterThan(0);
+    expect(revisionReads.every((exchange) => exchange.path.endsWith('/composition-revisions/case10-head-0'))).toBe(true);
+    expect(revisionReads.every((exchange) => wire.indexOf(exchange) < wire.indexOf(commit!))).toBe(true);
+  });
+
+  it('case 10 register-asset binds RuntimeDataProvider.registerAsset to a refused semantic COMMIT request', async () => {
+    const projectId = 'case10-asset-project';
+    const { baseUrl, wire, transport, commitSessionStorage } = createCase10RefusalTransport(projectId);
+    const runtime = new RuntimeDataProvider({ projectId, baseUrl, transport, commitSessionStorage,
+      commitRouting: { enabled: true } });
+    const assetId = 'case10-registered-asset';
+    const entry = { media_id: `sha256:${'c'.repeat(64)}`, type: 'image/png', file: 'https://fixture.invalid/case10.png' };
+
+    let actionError: unknown;
+    try { await runtime.registerAsset('case10-parent', assetId, entry); } catch (error) { actionError = error; }
+    expect(actionError).toBeDefined();
+
+    const commit = wire.find((exchange) => exchange.method === 'POST' && exchange.path.endsWith('/commit'));
+    writeX0HarnessEvidence('case10-register-asset-http.json', {
+      action: 'RuntimeDataProvider.registerAsset',
+      fixture: { project_id: projectId, timeline_id: 'case10-parent', base_revision_id: 'case10-head-0', asset_id: assetId },
+      wire,
+    });
+    expect(commit, `Asset action failed before COMMIT: ${String(actionError)}; exchanges=${JSON.stringify(wire)}`).toBeDefined();
+    expect(commit?.status).toBe(503);
+    const request = JSON.parse(commit!.bytes!) as Record<string, unknown>;
+    expect(request).toMatchObject({ project_id: projectId, timeline_id: 'case10-parent',
+      base_revision_id: 'case10-head-0', source: { via: 'app' },
+      change: { commands: [{ op: 'timeline.register-asset', args: { asset_id: assetId, entry } }] } });
+    expect(commit?.headers['Idempotency-Key']).toBe(request.request_id);
+    expect(request.session_id).toEqual(expect.any(String));
+    expect(request.session_sequence).toEqual(expect.any(Number));
+    expect(wire.filter((exchange) => exchange.method === 'POST' && exchange.path.endsWith('/commit'))).toHaveLength(1);
+    const revisionReads = wire.filter((exchange) => exchange.method === 'GET'
+      && exchange.path.includes('/composition-revisions/'));
+    expect(revisionReads).toHaveLength(1);
+    expect(revisionReads[0]?.path.endsWith('/composition-revisions/case10-head-0')).toBe(true);
+    expect(wire.indexOf(revisionReads[0]!) < wire.indexOf(commit!)).toBe(true);
+  });
+
+  it('case 10 proposal acceptance calls TimelineOps.acceptProposal and records the refused semantic COMMIT', async () => {
+    const projectId = 'case10-proposal-project';
+    const { baseUrl, wire, transport, commitSessionStorage } = createCase10RefusalTransport(projectId);
+    const runtime = new RuntimeDataProvider({ projectId, baseUrl, transport, commitSessionStorage,
+      commitRouting: { enabled: true } });
+    const loaded = await runtime.loadTimeline('case10-parent');
+    const initial = await buildTimelineData(loaded.config, loaded.registry ?? { assets: {} }, undefined,
+      loaded.configVersion, undefined, loaded.head);
+    const dataRef = { current: initial };
+    let authored: { data: typeof initial; options?: { editCommands?: readonly import('@/integrations/runtime/generated.ts').EditCommand[] } } | undefined;
+    const saveTarget = { session: {}, timelineId: 'case10-parent', targetSeq: 1, generation: 1 };
+    const hook = renderHook(() => useTimelineOps({
+      dataRef,
+      semanticCommandSaving: runtime.semanticCommandSaving,
+      getConfigVersion: () => initial.configVersion,
+      commitData: (data, options) => { dataRef.current = data; authored = { data, options }; },
+      captureSaveTarget: () => saveTarget,
+      flushSaveTarget: async () => {
+        if (!authored) throw new Error('Proposal did not author a semantic save');
+        await runtime.saveTimelineAtHead('case10-parent', authored.data.config, loaded.head!,
+          authored.data.registry, undefined, authored.options?.editCommands);
+        return 1;
+      },
+      createManualCheckpoint: async () => {}, jumpToCheckpoint: () => {}, checkpoints: [],
+    }));
+    const reader = createTimelineReader({ data: () => dataRef.current! });
+    const proposals = createProposalRuntime({ timelineOps: hook.result.current, reader, persistenceProvider: null });
+    const proposal = proposals.create({ source: 'x0-case10-proposal', rationale: 'case 10 harness action',
+      baseVersion: initial.configVersion, patch: { version: initial.configVersion, operations: [
+        { op: 'clip.update', target: 'catalog-target', payload: { opacity: 0.6 } },
+      ] } });
+
+    await act(async () => { await expect(proposals.accept(proposal.id)).rejects.toThrow(); });
+
+    const commit = wire.find((exchange) => exchange.method === 'POST' && exchange.path.endsWith('/commit'));
+    writeX0HarnessEvidence('case10-proposal-accept-http.json', {
+      action: 'createProposalRuntime.accept -> TimelineOps.acceptProposal -> RuntimeDataProvider.saveTimelineAtHead',
+      fixture: { project_id: projectId, timeline_id: 'case10-parent', base_revision_id: 'case10-head-0',
+        proposal_id: proposal.id, proposal_transaction_id: `proposal:${proposal.id}` },
+      wire,
+    });
+    expect(commit?.status).toBe(503);
+    const request = JSON.parse(commit!.bytes!) as Record<string, unknown>;
+    expect(request).toMatchObject({ project_id: projectId, timeline_id: 'case10-parent',
+      base_revision_id: 'case10-head-0', source: { via: 'app' },
+      change: { commands: [expect.objectContaining({ op: 'clip.set-look' })] } });
+    expect(commit?.headers['Idempotency-Key']).toBe(request.request_id);
+    expect(request.session_id).toEqual(expect.any(String));
+    expect(request.session_sequence).toEqual(expect.any(Number));
+    expect(wire.filter((exchange) => exchange.method === 'POST' && exchange.path.endsWith('/commit'))).toHaveLength(1);
+    expect(authored?.options).toMatchObject({ semantic: true, transactionId: `proposal:${proposal.id}` });
+    const revisionReads = wire.filter((exchange) => exchange.method === 'GET'
+      && exchange.path.includes('/composition-revisions/'));
+    expect(revisionReads).toHaveLength(1);
+    expect(revisionReads[0]?.path.endsWith('/composition-revisions/case10-head-0')).toBe(true);
+    expect(wire.indexOf(revisionReads[0]!) < wire.indexOf(commit!)).toBe(true);
+    hook.unmount();
+  });
+
+  it('case 10 canonical duplicate handler submits an independent graph through Runtime shotComposition.publish; synthetic refusal is pre-acceptance', async () => {
+    const h = await createCase910PopupHarness({ publicationStatus: 503 });
+    const originalGraph = structuredClone(h.graph);
+    const refetchShots = vi.fn();
+    const editorData = {
+      config: { ...createDefaultTimelineConfig(), tracks: [{ id: 'V1', kind: 'visual' as const }], clips: [], pinnedShotGroups: [] },
+      configVersion: 1,
+      registry: { assets: {} },
+      resolvedConfig: { registry: {} },
+      rows: [{ id: 'V1', actions: [] }],
+      meta: {},
+    };
+    const runtimeContext = {
+      userId: null,
+      timelineId: h.graph.primary_timeline.document_id,
+      project: { projectId: h.graph.project.project_id },
+      provider: { apiBaseUrl: 'http://case910-runtime.fixture' },
+      shots: {
+        canonicalOccurrences: h.composition.occurrences,
+        shotComposition: h.adapter,
+        canonicalComposition: h.composition,
+        refetchShots,
+      },
+    };
+    const mockedModules = [
+      '@/shared/contexts/ShotsContext.tsx',
+      '@/shared/hooks/shotCreation/useShotCreation.ts',
+      '@/shared/hooks/shots/useShotNavigation.ts',
+      '@/shared/contexts/ProjectContext.tsx',
+      '@/tools/video-editor/contexts/VideoEditorRuntimeContext.tsx',
+      '@/tools/video-editor/hooks/timelineStore.ts',
+      '@/tools/video-editor/hooks/useTimelineCommandsService.ts',
+      '@/tools/video-editor/hooks/usePinnedShotGroups.ts',
+      '@/tools/video-editor/hooks/useShotGroups.ts',
+      '@/tools/video-editor/hooks/useActiveTaskClips.ts',
+      '@/tools/video-editor/hooks/useFinalVideoAvailable.ts',
+      '@/tools/video-editor/hooks/useSwitchToFinalVideo.ts',
+      '@/tools/video-editor/hooks/useShotGroupHandlers.ts',
+      '@/tools/video-editor/lib/shot-group-pack-commands.ts',
+      '@/integrations/astrid/client.ts',
+      '@/tools/video-editor/components/TimelineEditor/TimelineEditorCore.tsx',
+      '@/tools/video-editor/lib/generation-utils.ts',
+      '@/tools/travel-between-images/components/VideoGenerationModal.tsx',
+      '@/tools/travel-between-images/pages/LocalTimelineShotBrowser.tsx',
+      '@/shared/components/ui/runtime/sonner.tsx',
+      '@/shared/lib/errorHandling/runtimeError.ts',
+    ];
+    let unmount: (() => void) | undefined;
+    try {
+      vi.doMock('@/shared/contexts/ShotsContext.tsx', () => ({ useShots: () => ({ shots: [] }) }));
+      vi.doMock('@/shared/hooks/shotCreation/useShotCreation.ts', () => ({ useShotCreation: () => ({ createShot: vi.fn(), isCreating: false }) }));
+      vi.doMock('@/shared/hooks/shots/useShotNavigation.ts', () => ({ useShotNavigation: () => ({ navigateToShot: vi.fn() }) }));
+      vi.doMock('@/shared/contexts/ProjectContext.tsx', () => ({ useProjectSelectionContext: () => ({ selectedProjectId: h.graph.project.project_id }) }));
+      vi.doMock('@/tools/video-editor/contexts/VideoEditorRuntimeContext.tsx', () => ({ useVideoEditorRuntime: () => runtimeContext }));
+      vi.doMock('@/tools/video-editor/hooks/timelineStore.ts', () => ({
+        useTimelineConfigVersion: () => 1,
+        useTimelineDataSelector: (selector: (value: unknown) => unknown) => selector({ data: editorData,
+          resolvedConfig: editorData.resolvedConfig, dataRef: { current: editorData }, selectedClipIds: new Set<string>(),
+          interactionStateRef: { current: { drag: false, resize: false } } }),
+        useTimelineOpsSelector: (selector: (value: unknown) => unknown) => selector({ applyEdit: vi.fn(),
+          prepareGenerationAsset: vi.fn(), registerGenerationAsset: vi.fn(), registerAsset: vi.fn() }),
+        useTimelineChromeSelector: (selector: (value: unknown) => unknown) => selector({ reloadFromServer: vi.fn() }),
+      }));
+      vi.doMock('@/tools/video-editor/hooks/useTimelineCommandsService.ts', () => ({ useTimelineCommandsService: () => ({
+        addClip: vi.fn(), prepareGenerationClone: vi.fn(),
+      }) }));
+      vi.doMock('@/tools/video-editor/hooks/usePinnedShotGroups.ts', () => ({
+        usePinnedShotGroups: () => ({ pinGroup: vi.fn(), unpinGroup: vi.fn() }),
+        usePinnedShotGroupViews: () => [], usePinnedGroupSync: vi.fn(),
+      }));
+      vi.doMock('@/tools/video-editor/hooks/useShotGroups.ts', () => ({
+        useShotGroups: () => [{ shotId: h.occurrence.shotId, shotName: 'Opening', rowId: 'V1', rowIndex: 0,
+          start: 0, clipIds: [], children: [], color: '#fff', poolGenerationIds: [], variantIdsByGenerationId: {},
+          canonicalIdentity: h.occurrence }],
+        projectCanonicalShotRows: (rows: unknown[]) => rows,
+        shotGroupVideoKey: () => 'case10-shot-video',
+      }));
+      vi.doMock('@/tools/video-editor/hooks/useActiveTaskClips.ts', () => ({ useActiveTaskClips: () => ({ activeTaskAssetKeys: new Set() }) }));
+      vi.doMock('@/tools/video-editor/hooks/useFinalVideoAvailable.ts', () => ({
+        useFinalVideoAvailable: () => ({ finalVideoMap: new Map(), dismissFinalVideo: vi.fn(), exportRuntimeManagedOutput: vi.fn() }),
+        formatManagedOutputExportReceipt: vi.fn(),
+      }));
+      vi.doMock('@/tools/video-editor/hooks/useSwitchToFinalVideo.ts', () => ({ useSwitchToFinalVideo: () => ({
+        switchToFinalVideo: vi.fn(), updateToLatestVideo: vi.fn(), switchToImages: vi.fn(),
+      }) }));
+      vi.doMock('@/tools/video-editor/hooks/useShotGroupHandlers.ts', () => ({ useShotGroupHandlers: () => ({
+        shotGroupClipIds: new Set(), activeTaskClipIds: new Set(), staleShotGroupIds: new Set(),
+        handleShotGroupNavigate: vi.fn(), handleShotGroupGenerateVideo: vi.fn(), handleDeleteShotGroup: vi.fn(),
+        handleUpdateToLatestVideo: vi.fn(), handleShotGroupUnpin: vi.fn(), handleShotGroupSwitchToFinalVideo: vi.fn(),
+        handleShotGroupSwitchToImages: vi.fn(),
+      }) }));
+      vi.doMock('@/tools/video-editor/lib/shot-group-pack-commands.ts', () => ({
+        duplicateShotGroup: vi.fn(), promotePrimaryVariant: vi.fn(),
+      }));
+      vi.doMock('@/integrations/astrid/client.ts', () => ({ AstridLocalClient: class {} }));
+      vi.doMock('@/tools/video-editor/components/TimelineEditor/TimelineEditorCore.tsx', () => ({
+        resolveSelectedGenerationIdsForShotCreation: () => ({ canCreateShot: false, generationIds: [] }),
+        TimelineEditorCore: (props: { onShotGroupDuplicate?: (group: { shotId: string; trackId: string; canonicalIdentity?: unknown }) => void }) => React.createElement(
+          'button', { type: 'button', onClick: () => { void props.onShotGroupDuplicate?.({
+            shotId: h.occurrence.shotId, trackId: 'V1', canonicalIdentity: h.occurrence,
+          }); } }, 'Duplicate canonical occurrence',
+        ),
+      }));
+      vi.doMock('@/tools/video-editor/lib/generation-utils.ts', () => ({ duplicateGenerationAsset: vi.fn() }));
+      vi.doMock('@/tools/travel-between-images/components/VideoGenerationModal.tsx', () => ({ VideoGenerationModal: () => null }));
+      vi.doMock('@/tools/travel-between-images/pages/LocalTimelineShotBrowser.tsx', () => ({ LocalTimelineShotBrowser: () => null }));
+      vi.doMock('@/shared/components/ui/runtime/sonner.tsx', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+      vi.doMock('@/shared/lib/errorHandling/runtimeError.ts', () => ({ normalizeAndPresentError: vi.fn() }));
+
+      const { ReighTimelineEditor } = await import('@/tools/video-editor/components/ReighTimelineEditor.tsx');
+      const view = render(React.createElement(ReighTimelineEditor));
+      unmount = () => view.unmount();
+      fireEvent.click(screen.getByRole('button', { name: 'Duplicate canonical occurrence' }));
+
+      await waitFor(() => expect(h.wire.some((exchange) => exchange.method === 'POST'
+        && exchange.path.endsWith('/composition-revisions'))).toBe(true));
+      const request = h.publicationRequests[0] as {
+        projectId: string; parentDocumentId: string; expectedHeadRevisionId: string | null; graph: ShotCompositionContract;
+      };
+      expect(h.publicationRequests).toHaveLength(1);
+      expect(request).toMatchObject({ projectId: h.graph.project.project_id,
+        parentDocumentId: h.graph.primary_timeline.document_id,
+        expectedHeadRevisionId: h.graph.primary_timeline.head.revision_id });
+      expect(request.graph.occurrences).toHaveLength(originalGraph.occurrences.length + 1);
+      const withoutOrdinal = (row: JsonRecord): JsonRecord => {
+        const { ordinal: _ordinal, ...immutableFields } = row;
+        return immutableFields;
+      };
+      for (const originalOccurrence of originalGraph.occurrences) {
+        const attemptedOccurrence = request.graph.occurrences.find((row) => row.occurrence_id === originalOccurrence.occurrence_id);
+        expect(attemptedOccurrence).toBeDefined();
+        expect(withoutOrdinal(attemptedOccurrence!)).toEqual(withoutOrdinal(originalOccurrence));
+      }
+      expect(request.graph.occurrences.map((row) => row.ordinal))
+        .toEqual(request.graph.occurrences.map((_, index) => index));
+      const originalSourceSiblingIds = originalGraph.occurrences
+        .filter((row) => row.shot_id === h.occurrence.shotId).map((row) => row.occurrence_id);
+      const attemptedSourceSiblingIds = request.graph.occurrences
+        .filter((row) => originalSourceSiblingIds.includes(String(row.occurrence_id)))
+        .map((row) => row.occurrence_id);
+      expect(attemptedSourceSiblingIds).toEqual(originalSourceSiblingIds);
+      const newOccurrence = request.graph.occurrences.find((row) => !originalGraph.occurrences.some((existing) => existing.occurrence_id === row.occurrence_id));
+      expect(newOccurrence).toBeDefined();
+      expect(newOccurrence?.shot_id).toMatch(new RegExp(`^${h.occurrence.shotId}-copy-`));
+      expect(newOccurrence?.revision_id).toMatch(new RegExp(`^${h.occurrence.revisionId}-copy-`));
+      expect(newOccurrence?.occurrence_id).toMatch(new RegExp(`^${h.occurrence.occurrenceId}-copy-`));
+      expect(request.graph.shot_revisions).toHaveLength(originalGraph.shot_revisions.length + 1);
+      for (const originalRevision of originalGraph.shot_revisions) {
+        expect(request.graph.shot_revisions.find((row) => row.shot_id === originalRevision.shot_id
+          && row.revision_id === originalRevision.revision_id)).toEqual(originalRevision);
+      }
+      expect(request.graph.shot_revisions.find((row) => row.shot_id === newOccurrence?.shot_id
+        && row.revision_id === newOccurrence?.revision_id)).toMatchObject({ publish: true,
+          internal_timeline_revision: { revision_id: expect.stringMatching(/-timeline-copy-/), publish: true } });
+      expect(h.graph).toEqual(originalGraph);
+
+      const publications = h.wire.filter((exchange) => exchange.method === 'POST'
+        && exchange.path.endsWith('/composition-revisions'));
+      expect(publications).toHaveLength(1);
+      expect(publications[0]).toMatchObject({ status: 503,
+        url: `${h.runtime.apiBaseUrl}/v1/projects/${h.graph.project.project_id}/timelines/${h.graph.primary_timeline.document_id}/composition-revisions` });
+      expect(publications[0]?.headers['Idempotency-Key']).toEqual(expect.any(String));
+      const body = JSON.parse(publications[0]!.bytes!) as Record<string, unknown>;
+      expect(body).toMatchObject({ project_id: h.graph.project.project_id,
+        timeline_id: h.graph.primary_timeline.document_id,
+        expected_head: h.graph.primary_timeline.head.revision_id,
+        parent_composition: { occurrences: expect.arrayContaining([expect.objectContaining({
+          occurrence_id: newOccurrence?.occurrence_id, shot_id: newOccurrence?.shot_id,
+          shot_revision_id: newOccurrence?.revision_id,
+        })]) } });
+      expect(h.wire.filter((exchange) => exchange.method === 'POST' && exchange.path.endsWith('/composition-revisions'))).toHaveLength(1);
+      expect(h.wire.some((exchange) => exchange.method === 'POST' && exchange.path.endsWith('/commit'))).toBe(false);
+      expect(h.wire.some((exchange) => exchange.method === 'GET' && exchange.path.includes('/composition-revisions/'))).toBe(false);
+      expect(refetchShots).not.toHaveBeenCalled();
+      writeX0HarnessEvidence('case10-canonical-duplicate-handler-http.json', {
+        action: 'ReighTimelineEditor.handleDuplicateDocumentShotGroup -> duplicateIndependentShot -> ShotCompositionAdapter.publish -> RuntimeDataProvider.shotComposition.publish',
+        route_selection: 'canonicalIdentity branch; TimelineEditorCore is a minimal button mock, while ReighTimelineEditor handler, graph duplicator, shot-composition adapter and RuntimeDataProvider transport path are actual App modules',
+        fixture: { project_id: h.graph.project.project_id, parent_document_id: h.graph.primary_timeline.document_id,
+          base_head_revision_id: h.graph.primary_timeline.head.revision_id, source_occurrence_id: h.occurrence.occurrenceId,
+          source_shot_id: h.occurrence.shotId, same_shot_siblings: originalGraph.occurrences
+            .filter((row) => row.shot_id === h.occurrence.shotId).map((row) => row.occurrence_id) },
+        attempted_publication: { request: h.publicationRequests[0], http: publications[0], retries: 0,
+          response_label: 'synthetic test transport refusal before acceptance' },
+        no_effect: { original_graph_unchanged: isDeepStrictEqual(h.graph, originalGraph),
+          original_occurrence_fields_preserved_except_reordered_ordinals: originalGraph.occurrences.every((row) => {
+            const attempted = request.graph.occurrences.find((candidate) => candidate.occurrence_id === row.occurrence_id);
+            return Boolean(attempted && isDeepStrictEqual(withoutOrdinal(attempted), withoutOrdinal(row)));
+          }),
+          attempted_ordinals_match_sorted_positions: request.graph.occurrences.every((row, index) => row.ordinal === index),
+          source_sibling_relative_order_preserved: isDeepStrictEqual(attemptedSourceSiblingIds, originalSourceSiblingIds),
+          publication_attempts: publications.length, accepted_revision: null, exact_readback: null,
+          refetch_shots_calls: refetchShots.mock.calls.length },
+        exercised_level: { reigh_timeline_editor_rendered: true, timeline_editor_core_mocked: true,
+          runtime_provider_actual: true, synthetic_transport: true, live_runtime_capture: false,
+          acceptance_claimed: false },
+      });
+    } finally {
+      unmount?.();
+      for (const moduleId of mockedModules) vi.doUnmock(moduleId);
+    }
+  });
+
+  it('case 10 restore-history emits the App semantic COMMIT request and records a terminal refusal without acceptance', async () => {
+    const wire: Array<{ method: string; path: string; url: string; bytes?: string; headers: Record<string, string>; status?: number; response?: string }> = [];
+    const projectId = 'case10-restore-project';
+    const baseUrl = 'http://case10-runtime.fixture';
+    const json = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
+    const transport: Transport = async (method, path, headers, body) => {
+      const exchange: typeof wire[number] = { method, path, url: `${baseUrl}${path}`, headers: { ...headers } };
+      if (typeof body === 'string') exchange.bytes = body;
+      else if (body && typeof (body as Blob).text === 'function') exchange.bytes = await (body as Blob).text();
+      else if (ArrayBuffer.isView(body)) exchange.bytes = new TextDecoder().decode(body as Uint8Array);
+      if (path === '/v1/health') {
+        exchange.status = 200;
+        exchange.response = JSON.stringify({ status: 'ok', protocol: 'workspace.v1', schema_digest: RUNTIME_SCHEMA_DIGEST, runtime_epoch: 1 });
+        wire.push(exchange);
+        return { status: 200, headers: {}, body: json(JSON.parse(exchange.response)) };
+      }
+      if (path === '/v1/handshake') {
+        exchange.status = 200;
+        exchange.response = JSON.stringify({ protocol: 'workspace.v1', schema_digest: RUNTIME_SCHEMA_DIGEST,
+          session_id: 'case10-session', actor_id: 'reigh-product-connector', realm_id: 'case10-realm',
+          scopes: RUNTIME_CLIENT_SCOPES, capabilities: [RUNTIME_TARGETED_EXECUTION_CAPABILITY] });
+        wire.push(exchange);
+        return { status: 200, headers: {}, body: json(JSON.parse(exchange.response)) };
+      }
+      if (path === '/v1/realm') {
+        exchange.status = 200;
+        exchange.response = JSON.stringify({ realm_id: 'case10-realm' });
+        wire.push(exchange);
+        return { status: 200, headers: {}, body: json(JSON.parse(exchange.response)) };
+      }
+      if (method === 'POST' && path.endsWith('/commit')) {
+        exchange.status = 503;
+        exchange.response = JSON.stringify({ code: 'unavailable', message: 'Harness refuses before semantic acceptance' });
+        wire.push(exchange);
+        return { status: 503, headers: {}, body: json(JSON.parse(exchange.response)) };
+      }
+      wire.push(exchange);
+      throw new Error(`Unexpected restore-history transport ${method} ${path}`);
+    };
+    const runtime = new RuntimeDataProvider({ projectId, baseUrl, transport, commitRouting: { enabled: true } });
+    const requestId = 'case10-restore-request-1';
+
+    await expect(runtime.shotComposition.restoreHistory!({
+      projectId, parentDocumentId: 'case10-parent', expectedHead: 'case10-head-0',
+      expectedPublicationId: 'case10-publication-0', revisionId: 'case10-history-revision',
+      publicationId: 'case10-history-publication', contentDigest: `sha256:${'b'.repeat(64)}`, requestId,
+    })).rejects.toThrow();
+
+    const commit = wire.find((exchange) => exchange.method === 'POST' && exchange.path.endsWith('/commit'));
+    writeX0HarnessEvidence('case10-restore-history-http.json', {
+      action: 'RuntimeDataProvider.shotComposition.restoreHistory',
+      fixture: { project_id: projectId, timeline_id: 'case10-parent', base_revision_id: 'case10-head-0',
+        selected_revision_id: 'case10-history-revision' },
+      wire,
+    });
+    expect(commit).toMatchObject({ status: 503, url: `${baseUrl}/astrid/v1/projects/${projectId}/timelines/case10-parent/commit` });
+    expect(commit?.bytes).toBeTruthy();
+    const request = JSON.parse(commit!.bytes!) as Record<string, unknown>;
+    expect(request).toMatchObject({ project_id: projectId, timeline_id: 'case10-parent',
+      base_revision_id: 'case10-head-0', request_id: requestId,
+      change: { commands: [{ op: 'timeline.restore', args: { revision_id: 'case10-history-revision',
+        content_digest: `sha256:${'b'.repeat(64)}`, publication_id: 'case10-history-publication' } }] } });
+    expect(commit?.headers['Idempotency-Key']).toBe(requestId);
+    expect(request.session_id).toEqual(expect.any(String));
+    expect(String(request.session_id).length).toBeGreaterThan(0);
+    expect(request).toHaveProperty('session_sequence');
+    expect(wire.filter((exchange) => exchange.method === 'POST' && exchange.path.endsWith('/commit'))).toHaveLength(1);
+    expect(wire.some((exchange) => exchange.method === 'GET' && exchange.path.includes('/composition-revisions/'))).toBe(false);
+  });
+});
