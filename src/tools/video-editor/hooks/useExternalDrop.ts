@@ -20,7 +20,14 @@ import {
 } from '@/tools/video-editor/lib/timeline-asset-plans.ts';
 import type { DragCoordinator } from '@/tools/video-editor/hooks/useDragCoordinator.ts';
 import { buildAssetDropEdit } from '@/tools/video-editor/lib/timeline-asset-plans.ts';
-import type { UseAssetManagementResult } from '@/tools/video-editor/hooks/useAssetManagement.ts';
+import {
+  prepareGenerationAssetForDrop as resolveGenerationDropAsset,
+} from '@/tools/video-editor/hooks/useAssetManagement.ts';
+import type {
+  ManagedOutputDropBinding,
+  UseAssetManagementResult,
+} from '@/tools/video-editor/hooks/useAssetManagement.ts';
+import type { DataProvider } from '@/tools/video-editor/data/DataProvider.ts';
 import { useVideoEditorRuntime } from '@/tools/video-editor/contexts/VideoEditorRuntimeContext.tsx';
 import type {
   TimelineApplyEdit,
@@ -47,6 +54,8 @@ import type { Shot } from '@/domains/generation/types/index.ts';
 import type { ShotFinalVideo } from '@/tools/video-editor/hooks/useFinalVideoAvailable.ts';
 import type { TimelineStoreApi } from '@/tools/video-editor/hooks/timelineStore.ts';
 
+type PreparedGenerationDropData = Exclude<Parameters<UseAssetManagementResult['prepareGenerationAsset']>[0], null>;
+
 async function resolveFinalVideoDurationSecondsWithRetry(
   finalVideo: Parameters<typeof resolveFinalVideoDurationSeconds>[0],
   assets?: TimelineData['registry']['assets'],
@@ -71,6 +80,8 @@ async function dispatchTimelineDrop({
   resolveAssetUrl,
   registerGenerationAsset,
   prepareGenerationAsset,
+  projectId,
+  provider,
   uploadImageGeneration,
   uploadVideoGeneration,
   dropAsset,
@@ -92,6 +103,8 @@ async function dispatchTimelineDrop({
   resolveAssetUrl: (file: string) => Promise<string>;
   registerGenerationAsset: UseAssetManagementResult['registerGenerationAsset'];
   prepareGenerationAsset?: UseAssetManagementResult['prepareGenerationAsset'];
+  projectId: string | null;
+  provider: DataProvider;
   uploadImageGeneration: UseAssetManagementResult['uploadImageGeneration'];
   uploadVideoGeneration: UseAssetManagementResult['uploadVideoGeneration'];
   dropAsset: UseAssetManagementResult['handleAssetDrop'];
@@ -100,9 +113,23 @@ async function dispatchTimelineDrop({
   onAssetDropError?: (error: unknown) => void;
   handleAddTextAt?: (trackId: string, time: number) => void;
   shots: Shot[] | undefined;
-  finalVideoMap: Map<string, { id: string; location: string; thumbnailUrl: string | null; durationSeconds?: number | null }>;
+  finalVideoMap: Map<string, ShotFinalVideo & { managedOutput?: ManagedOutputDropBinding }>;
 }) {
   const insertAtTop = Boolean(dropPosition.isNewTrackTop);
+  const selectionBase = dataRef.current;
+  const prepareGenerationAssetForDrop = prepareGenerationAsset
+    ? (generationData: PreparedGenerationDropData,
+      options?: { managedOutput?: ManagedOutputDropBinding; expectedGenerationId?: string | null; expectedVariantId?: string | null }) => (
+      resolveGenerationDropAsset({
+        generationData,
+        currentData: selectionBase,
+        projectId,
+        provider,
+        prepareGenerationAsset,
+        ...options,
+      })
+    )
+    : undefined;
 
   if (event.dataTransfer.types.includes('text-tool')) {
     handleTextToolDrop({ dataRef, dropPosition, insertAtTop, handleAddTextAt });
@@ -141,6 +168,59 @@ async function dispatchTimelineDrop({
   if (shotData) {
     const finalVideo = finalVideoMap.get(shotData.shotId);
     if (finalVideo) {
+      const capturedData = dataRef.current;
+      const managedOutput = finalVideo.managedOutput;
+      if (managedOutput || finalVideo.selectedMedia) {
+        if (!capturedData || !prepareGenerationAssetForDrop) {
+          return;
+        }
+
+        const assetDurationSeconds = await resolveFinalVideoDurationSecondsWithRetry(
+          finalVideo,
+          capturedData.registry.assets,
+        );
+        if (dataRef.current !== capturedData) {
+          return;
+        }
+        const durationContract = getFinalVideoDropDurationContract(assetDurationSeconds);
+        const generationData = {
+          generationId: finalVideo.variantFetchGenerationId
+            ?? finalVideo.selectedMedia?.generation_id
+            ?? finalVideo.id,
+          variantId: finalVideo.selectedMedia?.variant_id,
+          assetId: finalVideo.selectedMedia?.asset,
+          variantType: 'video',
+          mediaId: finalVideo.id,
+          ...(finalVideo.selectedMedia ? { selectedMedia: finalVideo.selectedMedia } : {}),
+          imageUrl: finalVideo.location,
+          thumbUrl: finalVideo.thumbnailUrl ?? finalVideo.location,
+          ...(typeof durationContract.assetDurationSeconds === 'number'
+            ? { durationSeconds: durationContract.assetDurationSeconds }
+            : {}),
+          metadata: { content_type: 'video/mp4' },
+        };
+        const preparedAsset = await prepareGenerationAssetForDrop(generationData, {
+          ...(managedOutput ? { managedOutput } : {}),
+          expectedGenerationId: finalVideo.variantFetchGenerationId,
+          expectedVariantId: finalVideo.selectedMedia?.variant_id,
+        });
+        if (!preparedAsset || dataRef.current !== capturedData) {
+          return;
+        }
+
+        dropAsset(
+          preparedAsset.assetKey,
+          dropPosition.isNewTrack ? undefined : dropPosition.trackId,
+          dropPosition.time,
+          dropPosition.isNewTrack,
+          insertAtTop,
+          preparedAsset,
+          undefined,
+          { pinnedShotGroup: { shotId: shotData.shotId, mode: 'video' } },
+        );
+        return;
+      }
+
       const assetDurationSeconds = await resolveFinalVideoDurationSecondsWithRetry(finalVideo, dataRef.current?.registry.assets);
       const durationContract = getFinalVideoDropDurationContract(assetDurationSeconds);
       const registrationPlan = planFinalVideoGenerationAssetRegistration({
@@ -415,13 +495,14 @@ async function dispatchTimelineDrop({
 
   const multiGenerationData = getMultiGenerationDropData(event);
   if (multiGenerationData?.length) {
-    handleMultiGenerationDrop({
+    await handleMultiGenerationDrop({
       generationItems: multiGenerationData,
       dataRef,
       dropPosition,
       insertAtTop,
       registerGenerationAsset,
       prepareGenerationAsset,
+      prepareGenerationAssetForDrop,
       selectedTrackId,
       dropAsset,
     });
@@ -430,13 +511,14 @@ async function dispatchTimelineDrop({
 
   const generationData = getGenerationDropData(event);
   if (generationData) {
-    handleSingleGenerationDrop({
+    await handleSingleGenerationDrop({
       generationData,
       dataRef,
       dropPosition,
       insertAtTop,
       registerGenerationAsset,
       prepareGenerationAsset,
+      prepareGenerationAssetForDrop,
       selectedTrackId,
       dropAsset,
     });
@@ -642,6 +724,8 @@ export function useExternalDrop({
       resolveAssetUrl,
       registerGenerationAsset,
       prepareGenerationAsset,
+      projectId: runtime.project.projectId,
+      provider: runtime.provider,
       uploadImageGeneration,
       uploadVideoGeneration,
       dropAsset,
@@ -673,6 +757,8 @@ export function useExternalDrop({
     directAssetUploadAllFiles,
     mediaImportForImageVideo,
     runtime.timelineEditability,
+    runtime.project.projectId,
+    runtime.provider,
     runtime.toast,
     shots,
     finalVideoMap,

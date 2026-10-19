@@ -30,12 +30,14 @@ import {
   planAssetDropTarget,
   planGenerationAssetRegistration,
 } from '@/tools/video-editor/lib/timeline-asset-plans.ts';
+import { buildPinnedShotGroupsOverride } from '@/tools/video-editor/lib/shot-group-commands.ts';
 import type {
   TimelineApplyEdit,
   TimelineInvalidateAssetRegistry,
   TimelinePatchRegistry,
 } from '@/tools/video-editor/hooks/timeline-state-types.ts';
 import type { TimelineStoreApi } from '@/tools/video-editor/hooks/timelineStore.ts';
+import type { SelectedProjectMediaIdentity } from '@/shared/contracts/selectedProjectMedia.ts';
 
 type UploadedGenerationData = GenerationDropData & {
   assetId?: string;
@@ -84,7 +86,214 @@ export interface UseAssetManagementResult {
     insertAtTop?: boolean,
     preparedAsset?: TimelineProvisionedAsset,
     removeClipId?: string,
+    options?: { pinnedShotGroup?: { shotId: string; mode: 'video' } },
   ) => boolean;
+}
+
+type GenerationDropSelectionProvider = {
+  getProjectMediaSelection?: (request: {
+    projectId: string;
+    asset: string;
+    generationId: string;
+    variantId: string;
+  }) => Promise<SelectedProjectMediaIdentity>;
+  getProjectMediaSelectionForOutput?: (request: {
+    projectId: string;
+    association_id: string;
+    object_id: string;
+    version: number;
+  }) => Promise<SelectedProjectMediaIdentity>;
+};
+
+export type ManagedOutputDropBinding = {
+  project_id: string | null;
+  association_id: string;
+  object_id: string;
+  version: number;
+};
+
+const selectedMediaIdentityFields = [
+  'asset',
+  'generation_id',
+  'variant_id',
+  'object_id',
+  'catalog_digest',
+] as const;
+
+function sameSelectedMediaIdentity(left: unknown, right: unknown): boolean {
+  const leftIdentity = readSelectedProjectMediaIdentity(left);
+  const rightIdentity = readSelectedProjectMediaIdentity(right);
+  return Boolean(leftIdentity && rightIdentity && selectedMediaIdentityFields.every((field) => (
+    leftIdentity[field] === rightIdentity[field]
+  )));
+}
+
+function findRegisteredGenerationSource(
+  currentData: TimelineData | null,
+  generationData: UploadedGenerationData,
+): { assetId: string; variantId: string; mediaId?: string }[] {
+  return Object.entries(currentData?.registry.assets ?? {})
+    .filter(([, entry]) => entry.generationId === generationData.generationId
+      && (!generationData.variantId || entry.variantId === generationData.variantId)
+      && (!generationData.mediaId || entry.media_id === generationData.mediaId))
+    .flatMap(([assetId, entry]) => typeof entry.variantId === 'string' && entry.variantId.length > 0
+      ? [{ assetId, variantId: entry.variantId, ...(typeof entry.media_id === 'string' ? { mediaId: entry.media_id } : {}) }]
+      : []);
+}
+
+/**
+ * Resolve a drop's existing Runtime selection before it becomes a prepared
+ * asset. `undefined` means this caller has no bound selector capability and
+ * may keep its legacy placement; `null` means a bound request was refused.
+ */
+export async function prepareGenerationAssetForDrop({
+  generationData,
+  currentData,
+  projectId,
+  provider,
+  prepareGenerationAsset,
+  managedOutput,
+  expectedGenerationId,
+  expectedVariantId,
+}: {
+  generationData: UploadedGenerationData;
+  currentData: TimelineData | null;
+  projectId: string | null;
+  provider: GenerationDropSelectionProvider;
+  prepareGenerationAsset: (data: UploadedGenerationData | null) => TimelineProvisionedAsset | null;
+  managedOutput?: ManagedOutputDropBinding;
+  expectedGenerationId?: string | null;
+  expectedVariantId?: string | null;
+}): Promise<TimelineProvisionedAsset | null | undefined> {
+  const attachedValue = generationData.selectedMedia;
+  const attachedSelection = attachedValue === undefined
+    ? null
+    : readSelectedProjectMediaIdentity(attachedValue);
+  if (attachedValue !== undefined && !attachedSelection) {
+    return null;
+  }
+  if (projectId && currentData?.head?.projectId && currentData.head.projectId !== projectId) {
+    return null;
+  }
+
+  if (managedOutput) {
+    if (!projectId || managedOutput.project_id !== projectId
+      || !managedOutput.association_id
+      || managedOutput.object_id !== generationData.mediaId
+      || !Number.isSafeInteger(managedOutput.version) || managedOutput.version < 1
+      || (expectedGenerationId && attachedSelection
+        && attachedSelection.generation_id !== expectedGenerationId)
+      || (expectedVariantId && attachedSelection
+        && attachedSelection.variant_id !== expectedVariantId)) {
+      return null;
+    }
+
+    const selectOutput = provider.getProjectMediaSelectionForOutput;
+    if (!selectOutput) {
+      return null;
+    }
+
+    let selectedMedia: SelectedProjectMediaIdentity;
+    try {
+      selectedMedia = await selectOutput.call(provider, {
+        projectId,
+        association_id: managedOutput.association_id,
+        object_id: managedOutput.object_id,
+        version: managedOutput.version,
+      });
+    } catch {
+      return null;
+    }
+
+    const identity = readSelectedProjectMediaIdentity(selectedMedia);
+    if (!identity || identity.object_id !== managedOutput.object_id
+      || (expectedGenerationId && identity.generation_id !== expectedGenerationId)
+      || (expectedVariantId && identity.variant_id !== expectedVariantId)
+      || (generationData.assetId && identity.asset !== generationData.assetId)
+      || (attachedSelection && !sameSelectedMediaIdentity(attachedSelection, selectedMedia))) {
+      return null;
+    }
+
+    const prepared = prepareGenerationAsset({
+      ...generationData,
+      assetId: identity.asset,
+      generationId: identity.generation_id,
+      variantId: identity.variant_id,
+      mediaId: identity.object_id,
+      selectedMedia,
+    });
+    return prepared?.selectedMedia === selectedMedia && prepared.assetKey === identity.asset
+      ? prepared
+      : null;
+  }
+
+  const registeredSources = findRegisteredGenerationSource(currentData, {
+    ...generationData,
+    variantId: generationData.variantId ?? attachedSelection?.variant_id,
+    mediaId: generationData.mediaId ?? attachedSelection?.object_id,
+  });
+  if (registeredSources.length > 1) {
+    return null;
+  }
+  const registeredSource = registeredSources[0];
+  if (registeredSource && (
+    (generationData.assetId && generationData.assetId !== registeredSource.assetId)
+    || (attachedSelection && (
+      attachedSelection.asset !== registeredSource.assetId
+      || attachedSelection.generation_id !== generationData.generationId
+      || attachedSelection.variant_id !== registeredSource.variantId
+      || (registeredSource.mediaId && attachedSelection.object_id !== registeredSource.mediaId)
+    ))
+  )) {
+    return null;
+  }
+
+  const requestedAsset = registeredSource?.assetId ?? generationData.assetId ?? attachedSelection?.asset;
+  const requestedGeneration = generationData.generationId;
+  const requestedVariant = generationData.variantId ?? attachedSelection?.variant_id ?? registeredSource?.variantId;
+  const requestedObject = generationData.mediaId ?? attachedSelection?.object_id ?? registeredSource?.mediaId;
+  const claimsBinding = attachedValue !== undefined || Boolean(generationData.assetId || generationData.mediaId);
+
+  if (!provider.getProjectMediaSelection) {
+    return claimsBinding ? null : undefined;
+  }
+
+  if (!requestedAsset || (!registeredSource && !attachedSelection)
+    || !projectId || !requestedGeneration || !requestedVariant) {
+    return null;
+  }
+
+  let selectedMedia: SelectedProjectMediaIdentity;
+  try {
+    selectedMedia = await provider.getProjectMediaSelection({
+      projectId,
+      asset: requestedAsset,
+      generationId: requestedGeneration,
+      variantId: requestedVariant,
+    });
+  } catch {
+    return null;
+  }
+
+  const identity = readSelectedProjectMediaIdentity(selectedMedia);
+  if (!identity || identity.asset !== requestedAsset
+    || identity.generation_id !== requestedGeneration
+    || identity.variant_id !== requestedVariant
+    || (requestedObject && identity.object_id !== requestedObject)
+    || (attachedSelection && !sameSelectedMediaIdentity(attachedSelection, selectedMedia))) {
+    return null;
+  }
+
+  const prepared = prepareGenerationAsset({
+    ...generationData,
+    assetId: requestedAsset,
+    variantId: requestedVariant,
+    mediaId: requestedObject ?? identity.object_id,
+    selectedMedia,
+  });
+  return prepared?.selectedMedia === selectedMedia && prepared.assetKey === identity.asset
+    ? prepared
+    : null;
 }
 
 export interface AssetDropTargetResolution {
@@ -101,6 +310,8 @@ export function buildPlacePreparedMediaCommand({
   forceNewTrack,
   insertAtTop,
   removeClipId,
+  clipId,
+  pinnedShotGroupsOverride,
 }: {
   prepared: TimelineProvisionedAsset;
   trackId?: string;
@@ -109,6 +320,8 @@ export function buildPlacePreparedMediaCommand({
   forceNewTrack: boolean;
   insertAtTop: boolean;
   removeClipId?: string;
+  clipId?: string;
+  pinnedShotGroupsOverride?: NonNullable<TimelineData['config']['pinnedShotGroups']>;
 }): PlacePreparedMediaCommand {
   return {
     type: 'place-prepared-media',
@@ -120,6 +333,8 @@ export function buildPlacePreparedMediaCommand({
       forceNewTrack,
       insertAtTop,
       ...(removeClipId !== undefined ? { removeClipId } : {}),
+      ...(clipId !== undefined ? { clipId } : {}),
+      ...(pinnedShotGroupsOverride ? { pinnedShotGroupsOverride } : {}),
     },
   };
 }
@@ -290,6 +505,7 @@ export function useAssetManagement({
     forceNewTrack: boolean,
     insertAtTop: boolean,
     removeClipId?: string,
+    options?: { pinnedShotGroup?: { shotId: string; mode: 'video' } },
   ) => {
     const latestDataRef = getDataRef();
     const current = latestDataRef.current;
@@ -320,8 +536,39 @@ export function useAssetManagement({
       return false;
     }
 
-    const insertedClip = preview.nextData.config.clips.find((clip) => clip.id === clipId);
-    const track = current.config.tracks?.find((candidate) => candidate.id === resolvedTrackId);
+    const pinnedShotGroupsOverride = options?.pinnedShotGroup
+      ? buildPinnedShotGroupsOverride(preview.nextData, {
+          shotId: options.pinnedShotGroup.shotId,
+          trackId: resolvedTrackId,
+          clipIds: [clipId],
+          mode: options.pinnedShotGroup.mode,
+          ...(options.pinnedShotGroup.mode === 'video' ? { videoAssetKey: prepared.assetKey } : {}),
+        })
+      : undefined;
+    const preparedMediaCommand = pinnedShotGroupsOverride
+      ? buildPlacePreparedMediaCommand({
+          prepared,
+          trackId,
+          selectedTrackId: getSelectedTrackId(),
+          time,
+          forceNewTrack,
+          insertAtTop,
+          removeClipId,
+          clipId,
+          pinnedShotGroupsOverride,
+        })
+      : command;
+    const preparedMediaPreview = preparedMediaCommand === command
+      ? preview
+      : previewPreparedMediaCommand(current, preparedMediaCommand);
+    if (!preparedMediaPreview?.commandResult?.detail
+      || preparedMediaPreview.commandResult.detail.clipId !== clipId
+      || preparedMediaPreview.commandResult.detail.trackId !== resolvedTrackId) {
+      return false;
+    }
+
+    const insertedClip = preparedMediaPreview.nextData.config.clips.find((clip) => clip.id === clipId);
+    const track = preparedMediaPreview.nextData.config.tracks?.find((candidate) => candidate.id === resolvedTrackId);
     const insertedDuration = insertedClip && typeof insertedClip.hold === 'number'
       ? insertedClip.hold
       : insertedClip && typeof insertedClip.from === 'number' && typeof insertedClip.to === 'number'
@@ -345,7 +592,11 @@ export function useAssetManagement({
         })
       : undefined;
 
-    getApplyEdit()({ type: 'prepared-media', command }, {
+    if (prepared.selectedMedia && !editCommand) {
+      return false;
+    }
+
+    getApplyEdit()({ type: 'prepared-media', command: preparedMediaCommand }, {
       selectedClipId: clipId,
       selectedTrackId: resolvedTrackId,
       semantic: true,
@@ -354,9 +605,9 @@ export function useAssetManagement({
     return true;
   }, [getApplyEdit, getDataRef, getSelectedTrackId]);
 
-  const handleAssetDrop = useCallback((assetKey: string, trackId: string | undefined, time: number, forceNewTrack = false, insertAtTop = false, preparedAsset?: TimelineProvisionedAsset, removeClipId?: string) => {
+  const handleAssetDrop = useCallback((assetKey: string, trackId: string | undefined, time: number, forceNewTrack = false, insertAtTop = false, preparedAsset?: TimelineProvisionedAsset, removeClipId?: string, options?: { pinnedShotGroup?: { shotId: string; mode: 'video' } }) => {
     if (preparedAsset) {
-      return placePreparedAsset(preparedAsset, trackId, time, forceNewTrack, insertAtTop, removeClipId);
+      return placePreparedAsset(preparedAsset, trackId, time, forceNewTrack, insertAtTop, removeClipId, options);
     }
 
     const latestDataRef = getDataRef();

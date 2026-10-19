@@ -197,6 +197,7 @@ describe('useAssetManagement Runtime media imports', () => {
     });
     expect(editCommand.expect).toEqual({
       [`${editCommand.created[0]}::`]: { state: 'absent' },
+      'parent::registry.assets.asset-selected': { state: 'absent' },
     });
   });
 

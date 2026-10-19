@@ -10,6 +10,7 @@ import {
 } from '@/shared/lib/dnd/dragDrop';
 import { useExternalDrop } from './useExternalDrop';
 import { AstridBridgeDataProvider } from '@/tools/video-editor/data/AstridBridgeDataProvider';
+import type { TimelineData } from '@/tools/video-editor/lib/timeline-data.ts';
 
 const mockUseShots = vi.fn(() => ({
   shots: undefined,
@@ -25,6 +26,7 @@ const mockExtractVideoMetadataFromUrl = vi.fn();
 const mockToastError = vi.fn();
 const mockRuntime = {
   provider: { persistenceEnabled: true },
+  project: { projectId: null as string | null },
   timelineEditability: undefined as {
     checkTimeline?: () => { allowed: boolean; reason?: 'timeline_read_only' };
   } | undefined,
@@ -182,6 +184,7 @@ afterEach(() => {
   mockExtractVideoMetadataFromUrl.mockReset();
   mockToastError.mockReset();
   mockRuntime.provider = { persistenceEnabled: true };
+  mockRuntime.project.projectId = null;
   mockRuntime.timelineEditability = undefined;
 });
 
@@ -1642,5 +1645,320 @@ describe('useExternalDrop', () => {
     });
 
     expect(handleAddTextAt).toHaveBeenCalledWith('V1', 12);
+  });
+
+  it('refuses a registered generation drop before mutation when Runtime selection refuses it', async () => {
+    mockRuntime.project.projectId = 'project-1';
+    const getProjectMediaSelection = vi.fn().mockRejectedValue(new Error('stale generation selection'));
+    mockRuntime.provider = { persistenceEnabled: true, getProjectMediaSelection };
+    const initialData = makeDropTestData();
+    initialData.registry.assets['asset-1'] = {
+      file: 'https://example.com/video.mp4',
+      type: 'video/mp4',
+      duration: 3,
+      generationId: 'generation-1',
+      variantId: 'variant-1',
+      media_id: 'object-1',
+    } as never;
+    const dataRef = { current: initialData } as unknown as React.MutableRefObject<TimelineData | null>;
+    const registerGenerationAsset = vi.fn();
+    const prepareGenerationAsset = vi.fn();
+    const handleAssetDrop = vi.fn();
+    const applyEdit = vi.fn();
+    const coordinator = {
+      update: vi.fn(),
+      showSecondaryGhosts: vi.fn(),
+      end: vi.fn(),
+      lastPosition: {
+        time: 12,
+        rowIndex: 0,
+        trackId: 'V1',
+        trackKind: 'visual',
+        trackName: 'V1',
+        isNewTrack: false,
+        isNewTrackTop: false,
+        isReject: false,
+        newTrackKind: null,
+        screenCoords: { rowTop: 0, rowLeft: 0, rowWidth: 0, rowHeight: 0, clipLeft: 0, clipWidth: 0, ghostCenter: 0 },
+      },
+      editAreaRef: { current: null },
+    };
+    const { result } = renderHook(() => useExternalDrop({
+      dataRef,
+      pendingOpsRef: { current: 0 },
+      scale: 1,
+      scaleWidth: 1,
+      selectedTrackId: 'V1',
+      applyEdit,
+      invalidateAssetRegistry: vi.fn(),
+      resolveAssetUrl: vi.fn(),
+      coordinator,
+      registerGenerationAsset,
+      prepareGenerationAsset,
+      uploadImageGeneration: vi.fn(),
+      uploadVideoGeneration: vi.fn(),
+      handleAssetDrop,
+      finalVideoMap: new Map(),
+    }));
+    const payload = createStoredDragPayload([{
+      generationId: 'generation-1',
+      variantId: 'variant-1',
+      variantType: 'video',
+      mediaId: 'object-1',
+      imageUrl: 'https://example.com/video.mp4',
+    }]);
+
+    await act(async () => {
+      await result.current.onTimelineDrop(createDropEvent(payload));
+    });
+
+    expect(getProjectMediaSelection).toHaveBeenCalledExactlyOnceWith({
+      projectId: 'project-1',
+      asset: 'asset-1',
+      generationId: 'generation-1',
+      variantId: 'variant-1',
+    });
+    expect(prepareGenerationAsset).not.toHaveBeenCalled();
+    expect(registerGenerationAsset).not.toHaveBeenCalled();
+    expect(handleAssetDrop).not.toHaveBeenCalled();
+    expect(applyEdit).not.toHaveBeenCalled();
+    expect(dataRef.current).toBe(initialData);
+  });
+
+  it('keeps legacy generation placement only when the provider lacks selection capability and the drop is unbound', async () => {
+    mockRuntime.project.projectId = 'project-1';
+    mockRuntime.provider = { persistenceEnabled: true };
+    const dataRef = { current: makeDropTestData() } as unknown as React.MutableRefObject<TimelineData | null>;
+    const preparedAsset = {
+      assetKey: 'legacy-asset',
+      mediaType: 'video',
+      durationSeconds: 2,
+      entry: { file: 'https://example.com/video.mp4', type: 'video/mp4', duration: 2 },
+      source: 'registered' as const,
+    };
+    const prepareGenerationAsset = vi.fn().mockReturnValue(preparedAsset);
+    const handleAssetDrop = vi.fn();
+    const coordinator = {
+      update: vi.fn(),
+      showSecondaryGhosts: vi.fn(),
+      end: vi.fn(),
+      lastPosition: {
+        time: 12,
+        rowIndex: 0,
+        trackId: 'V1',
+        trackKind: 'visual',
+        trackName: 'V1',
+        isNewTrack: false,
+        isNewTrackTop: false,
+        isReject: false,
+        newTrackKind: null,
+        screenCoords: { rowTop: 0, rowLeft: 0, rowWidth: 0, rowHeight: 0, clipLeft: 0, clipWidth: 0, ghostCenter: 0 },
+      },
+      editAreaRef: { current: null },
+    };
+    const { result } = renderHook(() => useExternalDrop({
+      dataRef,
+      pendingOpsRef: { current: 0 },
+      scale: 1,
+      scaleWidth: 1,
+      selectedTrackId: 'V1',
+      applyEdit: vi.fn(),
+      invalidateAssetRegistry: vi.fn(),
+      resolveAssetUrl: vi.fn(),
+      coordinator,
+      registerGenerationAsset: vi.fn(),
+      prepareGenerationAsset,
+      uploadImageGeneration: vi.fn(),
+      uploadVideoGeneration: vi.fn(),
+      handleAssetDrop,
+      finalVideoMap: new Map(),
+    }));
+    const payload = createStoredDragPayload([{
+      generationId: 'legacy-generation',
+      variantType: 'video',
+      imageUrl: 'https://example.com/video.mp4',
+    }]);
+
+    await act(async () => {
+      await result.current.onTimelineDrop(createDropEvent(payload));
+    });
+
+    expect(prepareGenerationAsset).toHaveBeenCalledOnce();
+    expect(handleAssetDrop).toHaveBeenCalledWith(
+      'legacy-asset',
+      'V1',
+      12,
+      false,
+      false,
+      preparedAsset,
+    );
+  });
+
+  it('refuses a bound generation drop on project or object mismatch and when selection capability is missing', async () => {
+    mockRuntime.project.projectId = 'project-1';
+    const getProjectMediaSelection = vi.fn();
+    mockRuntime.provider = { persistenceEnabled: true, getProjectMediaSelection };
+    const initialData = makeDropTestData();
+    initialData.head = { projectId: 'other-project', timelineId: 'timeline-1', headRevisionId: 'head-1' };
+    initialData.registry.assets['asset-1'] = {
+      file: 'https://example.com/video.mp4',
+      type: 'video/mp4',
+      duration: 3,
+      generationId: 'generation-1',
+      variantId: 'variant-1',
+      media_id: 'object-1',
+    } as never;
+    const dataRef = { current: initialData } as unknown as React.MutableRefObject<TimelineData | null>;
+    const prepareGenerationAsset = vi.fn();
+    const registerGenerationAsset = vi.fn();
+    const handleAssetDrop = vi.fn();
+    const applyEdit = vi.fn();
+    const coordinator = {
+      update: vi.fn(),
+      showSecondaryGhosts: vi.fn(),
+      end: vi.fn(),
+      lastPosition: {
+        time: 12,
+        rowIndex: 0,
+        trackId: 'V1',
+        trackKind: 'visual',
+        trackName: 'V1',
+        isNewTrack: false,
+        isNewTrackTop: false,
+        isReject: false,
+        newTrackKind: null,
+        screenCoords: { rowTop: 0, rowLeft: 0, rowWidth: 0, rowHeight: 0, clipLeft: 0, clipWidth: 0, ghostCenter: 0 },
+      },
+      editAreaRef: { current: null },
+    };
+    const { result } = renderHook(() => useExternalDrop({
+      dataRef,
+      pendingOpsRef: { current: 0 },
+      scale: 1,
+      scaleWidth: 1,
+      selectedTrackId: 'V1',
+      applyEdit,
+      invalidateAssetRegistry: vi.fn(),
+      resolveAssetUrl: vi.fn(),
+      coordinator,
+      registerGenerationAsset,
+      prepareGenerationAsset,
+      uploadImageGeneration: vi.fn(),
+      uploadVideoGeneration: vi.fn(),
+      handleAssetDrop,
+      finalVideoMap: new Map(),
+    }));
+
+    const dropGeneration = async (mediaId: string, variantId = 'variant-1') => act(async () => {
+      await result.current.onTimelineDrop(createDropEvent(createStoredDragPayload([{
+        generationId: 'generation-1',
+        variantId,
+        variantType: 'video',
+        mediaId,
+        imageUrl: 'https://example.com/video.mp4',
+      }])));
+    });
+
+    await dropGeneration('object-1');
+    expect(getProjectMediaSelection).not.toHaveBeenCalled();
+
+    initialData.head = { projectId: 'project-1', timelineId: 'timeline-1', headRevisionId: 'head-1' };
+    await dropGeneration('object-other');
+    expect(getProjectMediaSelection).not.toHaveBeenCalled();
+    await dropGeneration('object-1', 'variant-other');
+    expect(getProjectMediaSelection).not.toHaveBeenCalled();
+
+    mockRuntime.provider = { persistenceEnabled: true };
+    await dropGeneration('object-1');
+
+    expect(prepareGenerationAsset).not.toHaveBeenCalled();
+    expect(registerGenerationAsset).not.toHaveBeenCalled();
+    expect(handleAssetDrop).not.toHaveBeenCalled();
+    expect(applyEdit).not.toHaveBeenCalled();
+    expect(dataRef.current).toBe(initialData);
+  });
+
+  it('uses the captured managed-output selector and leaves no mutation when it refuses', async () => {
+    mockRuntime.project.projectId = 'project-1';
+    const getProjectMediaSelectionForOutput = vi.fn().mockRejectedValue(new Error('stale output version'));
+    mockRuntime.provider = { persistenceEnabled: true, getProjectMediaSelectionForOutput };
+    mockExtractVideoMetadataFromUrl.mockResolvedValue({ duration_seconds: 2.5 });
+    const objectId = `sha256:${'a'.repeat(64)}`;
+    const output = {
+      project_id: 'project-1',
+      association_id: 'association-1',
+      object_id: objectId,
+      version: 4,
+    };
+    const initialData = makeDropTestData();
+    const dataRef = { current: initialData } as unknown as React.MutableRefObject<TimelineData | null>;
+    const prepareGenerationAsset = vi.fn();
+    const registerGenerationAsset = vi.fn();
+    const handleAssetDrop = vi.fn();
+    const applyEdit = vi.fn();
+    mockUseFinalVideoAvailable.mockReturnValue({
+      finalVideoMap: new Map([['shot-1', {
+        id: objectId,
+        location: 'https://runtime.test/object',
+        thumbnailUrl: null,
+        variantFetchGenerationId: null,
+        managedOutput: output,
+      }]]),
+      dismissFinalVideo: vi.fn(),
+    });
+    const coordinator = {
+      update: vi.fn(),
+      showSecondaryGhosts: vi.fn(),
+      end: vi.fn(),
+      lastPosition: {
+        time: 12,
+        rowIndex: 0,
+        trackId: 'V1',
+        trackKind: 'visual',
+        trackName: 'V1',
+        isNewTrack: false,
+        isNewTrackTop: false,
+        isReject: false,
+        newTrackKind: null,
+        screenCoords: { rowTop: 0, rowLeft: 0, rowWidth: 0, rowHeight: 0, clipLeft: 0, clipWidth: 0, ghostCenter: 0 },
+      },
+      editAreaRef: { current: null },
+    };
+    const { result } = renderHook(() => useExternalDrop({
+      dataRef,
+      pendingOpsRef: { current: 0 },
+      scale: 1,
+      scaleWidth: 1,
+      selectedTrackId: 'V1',
+      applyEdit,
+      invalidateAssetRegistry: vi.fn(),
+      resolveAssetUrl: vi.fn(),
+      coordinator,
+      registerGenerationAsset,
+      prepareGenerationAsset,
+      uploadImageGeneration: vi.fn(),
+      uploadVideoGeneration: vi.fn(),
+      handleAssetDrop,
+      finalVideoMap: mockUseFinalVideoAvailable().finalVideoMap,
+    }));
+
+    await act(async () => {
+      await result.current.onTimelineDrop(createDropEvent(
+        createStoredShotPayload({ shotId: 'shot-1', shotName: 'Shot 1', imageGenerationIds: [] }),
+        ['application/x-shot', 'text/plain'],
+      ));
+    });
+
+    expect(getProjectMediaSelectionForOutput).toHaveBeenCalledExactlyOnceWith({
+      projectId: 'project-1',
+      association_id: 'association-1',
+      object_id: objectId,
+      version: 4,
+    });
+    expect(prepareGenerationAsset).not.toHaveBeenCalled();
+    expect(registerGenerationAsset).not.toHaveBeenCalled();
+    expect(handleAssetDrop).not.toHaveBeenCalled();
+    expect(applyEdit).not.toHaveBeenCalled();
+    expect(dataRef.current).toBe(initialData);
   });
 });
