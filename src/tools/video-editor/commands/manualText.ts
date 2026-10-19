@@ -6,7 +6,7 @@ import { canonicalJsonStringify } from '../data/typed/timelineBundle.ts';
 // Exact declaration from D e30f8d27's generated catalog. Runtime still validates
 // the admitted declaration/resources; this reference grants no execution custody.
 export const MANUAL_TEXT_REF = { id: 'am-type', kind: 'effect', packId: 'astrid_motion',
-  revision: 'sha256:343dc85b09aee328b7f9bdb589082193f6880c3bf113f9d728ecc3bdf7f02ec9' } as const;
+  revision: 'sha256:fd9bdcccf4ee0ffb7f32666de202d5e30617d3be59c68444910a2e7c8de7e047' } as const;
 export const record = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 export const same = (a: unknown, b: unknown) => canonicalJsonStringify(a) === canonicalJsonStringify(b);
 export const tagged = (v: unknown, present = v !== undefined): NonNullable<EditCommand['expect']>[string] =>

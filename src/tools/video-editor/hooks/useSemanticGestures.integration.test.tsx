@@ -5021,7 +5021,7 @@ describe('W41 W42 literal tiny expansion native history', () => {
 });
 
 describe('W34 W35 actual audio detach receipt gap', () => {
-  it.each(['existing-track', 'new-track'] as const)('%s materializes but lacks the created-child root in its actual receipt', async kind => {
+  it.each(['existing-track', 'new-track'] as const)('%s materializes with exact allocated-child and source-volume direct receipts', async kind => {
     const base = await literalLeftData(true);
     const initial = await buildTimelineData({ ...base.config, tracks: [...base.config.tracks!, ...(kind === 'existing-track'
       ? [{ id: 'A1', kind: 'audio' as const, label: 'Audio', app: { opaque: null } }] : [])] }, { assets: { 'left-source': { file: 'https://fixture.test/detach.mp4', type: 'video/mp4', duration: 10 } } }, undefined, 1, undefined, base.head);
@@ -5046,8 +5046,13 @@ describe('W34 W35 actual audio detach receipt gap', () => {
     expect(calls.at(-1)).toMatchObject({ select: 'parent/clip:clip-1', resolved: ['parent/clip:clip-1'], created: [created],
       args: { track: 'A1' }, expect: { '': { state: 'present', value: initial.config.clips[0] } } });
     expect(h.result.current.data!.config.clips.find(clip => clip.id === childId)).toEqual({ ...initial.config.clips[0], id: childId, track: 'A1' });
-    expect(source.plans[0].calls.at(-1)).toMatchObject({ created: [created], authorship: { [`${created}::`]: 'consequence' } });
-    expect(source.plans[0].writes.some(write => write.id === created)).toBe(false);
+    expect(source.plans[0].calls.at(-1)).toMatchObject({ created: [created], authorship: { [`${created}::`]: 'direct', volume: 'direct' } });
+    const expectedWrites = [
+      { id: 'parent/clip:clip-1', path: 'volume', before: { state: 'present', value: 1 }, after: { state: 'present', value: 0 } },
+      { id: created, path: '', before: { state: 'absent' }, after: { state: 'present', value: { ...initial.config.clips[0], id: childId, track: 'A1' } } },
+      ...(kind === 'new-track' ? [{ id: 'parent/track:A1', path: '', before: { state: 'absent' }, after: { state: 'present', value: calls[0].args.track } }] : []),
+    ];
+    expect(source.plans[0].writes).toEqual(expectedWrites);
     expect(source.journal).toBe(1); expect(source.reload).toBe(true); expect(h.requests).toHaveLength(1); expect(h.compatibilityRequests).toEqual([]);
     history.unmount(); h.unmount();
   }, 60_000);

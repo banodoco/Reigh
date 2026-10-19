@@ -7,10 +7,22 @@ import sys
 from pathlib import Path
 
 sdk = Path(os.environ['ASTRID_CHECKOUT'])
-expected = Path('/Users/peteromalley/Documents/reigh-workspace/Astrid/.otto/clones/timeline-r4-portfolio-20261015-Astrid.git/.otto/worktrees/timeline-r4-E-W30-MANUAL-TEXT-CONSUMER-001-SDK-E30-READER-001')
-assert sdk.resolve() == expected.resolve(), 'W30 must use its immutable e30 reader'
-import subprocess
-assert subprocess.check_output(['git', '-C', str(sdk), 'rev-parse', 'HEAD'], text=True).strip() == 'e30f8d27a436299852c536f36bc93abc06d90366'
+binding_keys = ('ASTRID_EXPECTED_SDK_ROOT', 'ASTRID_EXPECTED_SDK_COMMIT', 'ASTRID_EXPECTED_SDK_TREE')
+current_bound = any(key in os.environ for key in binding_keys)
+if current_bound:
+    assert all(os.environ.get(key, '').strip() for key in binding_keys), 'W30 current binding requires expected SDK root, commit and tree'
+    expected = Path(os.environ['ASTRID_EXPECTED_SDK_ROOT'])
+    assert sdk.resolve() == expected.resolve(), 'W30 current SDK root mismatch'
+    import subprocess
+    actual_commit, actual_tree = subprocess.check_output(
+        ['git', '-C', str(sdk), 'rev-parse', 'HEAD', 'HEAD^{tree}'], text=True).splitlines()
+    assert actual_commit == os.environ['ASTRID_EXPECTED_SDK_COMMIT'], 'W30 current SDK commit mismatch'
+    assert actual_tree == os.environ['ASTRID_EXPECTED_SDK_TREE'], 'W30 current SDK tree mismatch'
+else:
+    expected = Path('/Users/peteromalley/Documents/reigh-workspace/Astrid/.otto/clones/timeline-r4-portfolio-20261015-Astrid.git/.otto/worktrees/timeline-r4-E-W30-MANUAL-TEXT-CONSUMER-001-SDK-E30-READER-001')
+    assert sdk.resolve() == expected.resolve(), 'W30 must use its immutable e30 reader'
+    import subprocess
+    assert subprocess.check_output(['git', '-C', str(sdk), 'rev-parse', 'HEAD'], text=True).strip() == 'e30f8d27a436299852c536f36bc93abc06d90366'
 sys.path[:0] = [str(sdk), str(sdk / 'tests/sdk')]
 from test_timeline_commit import Port
 from astrid.core.timeline import scene_answers
@@ -29,6 +41,19 @@ Checkout._native_outline_integrity = lambda *args: None
 
 from astrid.core.element import catalog
 from astrid.sdk import invocation
+module_origins = {}
+if current_bound:
+    # Check every imported SDK module, including the synthetic acceptance port;
+    # a matching Git identity must not hide imports from another checkout.
+    for name, module in tuple(sys.modules.items()):
+        if name == 'test_timeline_commit' or name == 'astrid' or name.startswith('astrid.'):
+            origin = getattr(module, '__file__', None)
+            if origin:
+                origin = Path(origin).resolve()
+                assert origin.is_relative_to(expected.resolve()), f'W30 current SDK module origin mismatch: {name}: {origin}'
+                module_origins[name] = str(origin)
+            for location in getattr(module, '__path__', ()):
+                assert Path(location).resolve().is_relative_to(expected.resolve()), f'W30 current SDK package origin mismatch: {name}'
 element = catalog._registry().get('effects', 'am-type', pack_id='astrid_motion')
 # Same explicit synthetic resource boundary as the D producer tests. The real
 # declaration/schema/SDK service/receipt/inverse are exercised; no installed claim.
@@ -112,4 +137,6 @@ if len(results) > 1:
 if len(results) > 2:
     assert results[2]['canonical_document'] == results[0]['canonical_document'], 'App history Redo changed authored state'
 print(json.dumps(dict(readback=document, before=before, results=results, result=results_for_wire, replay=replays,
-                     accept_counts=ports, source=str(sdk))))
+                     accept_counts=ports, source=str(sdk),
+                     sdk_binding=dict(variant='current-bound', root=str(expected.resolve()), commit=actual_commit,
+                                      tree=actual_tree, module_origins=module_origins) if current_bound else None)))
