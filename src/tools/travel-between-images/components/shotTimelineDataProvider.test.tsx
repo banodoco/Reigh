@@ -13,6 +13,7 @@ import { RUNTIME_CLIENT_SCOPES } from '@/integrations/runtime/client.ts';
 import { RUNTIME_SCHEMA_DIGEST, RUNTIME_TARGETED_EXECUTION_CAPABILITY } from '@/integrations/runtime/contract-metadata.ts';
 import type { CommitRequest, CommitResult, Transport } from '@/integrations/runtime/generated.ts';
 import { createShotCompositionAdapter } from '@/tools/video-editor/data/shotCompositionAdapter.ts';
+import { loadTimelineDraft } from '@/tools/video-editor/data/timelineDraftIndexedDb.ts';
 import type { ShotCompositionContract } from '@/tools/video-editor/data/shotComposition.ts';
 import { projectCanonicalComposition } from '@/tools/video-editor/data/shotCompositionProjection.ts';
 import { attachGestureCommands, gestureCommandsFor, gestureOccurrenceFor, moveGestureCommands, propertyGestureCommands, tiedStartDragGesture, fallbackDragGestureCommands } from '@/tools/video-editor/commands/semanticGestures.ts';
@@ -22,7 +23,12 @@ import { useTimelineCommit } from '@/tools/video-editor/hooks/useTimelineCommit.
 import { useClipEditing } from '@/tools/video-editor/hooks/useClipEditing.ts';
 import { useTimelinePersistence } from '@/tools/video-editor/hooks/useTimelinePersistence.ts';
 import { createInteractionState } from '@/tools/video-editor/lib/interaction-state.ts';
-import { createShotTimelineDataProvider, createShotTimelineInitialData } from './shotTimelineDataProvider.ts';
+import {
+  createShotTimelineDataProvider,
+  createShotTimelineInitialData,
+  projectShotTimelineDraftComposition,
+  shotTimelineDurationSeconds,
+} from './shotTimelineDataProvider.ts';
 
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown) => value as RecordValue;
@@ -433,5 +439,181 @@ describe('popup authored config boundary', () => {
     const popup = createShotTimelineDataProvider(config, composition, 'occ-1', adapter);
     expect((await popup.loadTimeline('popup')).config.clips[0]).not.toHaveProperty('assetEntry');
     expect(config.clips[0].assetEntry?.type).toBe('image/png');
+  });
+});
+
+describe('popup occurrence boundary refusal', () => {
+  it('keeps an imported shared-shot occurrence draft recoverable when child content crosses the next occurrence', async () => {
+    const graph = graphFixture();
+    const sharedRevision = graph.shot_revisions.find((item) => item.shot_id === 'shot-alpha' && item.revision_id === 'rev-a')!;
+    record(record(sharedRevision.internal_timeline_revision).timeline).clips = [{
+      id: 'popup-image', clip_type: 'media', at_ms: 0, duration_ms: 2000, track: 'video', asset_id: 'alpha-image',
+    }];
+    const graphBefore = structuredClone(graph);
+    const recoveryAuthorityKey = 'x0-9-popup-boundary-refusal';
+    const recoveryKey = JSON.stringify(['runtime-shot-timeline-draft-v1', recoveryAuthorityKey, 'occ-1']);
+    const load = vi.fn(async () => graph);
+    const publish = vi.fn(async () => {
+      throw new Error('The over-boundary draft must be refused before publication.');
+    });
+    const listHistory = vi.fn(async () => []);
+    const adapter = createShotCompositionAdapter({
+      load,
+      publish,
+      listHistory,
+      getTimelineDraftRecoveryMetadata: () => ({ recoveryKey: recoveryAuthorityKey }),
+    });
+    const composition = adapter.prepare(graph);
+    const target = composition.occurrences.find((occurrence) => occurrence.occurrenceId === 'occ-1')!;
+    const sibling = composition.occurrences.find((occurrence) => occurrence.occurrenceId === 'occ-2')!;
+    expect([target.shotId, target.revisionId]).toEqual(['shot-alpha', 'rev-a']);
+    expect([sibling.shotId, sibling.revisionId]).toEqual(['shot-alpha', 'rev-a']);
+
+    const popupConfig = projectCanonicalComposition({ ...composition, occurrences: [target] }, {
+      output: { resolution: '1920x1080', fps: 30, file: 'fixture.mp4' }, clips: [], tracks: [], registry: {},
+    }, { clampToOccurrenceDuration: false }).config;
+    const popup = createShotTimelineDataProvider(popupConfig, composition, target.occurrenceId, adapter);
+    const opened = await popup.loadCanonicalTimeline!('popup-session');
+    expect(record(opened.config.app).canonicalComposition).toMatchObject({ headRevisionId: 'timeline-rev-2' });
+    expect(popup.timelineQueryIdentity).toBe('timeline-rev-2');
+    const initial = createShotTimelineInitialData(popupConfig, 1, composition);
+    await popup.loadTimeline('popup-session');
+
+    const importedAssetId = 'gallery-import-x0-9';
+    const sourceClip = initial.resolvedConfig.clips.find((clip) => clip.track === 'video')!;
+    const importedEntry = {
+      type: 'image/png',
+      file: 'object-gallery-import-x0-9',
+      media_id: 'object-gallery-import-x0-9',
+      src: 'https://fixture.invalid/gallery-import-x0-9.png',
+    };
+    const sourceIdentity = record(record(sourceClip.app).canonical);
+    const sourceClipId = String(sourceIdentity.sourceClipId);
+    const resolvedConfigAt = (hold: number) => ({
+      ...initial.resolvedConfig,
+      clips: initial.resolvedConfig.clips.map((clip) => clip.id === sourceClip.id
+        ? { ...clip, asset: importedAssetId, assetEntry: importedEntry, hold }
+        : clip),
+      registry: { ...initial.resolvedConfig.registry, [importedAssetId]: importedEntry },
+    });
+    const editorDataAt = (hold: number) => {
+      const data = structuredClone(initial);
+      data.config = {
+        ...data.config,
+        clips: data.config.clips.map((clip) => clip.id === sourceClip.id
+          ? { ...clip, asset: importedAssetId, hold }
+          : clip),
+      };
+      data.registry = {
+        ...data.registry,
+        assets: {
+          ...data.registry.assets,
+          [importedAssetId]: { file: importedEntry.file, media_id: importedEntry.media_id, type: importedEntry.type },
+        },
+      };
+      data.resolvedConfig = resolvedConfigAt(hold);
+      return data;
+    };
+
+    // Import/swap is represented by the editor's prepared gallery selection;
+    // this provider invariant does not claim that Runtime admitted those bytes.
+    const atBoundary = editorDataAt(4);
+    const boundaryProjection = projectShotTimelineDraftComposition(composition, target.occurrenceId, atBoundary.resolvedConfig);
+    const boundaryOccurrence = boundaryProjection.occurrences.find((occurrence) => occurrence.occurrenceId === 'occ-1')!;
+    const unchangedSibling = boundaryProjection.occurrences.find((occurrence) => occurrence.occurrenceId === 'occ-2')!;
+    expect(boundaryOccurrence).toMatchObject({ occurrenceId: 'occ-1', shotId: 'shot-alpha', revisionId: 'rev-a', durationMs: 4000 });
+    expect(unchangedSibling).toMatchObject({ occurrenceId: 'occ-2', shotId: 'shot-alpha', revisionId: 'rev-a' });
+    const boundaryTimeline = record(record(boundaryOccurrence.revision.internal_timeline_revision).timeline);
+    expect((boundaryTimeline.clips as RecordValue[]).find((clip) => clip.id === sourceClipId))
+      .toMatchObject({ asset: importedAssetId, hold: 4 });
+
+    const attempted = structuredClone(atBoundary);
+    attempted.config = {
+      ...attempted.config,
+      clips: attempted.config.clips.map((clip) => clip.id === sourceClip.id ? { ...clip, hold: 4.25 } : clip),
+    };
+    attempted.resolvedConfig = {
+      ...attempted.resolvedConfig,
+      clips: attempted.resolvedConfig.clips.map((clip) => clip.id === sourceClip.id ? { ...clip, hold: 4.25 } : clip),
+    };
+    expect(shotTimelineDurationSeconds(attempted.resolvedConfig, 4)).toBe(4);
+    const attemptedIdentity = record(record(attempted.config.clips.find((clip) => clip.id === sourceClip.id)?.app).canonical);
+    expect(attemptedIdentity).toMatchObject({
+      occurrenceId: 'occ-1', shotId: 'shot-alpha', revisionId: 'rev-a',
+      internalTimelineRevisionId: 'timeline-alpha-a', sourceClipId,
+    });
+    const pastBoundaryProjection = projectShotTimelineDraftComposition(composition, target.occurrenceId, attempted.resolvedConfig);
+    const attemptedOccurrence = pastBoundaryProjection.occurrences.find((occurrence) => occurrence.occurrenceId === 'occ-1')!;
+    const attemptedTimeline = record(record(attemptedOccurrence.revision.internal_timeline_revision).timeline);
+    expect(attemptedOccurrence.durationMs).toBe(4000);
+    expect((attemptedTimeline.clips as RecordValue[]).find((clip) => clip.id === sourceClipId))
+      .toMatchObject({ asset: importedAssetId, hold: 4.25 });
+
+    popup.setDraftGeneration(1);
+    popup.setDraftState(true);
+    const refusals: unknown[] = [];
+    const saveTimeline = popup.saveTimeline!.bind(popup);
+    const save = vi.spyOn(popup, 'saveTimeline').mockImplementation(async (...args) => {
+      try {
+        return await saveTimeline(...args);
+      } catch (error) {
+        refusals.push(error);
+        throw error;
+      }
+    });
+    const query = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) => React.createElement(QueryClientProvider, { client: query }, children);
+    const eventBus = new TimelineEventBus();
+    const dataRef = { current: initial };
+    const editSeqRef = { current: 1 };
+    const savedSeqRef = { current: 0 };
+    const configVersionRef = { current: initial.configVersion };
+    const headRevisionRef = { current: initial.head };
+    const lastSavedSignatureRef = { current: initial.stableSignature };
+    const selectedClipIdRef = { current: sourceClip.id };
+    const selectedTrackIdRef = { current: sourceClip.track };
+    const interactionStateRef = { current: createInteractionState() };
+    const hook = renderHook(() => useTimelinePersistence({
+      provider: popup,
+      timelineId: 'popup-session',
+      eventBus,
+      dataRef,
+      commitData: vi.fn(),
+      selectedClipIdRef,
+      selectedTrackIdRef,
+      editSeqRef,
+      savedSeqRef,
+      configVersionRef,
+      headRevisionRef,
+      lastSavedSignatureRef,
+      interactionStateRef,
+    }), { wrapper });
+    act(() => hook.result.current.scheduleSave(attempted));
+    await waitFor(() => expect(refusals).toHaveLength(1), { timeout: 3000 });
+    hook.unmount();
+
+    expect(save).toHaveBeenCalledOnce();
+    expect(refusals[0]).toBeInstanceOf(Error);
+    expect((refusals[0] as Error).message).toBe('Shot content would cross the next shot at 4s');
+    const recovered = await loadTimelineDraft(recoveryKey);
+    expect(recovered).toMatchObject({
+      timelineId: 'document-primary:shot:occ-1',
+      baseHeadRevisionId: 'timeline-rev-2',
+      baseCanonicalGraph: graphBefore,
+      draft: {
+        config: { clips: expect.arrayContaining([expect.objectContaining({ id: sourceClip.id, asset: importedAssetId, hold: 4.25 })]) },
+        registry: { assets: { [importedAssetId]: { media_id: importedEntry.media_id, type: 'image/png' } } },
+      },
+    });
+    const reopenedDraft = await popup.loadTimeline('popup-session');
+    expect(reopenedDraft.config.clips.find((clip) => clip.id === sourceClip.id)).toMatchObject({ asset: importedAssetId, hold: 4.25 });
+    expect(popup.timelineQueryIdentity).toBe('timeline-rev-2');
+    expect(popup.getTimelineDraftRecoveryMetadata!().baseHeadRevisionId).toBe('timeline-rev-2');
+    expect(publish).not.toHaveBeenCalled();
+    expect(listHistory).not.toHaveBeenCalled();
+    expect(load).toHaveBeenCalledOnce();
+    expect(composition.contract).toEqual(graphBefore);
+    expect(composition.contract.occurrences.slice(0, 2).map((occurrence) => [occurrence.occurrence_id, occurrence.shot_id, occurrence.revision_id]))
+      .toEqual([['occ-1', 'shot-alpha', 'rev-a'], ['occ-2', 'shot-alpha', 'rev-a']]);
   });
 });
