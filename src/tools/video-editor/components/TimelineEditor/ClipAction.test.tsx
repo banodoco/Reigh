@@ -12,6 +12,8 @@ import { VideoEditorRuntimeProvider, type VideoEditorRuntimeContextValue } from 
 import { createCommandRegistry, type CommandRegistry } from '@/tools/video-editor/runtime/commandRegistry';
 import type { TimelineAction } from '@/tools/video-editor/types/timeline-canvas';
 import type { ReighExtension } from '@reigh/editor-sdk';
+import { getOverlayLayerStyle } from '@/shared/components/ui/overlay/shared';
+import { __resetOverlayStackForTests, useOverlayStackApi } from '@/shared/state/overlayStack';
 
 const mocks = vi.hoisted(() => ({
   useWaveformData: vi.fn(),
@@ -62,7 +64,7 @@ function buildProps(overrides: Partial<ComponentProps<typeof ClipAction>> = {}) 
 }
 
 function getContextMenu() {
-  return document.body.querySelector('div.fixed.z-50');
+  return document.body.querySelector('[data-clip-action-menu]');
 }
 
 function buildRuntime(commandRegistry: CommandRegistry): VideoEditorRuntimeContextValue {
@@ -148,6 +150,7 @@ function renderWithRuntime(props: ReturnType<typeof buildProps>, registry: Comma
 
 describe('ClipAction', () => {
   afterEach(() => {
+    __resetOverlayStackForTests();
     vi.restoreAllMocks();
     mocks.useWaveformData.mockReset();
   });
@@ -186,6 +189,41 @@ describe('ClipAction', () => {
     fireEvent.click(screen.getByText('Create Shot from selection'));
 
     expect(props.onCreateShotFromSelection).toHaveBeenCalledTimes(1);
+  });
+
+  it('portals the clip menu above the active App dialog layer', () => {
+    mockUseWaveformData();
+    const overlayStack = useOverlayStackApi();
+    overlayStack.getState().pushOverlay({ id: 'shot-editor-dialog', type: 'dialog', modal: true });
+    const props = buildProps({ selectedClipIds: ['clip-1'] });
+    const { container } = render(<ClipAction {...props} />);
+
+    fireEvent.contextMenu(container.querySelector('[data-clip-id="clip-1"]') as HTMLElement, {
+      clientX: 220,
+      clientY: 180,
+    });
+
+    const menu = getContextMenu() as HTMLElement;
+    const dialogLayer = overlayStack.getState().getOverlayLayer('shot-editor-dialog');
+    const dialogZIndex = getOverlayLayerStyle(dialogLayer, 'popup').zIndex;
+
+    expect(menu.parentElement).toBe(document.body);
+    expect(Number(menu.style.zIndex)).toBeGreaterThan(Number(dialogZIndex));
+  });
+
+  it('dispatches Split Here with the clip id and context-menu pointer coordinate', () => {
+    mockUseWaveformData();
+    const onSplitHere = vi.fn();
+    const props = buildProps({ selectedClipIds: ['clip-1'], onSplitHere });
+    const { container } = render(<ClipAction {...props} />);
+
+    fireEvent.contextMenu(container.querySelector('[data-clip-id="clip-1"]') as HTMLElement, {
+      clientX: 220,
+      clientY: 180,
+    });
+    fireEvent.click(screen.getByText('Split Here'));
+
+    expect(onSplitHere).toHaveBeenCalledWith('clip-1', 220);
   });
 
   it('shows create animation sequence for single and multi-clip context menus', () => {

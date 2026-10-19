@@ -4,6 +4,8 @@ import React, { useCallback, useContext, useEffect, useLayoutEffect, useRef, use
 import { createPortal } from 'react-dom';
 import { ArrowRight, Clapperboard, Copy, Ellipsis, Film, FolderPlus, ImageIcon, Layers, Loader2, MapPin, MapPinOff, Music2, RefreshCw, Scissors, Sparkles, Trash2, Type, X } from 'lucide-react';
 import { cn } from '@/shared/components/ui/contracts/cn.ts';
+import { getOverlayLayerStyle } from '@/shared/components/ui/overlay/shared.tsx';
+import { useOverlayStackState } from '@/shared/state/overlayStack.ts';
 import type { EditorVariantPicker } from '@/tools/video-editor/runtime/editorHostObservations.ts';
 import type { GenerationVariant } from '@/shared/hooks/variants/useVariants.ts';
 import type { Shot } from '@/domains/generation/types/index.ts';
@@ -154,6 +156,7 @@ function ClipContextMenu(props: ClipContextMenuProps) {
   const [adjusted, setAdjusted] = useState<{ x: number; y: number } | null>(null);
   const [createdShot, setCreatedShot] = useState<Shot | null>(null);
   const [isCreatingLocal, setIsCreatingLocal] = useState(false);
+  const { overlays } = useOverlayStackState();
   const { onCreateShotFromSelection } = props;
 
   // Recompute position whenever the menu's size changes (e.g. async-loaded
@@ -211,6 +214,7 @@ function ClipContextMenu(props: ClipContextMenuProps) {
   }, [onCreateShotFromSelection]);
 
   const pos = adjusted ?? props.contextMenu;
+  const menuLayerStyle = getOverlayLayerStyle(overlays.length + 1, 'popup');
   const visibleExistingShots = (props.existingShots ?? []).filter((shot) => shot.id !== createdShot?.id);
   const hasOverhang = typeof props.overhangDurationSeconds === 'number' && props.overhangDurationSeconds > 0.0001;
   const hasAssetStateActions = !props.hasBatchSelection && Boolean(
@@ -235,8 +239,9 @@ function ClipContextMenu(props: ClipContextMenuProps) {
   return createPortal(
     <div
       ref={props.menuRef}
-      className="fixed z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
-      style={{ left: pos.x, top: pos.y, visibility: adjusted ? 'visible' : 'hidden' }}
+      data-clip-action-menu
+      className="fixed min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95"
+      style={{ ...menuLayerStyle, left: pos.x, top: pos.y, visibility: adjusted ? 'visible' : 'hidden' }}
     >
       {!props.hasBatchSelection && !props.isInPinnedShotGroup && props.isGenerationAsset && props.onDuplicateGeneration && (
         <ClipContextMenuItem
